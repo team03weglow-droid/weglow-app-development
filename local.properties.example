@@ -1,0 +1,4 @@
+# Copy these lines into your machine's local.properties. Never commit local.properties.
+# Android Studio will also keep sdk.dir in local.properties.
+WEGLOW_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+WEGLOW_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
