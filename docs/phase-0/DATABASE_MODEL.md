@@ -1,6 +1,6 @@
-# Initial Database / Domain Model
+# Database / Domain Model
 
-This is a planning model only. Phase 7 owns database implementation and migrations.
+The initial profile schema is implemented by `supabase/migrations/20260909000000_create_profiles.sql`.
 
 ## Existing profile concept
 
@@ -11,8 +11,10 @@ This is a planning model only. Phase 7 owns database implementation and migratio
 - `skin_type`: nullable text
 - `gender`: nullable text
 - `is_skin_sensitive`: nullable boolean
+- `created_at`: creation timestamp
+- `updated_at`: last-update timestamp
 
-Phase 1 introduces the backend-agnostic `UserProfile` domain model and keeps `ProfileRow` in the data layer.
+The Android app upserts this row after the signed-in user answers the final onboarding question. Row Level Security permits authenticated users to select, insert, and update only the row whose `id` matches their authentication ID. The backend-agnostic `UserProfile` domain model remains separate from the `ProfileRow` data model.
 
 ## Future entities (not implemented in Phase 1)
 
