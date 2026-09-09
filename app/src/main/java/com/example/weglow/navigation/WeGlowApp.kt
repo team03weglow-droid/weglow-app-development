@@ -10,10 +10,7 @@ import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -31,7 +28,6 @@ import com.example.weglow.feature.scan.ScanViewModel
 import com.example.weglow.ui.screens.*
 import com.example.weglow.ui.components.WeGlowBottomNavigation
 import com.example.weglow.ui.components.WeGlowNavItem
-import com.example.weglow.ui.theme.JungeFont
 
 private val tabs = listOf(
     WeGlowNavItem(Destination.Home.route, "Home", Icons.Default.Home),
@@ -67,7 +63,7 @@ fun WeGlowApp() {
     val discoverState by discoverViewModel.uiState.collectAsState()
 
     Scaffold(
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentDestination = backStackEntry?.destination

@@ -10,7 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -106,7 +105,10 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
                     selected?.let(onContinue)
                 },
                 enabled = selected != null,
-                colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = DarkGreen,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
                 shape = RoundedCornerShape(999.dp),
                 modifier = Modifier.weight(1f).height(54.dp)
             ) {

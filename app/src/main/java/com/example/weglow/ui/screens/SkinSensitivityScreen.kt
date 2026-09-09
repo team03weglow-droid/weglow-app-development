@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,7 +75,7 @@ fun SkinSensitivityScreen(
         Button(
             onClick = { onAnswer(true) },
             enabled = !isSaving,
-            colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = MaterialTheme.colorScheme.onPrimary),
             shape = RoundedCornerShape(999.dp),
             modifier = Modifier.fillMaxWidth().height(58.dp)
         ) {
@@ -86,7 +85,7 @@ fun SkinSensitivityScreen(
         Button(
             onClick = { onAnswer(false) },
             enabled = !isSaving,
-            colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = MaterialTheme.colorScheme.onPrimary),
             shape = RoundedCornerShape(999.dp),
             modifier = Modifier.fillMaxWidth().height(58.dp)
         ) {

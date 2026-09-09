@@ -55,6 +55,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.example.weglow.ui.components.WeGlowPrimaryButton
 
 
 enum class ScanMode { ACNE, HAIRSTYLE }
@@ -498,13 +499,10 @@ private fun AnalyzingScreen(mode: ScanMode, photoUri: Uri?, onFinished: () -> Un
 
 @Composable
 fun PillButton(text: String, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = Color.White),
-        shape = RoundedCornerShape(999.dp)
-    ) {
-        Text(text, fontFamily = JungeFont, fontSize = 15.sp)
-    }
+    WeGlowPrimaryButton(
+        text = text,
+        onClick = onClick
+    )
 }
 
 internal suspend fun loadImageBitmap(context: android.content.Context, uri: Uri): ImageBitmap? =
