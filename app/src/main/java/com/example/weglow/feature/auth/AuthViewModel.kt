@@ -39,13 +39,27 @@ class AuthViewModel(
 
     fun resolveStartupDestination() {
         viewModelScope.launch {
-            val userId = authRepository.currentUserId()
-            if (!authRepository.hasActiveSession() || userId == null) {
+            runCatching {
+                val userId = authRepository.currentUserId()
+
+                if (!authRepository.hasActiveSession() || userId == null) {
+                    StartupDestination.LOGIN
+                } else {
+                    val completed = profileRepository
+                        .hasCompletedOnboarding(userId)
+                        .getOrDefault(false)
+
+                    if (completed) {
+                        StartupDestination.HOME
+                    } else {
+                        StartupDestination.ONBOARDING
+                    }
+                }
+            }.onSuccess { destination ->
+                _startupDestination.value = destination
+            }.onFailure {
                 _startupDestination.value = StartupDestination.LOGIN
-                return@launch
             }
-            val completed = profileRepository.hasCompletedOnboarding(userId).getOrDefault(false)
-            _startupDestination.value = if (completed) StartupDestination.HOME else StartupDestination.ONBOARDING
         }
     }
 
@@ -68,8 +82,15 @@ class AuthViewModel(
     }
 
     fun signUp(fullName: String, email: String, password: String) {
-        if (fullName.isBlank() || email.isBlank() || password.length < 6) {
-            _uiState.value = AuthUiState(errorMessage = "Enter your name, a valid email and a password of at least 6 characters.")
+        if (
+            fullName.isBlank() ||
+            email.isBlank() ||
+            password.length < 8 ||
+            password.none { it.isDigit() }
+        ) {
+            _uiState.value = AuthUiState(
+                errorMessage = "Enter your name, a valid email and a password of at least 8 characters with a number."
+            )
             return
         }
         viewModelScope.launch {
