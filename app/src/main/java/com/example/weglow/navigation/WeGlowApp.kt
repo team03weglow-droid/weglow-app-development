@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -60,7 +61,10 @@ fun WeGlowApp() {
         }
     )
 
-    val scanViewModel: ScanViewModel = viewModel()
+    val context = LocalContext.current.applicationContext
+    val scanViewModel: ScanViewModel = viewModel(
+        factory = viewModelFactory { ScanViewModel(container.acneScanRepository(context)) }
+    )
 
     val discoverViewModel: DiscoverViewModel = viewModel(
         factory = viewModelFactory {
@@ -422,6 +426,9 @@ fun WeGlowApp() {
 
                 ScanScreen(
                     photoUri = scanState.photoUri,
+                    acneState = scanState,
+                    onAnalyzeAcne = scanViewModel::analyze,
+                    onCancelAcne = scanViewModel::cancelAnalysis,
                     onPhotoCaptured = scanViewModel::setPhoto,
 
                     onBack = {
@@ -462,6 +469,7 @@ fun WeGlowApp() {
 
                 ScanResultsScreen(
                     photoUri = scanState.photoUri,
+                    result = scanState.result,
 
                     onBack = {
                         navController.popBackStack()

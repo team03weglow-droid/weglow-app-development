@@ -2,6 +2,10 @@
 
 Native Android application built with Kotlin and Jetpack Compose.
 
+Acne scans run locally on the phone using the bundled YOLOv8s ONNX model. No
+scan server or USB connection is required. See [offline scan setup](docs/ON_DEVICE_SCANS.md)
+for installation, model export, and verification details.
+
 ## Current refactor status
 
 **Phase 1 — Project + Architecture** is applied to the supplied prototype. Existing screens and feature behavior are intentionally preserved; subsequent phases should be implemented in order.

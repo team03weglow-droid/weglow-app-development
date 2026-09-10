@@ -2,3 +2,5 @@
 # Android Studio will also keep sdk.dir in local.properties.
 WEGLOW_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 WEGLOW_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+
+# Acne scans run using the model bundled in the APK; no server URL is required.

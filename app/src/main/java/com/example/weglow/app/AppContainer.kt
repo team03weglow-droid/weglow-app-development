@@ -9,6 +9,9 @@ import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.CatalogRepository
 import com.example.weglow.domain.repository.HairstyleRepository
 import com.example.weglow.domain.repository.ProfileRepository
+import android.content.Context
+import com.example.weglow.data.repository.LocalAcneScanRepository
+import com.example.weglow.domain.repository.AcneScanRepository
 
 /**
  * Simple dependency container for Phase 1.
@@ -18,6 +21,8 @@ import com.example.weglow.domain.repository.ProfileRepository
  * replaceable in tests.
  */
 class AppContainer {
+    fun acneScanRepository(context: Context): AcneScanRepository =
+        LocalAcneScanRepository(context)
     private val supabaseClient by lazy { SupabaseClientProvider.client }
 
     val authRepository: AuthRepository by lazy { SupabaseAuthRepository(supabaseClient) }

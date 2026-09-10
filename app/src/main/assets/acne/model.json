@@ -1,0 +1,28 @@
+{
+  "architecture": "YOLOv8s",
+  "source_sha256": "c8927d33616abf4016376eec6e4f0d5e058987db5060b680d3376a9f9930f284",
+  "model_sha256": "f562b417738082c7e90414bc691806fd0588f8a196599dd843fe012cb752fa1a",
+  "input_name": "images",
+  "output_name": "output0",
+  "input_size": 640,
+  "prediction_count": 8400,
+  "labels": [
+    "Acne scars",
+    "Dark spots",
+    "black heads",
+    "cysts",
+    "freckles",
+    "nodules",
+    "open pores",
+    "papules",
+    "pustules",
+    "whiteheads"
+  ],
+  "confidence_threshold": 0.25,
+  "iou_threshold": 0.7,
+  "max_detections": 300,
+  "output_layout": "1,4+classes,8400",
+  "box_format": "cxcywh_pixels",
+  "ultralytics_version": "8.4.145",
+  "onnxruntime_version": "1.23.2"
+}

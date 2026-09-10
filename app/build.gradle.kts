@@ -65,6 +65,10 @@ android {
         compose = true
         buildConfig = true
     }
+    androidResources { noCompress += "onnx" }
+    testOptions.unitTests.all {
+        it.systemProperty("weglow.model.assets", file("src/main/assets/acne").absolutePath)
+    }
 }
 
 abstract class ArchitectureCheckTask : DefaultTask() {
@@ -110,6 +114,7 @@ val architectureCheck by tasks.registering(ArchitectureCheckTask::class) {
 tasks.named("preBuild").configure { dependsOn(architectureCheck) }
 
 dependencies {
+    implementation(libs.onnxruntime.android)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
@@ -136,6 +141,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     testImplementation(libs.junit)
+    testRuntimeOnly(libs.onnxruntime.desktop)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

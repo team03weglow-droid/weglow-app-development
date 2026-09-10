@@ -12,3 +12,12 @@ captures/
 .cxx/
 __MACOSX/
 *.hprof
+
+# Local YOLO runtime, weights, and uploaded test images
+backend/.venv/
+backend/models/*.pt
+backend/models/*.onnx
+backend/.env
+backend/.runtime/
+__pycache__/
+.pytest_cache/

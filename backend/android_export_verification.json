@@ -1,0 +1,21 @@
+{
+  "model_sha256": "f562b417738082c7e90414bc691806fd0588f8a196599dd843fe012cb752fa1a",
+  "checks": [
+    {
+      "input": "blank",
+      "max_box_difference_pixels": 0.00146484375,
+      "max_score_difference": 1.2728651199722663e-07
+    },
+    {
+      "input": "random",
+      "max_box_difference_pixels": 0.00042724609375,
+      "max_score_difference": 1.27276962302858e-07
+    },
+    {
+      "input": "gradient",
+      "max_box_difference_pixels": 0.00091552734375,
+      "max_score_difference": 1.3717726687900722e-07
+    }
+  ],
+  "scope": "Numerical export parity on synthetic inputs; not a clinical accuracy evaluation."
+}

@@ -3,8 +3,8 @@ package com.example.weglow.ui.screens
 import com.example.weglow.ui.theme.*
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.SystemClock
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
@@ -14,7 +14,12 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -38,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -56,6 +62,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import com.example.weglow.ui.components.WeGlowPrimaryButton
+import com.example.weglow.feature.scan.ScanUiState
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
 
 
 enum class ScanMode { ACNE, HAIRSTYLE }
@@ -64,6 +73,9 @@ private enum class ScanFlowState { MODE_SELECT, CAMERA, ANALYZING }
 @Composable
 fun ScanScreen(
     photoUri: Uri?,
+    acneState: ScanUiState,
+    onAnalyzeAcne: () -> Unit,
+    onCancelAcne: () -> Unit,
     onPhotoCaptured: (Uri) -> Unit,
     onBack: () -> Unit,
     onAcneScanComplete: () -> Unit,
@@ -80,8 +92,36 @@ fun ScanScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted -> hasCameraPermission = granted }
 
-    var flowState by remember { mutableStateOf(ScanFlowState.MODE_SELECT) }
-    var scanMode by remember { mutableStateOf(ScanMode.ACNE) }
+    var flowState by rememberSaveable { mutableStateOf(ScanFlowState.MODE_SELECT) }
+    var scanMode by rememberSaveable { mutableStateOf(ScanMode.ACNE) }
+    var acneAnalysisStartedAt by remember { mutableLongStateOf(0L) }
+    fun beginAcneAnalysis() {
+        acneAnalysisStartedAt = SystemClock.elapsedRealtime()
+        onAnalyzeAcne()
+    }
+    val galleryWithoutCamera = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            onPhotoCaptured(uri)
+            flowState = ScanFlowState.ANALYZING
+            if (scanMode == ScanMode.ACNE) beginAcneAnalysis()
+        }
+    }
+    BackHandler(flowState == ScanFlowState.ANALYZING) {
+        onCancelAcne()
+        flowState = ScanFlowState.CAMERA
+    }
+    LaunchedEffect(acneState.result, flowState) {
+        if (flowState == ScanFlowState.ANALYZING && scanMode == ScanMode.ACNE && acneState.result != null) {
+            val elapsed = SystemClock.elapsedRealtime() - acneAnalysisStartedAt
+            val remaining = (5_000L - elapsed).coerceAtLeast(0L)
+            if (remaining > 0L) delay(remaining)
+            // Allow the UI progress animation to visibly finish at 100%.
+            delay(750L)
+            onAcneScanComplete()
+        }
+    }
 
     when {
         flowState == ScanFlowState.MODE_SELECT -> {
@@ -97,7 +137,15 @@ fun ScanScreen(
             )
         }
 
-        !hasCameraPermission -> {
+        flowState == ScanFlowState.ANALYZING && scanMode == ScanMode.ACNE -> {
+            FigmaAcneAnalyzingScreen(
+                state = acneState,
+                onRetry = ::beginAcneAnalysis,
+                onCancel = { onCancelAcne(); flowState = ScanFlowState.CAMERA },
+            )
+        }
+
+        !hasCameraPermission && flowState != ScanFlowState.ANALYZING -> {
             Column(
                 modifier = Modifier.fillMaxSize().padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -114,6 +162,10 @@ fun ScanScreen(
                     text = "Grant camera access",
                     onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }
                 )
+                Spacer(Modifier.height(16.dp))
+                PillButton("Choose from gallery") {
+                    galleryWithoutCamera.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
                 Spacer(Modifier.weight(1f))
             }
         }
@@ -135,9 +187,94 @@ fun ScanScreen(
                 onPhotoReady = { uri ->
                     onPhotoCaptured(uri)
                     flowState = ScanFlowState.ANALYZING
+                    if (scanMode == ScanMode.ACNE) beginAcneAnalysis()
                 }
             )
         }
+    }
+}
+
+@Composable
+private fun FigmaAcneAnalyzingScreen(state: ScanUiState, onRetry: () -> Unit, onCancel: () -> Unit) {
+    val context = LocalContext.current
+    var photoBitmap by remember(state.photoUri) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(state.photoUri) { photoBitmap = state.photoUri?.let { loadImageBitmap(context, it) } }
+    val progress = remember { Animatable(0.26f) }
+    val scanLinePosition by rememberInfiniteTransition(label = "skin scan line").animateFloat(
+        initialValue = 0.08f,
+        targetValue = 0.92f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1_250, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "scan line position",
+    )
+    LaunchedEffect(state.isAnalyzing) {
+        while (state.isAnalyzing) {
+            // Progress is deliberately capped until the real model result arrives.
+            progress.snapTo((progress.value + 0.008f).coerceAtMost(0.92f))
+            delay(80)
+        }
+    }
+    LaunchedEffect(state.result) {
+        if (state.result != null) progress.animateTo(1f, tween(700, easing = EaseInOutSine))
+    }
+    Column(Modifier.fillMaxSize().background(ButtonGreen).padding(horizontal = 20.dp)) {
+        Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.CenterStart) {
+            Box(Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)).clickable(onClick = onCancel), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Close, contentDescription = "Cancel analysis", tint = Color.White)
+            }
+        }
+        Column(Modifier.fillMaxSize().padding(bottom = 34.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Box(Modifier.fillMaxWidth(0.78f).aspectRatio(3f / 4f).clip(RoundedCornerShape(100.dp)).background(Color.White.copy(alpha = 0.06f)).padding(2.dp)) {
+                photoBitmap?.let { Image(it, "Your photo being analyzed", Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, ButtonGreen.copy(alpha = 0.45f)))))
+                Canvas(Modifier.fillMaxSize()) {
+                    val scanY = size.height * scanLinePosition
+                    drawLine(CoralAccent.copy(alpha = 0.9f), Offset(0f, scanY), Offset(size.width, scanY), 3.dp.toPx(), cap = StrokeCap.Round)
+                }
+            }
+            Spacer(Modifier.height(48.dp))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.Bottom) {
+                Text(if (state.error == null) "Analyzing skin\ntexture..." else "Analysis paused", fontFamily = JungeFont, fontSize = 28.sp, lineHeight = 36.sp, color = Color.White, modifier = Modifier.weight(1f))
+                Text("${(progress.value * 100).toInt()}%", fontSize = 14.sp, color = CoralAccent)
+            }
+            Spacer(Modifier.height(8.dp))
+            if (state.error == null) {
+                LinearProgressIndicator(progress = { progress.value }, color = Color.White, trackColor = Color.White.copy(alpha = 0.2f), modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)))
+                Spacer(Modifier.height(16.dp))
+                Text("AI analysis in progress...", color = Sage, fontSize = 14.sp, textAlign = TextAlign.Center)
+            } else {
+                Text(state.error, color = Color.White, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
+                PillButton("Retry analysis", onRetry)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AcneAnalyzingScreen(state: ScanUiState, onRetry: () -> Unit, onCancel: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().background(DarkGreen).padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (state.isAnalyzing) {
+            CircularProgressIndicator(color = CoralAccent)
+            Spacer(Modifier.height(24.dp))
+            Text("Analyzing your photo…", color = Color.White, fontSize = 24.sp)
+            Spacer(Modifier.height(12.dp))
+            Text("Analyzing on your phone. Your photo stays on this device.", color = Color.White, textAlign = TextAlign.Center)
+        } else if (state.error != null) {
+            Text(state.error, color = Color.White, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(24.dp))
+            PillButton("Retry analysis", onRetry)
+        } else if (state.result == null) {
+            Text("Select a photo to start a new scan.", color = Color.White)
+        }
+        Spacer(Modifier.height(24.dp))
+        TextButton(onClick = onCancel) { Text("Choose another photo", color = Color.White) }
     }
 }
 
@@ -508,9 +645,9 @@ fun PillButton(text: String, onClick: () -> Unit) {
 internal suspend fun loadImageBitmap(context: android.content.Context, uri: Uri): ImageBitmap? =
     withContext(Dispatchers.IO) {
         try {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                BitmapFactory.decodeStream(stream)?.asImageBitmap()
-            }
+            com.example.weglow.core.image.ScanPhotoDecoder.decode(context.contentResolver, uri).asImageBitmap()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             null
         }
