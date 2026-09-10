@@ -4,12 +4,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -26,6 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.example.weglow.R
 import com.example.weglow.ui.theme.*
 import com.example.weglow.domain.model.Product
@@ -34,39 +34,61 @@ import com.example.weglow.domain.model.Product
 private val CATEGORIES = listOf("All Products", "Trending", "Serums", "Moisturizers", "Hair")
 
 @Composable
-fun DiscoverScreen(products: List<Product>) {
+fun DiscoverScreen(
+    products: List<Product>,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit,
+) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All Products") }
+    val filteredProducts = remember(products, searchQuery, selectedCategory) {
+        products.filter { product ->
+            val matchesSearch = searchQuery.isBlank() || listOfNotNull(
+                product.name,
+                product.brandName,
+                product.description,
+                product.category,
+            ).any { it.contains(searchQuery.trim(), ignoreCase = true) }
+            val matchesCategory = selectedCategory == "All Products" ||
+                product.category?.contains(selectedCategory.removeSuffix("s"), ignoreCase = true) == true
+            matchesSearch && matchesCategory
+        }
+    }
+    val featuredProduct = filteredProducts.firstOrNull()
+    val pairedProduct = filteredProducts.getOrNull(1)
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(PageBackground)
-            .verticalScroll(rememberScrollState())
+            .background(PageBackground),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Image(
-                painter = painterResource(R.drawable.weglow_logo),
-                contentDescription = null,
-                modifier = Modifier.size(24.dp)
-            )
-            Image(
-                painter = painterResource(R.drawable.avatar_rukman),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+        item {
+            Row(
                 modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-            )
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.weglow_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp)
+                )
+                Image(
+                    painter = painterResource(R.drawable.avatar_rukman),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                )
+            }
         }
 
-        Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+        item {
+            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
             Text("Discover", fontFamily = JungeFont, fontSize = 30.sp, color = TextBlack)
             Spacer(modifier = Modifier.height(6.dp))
             Text(
@@ -135,17 +157,16 @@ fun DiscoverScreen(products: List<Product>) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Column(
+            featuredProduct?.let { product -> Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
                     .background(CardWhite)
             ) {
                 Box {
-                    Image(
-                        painter = painterResource(R.drawable.radiance_serum),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
+                    ProductImage(
+                        imageUrl = product.imageUrl,
+                        contentDescription = product.name,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(280.dp)
@@ -164,10 +185,14 @@ fun DiscoverScreen(products: List<Product>) {
                     }
                 }
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Radiance Serum", fontFamily = JungeFont, fontSize = 22.sp, color = TextBlack)
+                    product.brandName?.let {
+                        Text(it, fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+                        Spacer(modifier = Modifier.height(3.dp))
+                    }
+                    Text(product.name, fontFamily = JungeFont, fontSize = 22.sp, color = TextBlack)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        "A deeply hydrating blend designed to restore your natural glow and plump dry skin overnight.",
+                        product.description.orEmpty(),
                         fontFamily = JungeFont,
                         fontSize = 13.sp,
                         color = SoftGray
@@ -178,7 +203,7 @@ fun DiscoverScreen(products: List<Product>) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("LKR 4800", fontFamily = JungeFont, fontSize = 18.sp, color = TextBlack)
+                        Text(product.priceLabel, fontFamily = JungeFont, fontSize = 18.sp, color = TextBlack)
                         Button(
                             onClick = { },
                             colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = Color.White),
@@ -188,21 +213,20 @@ fun DiscoverScreen(products: List<Product>) {
                         }
                     }
                 }
-            }
+            } }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            Column(
+            pairedProduct?.let { product -> Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
                     .background(CardWhite)
             ) {
                 Box {
-                    Image(
-                        painter = painterResource(R.drawable.keratin_repair_lotion),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
+                    ProductImage(
+                        imageUrl = product.imageUrl,
+                        contentDescription = product.name,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(240.dp)
@@ -228,8 +252,11 @@ fun DiscoverScreen(products: List<Product>) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Keratin Repair Lotion", fontFamily = JungeFont, fontSize = 18.sp, color = TextBlack)
-                        Text("LKR 3200", fontFamily = JungeFont, fontSize = 14.sp, color = SoftGray)
+                        Text(product.name, fontFamily = JungeFont, fontSize = 18.sp, color = TextBlack)
+                        product.brandName?.let { brand ->
+                            Text(brand, fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+                        }
+                        Text(product.priceLabel, fontFamily = JungeFont, fontSize = 14.sp, color = SoftGray)
                     }
                     Box(
                         modifier = Modifier
@@ -241,23 +268,55 @@ fun DiscoverScreen(products: List<Product>) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = TextBlack)
                     }
                 }
-            }
+            } }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Text("All Products", fontFamily = JungeFont, fontSize = 26.sp, color = TextBlack)
             Spacer(modifier = Modifier.height(16.dp))
 
-            products.chunked(2).forEach { rowItems ->
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
-                    rowItems.forEach { product ->
-                        ProductGridCard(product = product, modifier = Modifier.weight(1f))
-                    }
-                    if (rowItems.size < 2) Spacer(modifier = Modifier.weight(1f))
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = DarkGreen)
                 }
-                Spacer(modifier = Modifier.height(20.dp))
+            } else if (errorMessage != null) {
+                ProductLoadMessage(
+                    message = "We couldn't load products. $errorMessage",
+                    actionLabel = "Try again",
+                    onAction = onRetry,
+                )
+            } else if (filteredProducts.isEmpty()) {
+                ProductLoadMessage(
+                    message = if (products.isEmpty()) {
+                        "No products are available yet."
+                    } else {
+                        "No products match your search."
+                    },
+                )
             }
+            }
+        }
 
+        items(
+            items = filteredProducts.chunked(2),
+            key = { rowItems -> rowItems.joinToString(separator = "|") { it.id } },
+        ) { rowItems ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            ) {
+                rowItems.forEach { product ->
+                    ProductGridCard(product = product, modifier = Modifier.weight(1f))
+                }
+                if (rowItems.size < 2) Spacer(modifier = Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+
+        item {
             Spacer(modifier = Modifier.height(90.dp))
         }
     }
@@ -267,10 +326,9 @@ fun DiscoverScreen(products: List<Product>) {
 private fun ProductGridCard(product: Product, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Box {
-            Image(
-                painter = painterResource(product.imageRes),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+            ProductImage(
+                imageUrl = product.imageUrl,
+                contentDescription = product.name,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
@@ -289,14 +347,61 @@ private fun ProductGridCard(product: Product, modifier: Modifier = Modifier) {
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Star, contentDescription = null, tint = WarmGold, modifier = Modifier.size(14.dp))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(product.ratingLabel, fontFamily = JungeFont, fontSize = 12.sp, color = TextBlack)
+        product.ratingLabel?.let { rating ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Star, contentDescription = null, tint = WarmGold, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(rating, fontFamily = JungeFont, fontSize = 12.sp, color = TextBlack)
+            }
+            Spacer(modifier = Modifier.height(2.dp))
         }
-        Spacer(modifier = Modifier.height(2.dp))
+        product.brandName?.let { brand ->
+            Text(brand, fontFamily = JungeFont, fontSize = 11.sp, color = SoftGray)
+            Spacer(modifier = Modifier.height(2.dp))
+        }
         Text(product.name, fontFamily = JungeFont, fontSize = 14.sp, color = TextBlack)
         Spacer(modifier = Modifier.height(2.dp))
         Text(product.priceLabel, fontFamily = JungeFont, fontSize = 13.sp, color = SoftGray)
+    }
+}
+
+@Composable
+private fun ProductImage(
+    imageUrl: String?,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    AsyncImage(
+        model = imageUrl,
+        contentDescription = contentDescription,
+        placeholder = painterResource(R.drawable.weglow_logo),
+        error = painterResource(R.drawable.weglow_logo),
+        fallback = painterResource(R.drawable.weglow_logo),
+        contentScale = ContentScale.Crop,
+        modifier = modifier.background(PillGray),
+    )
+}
+
+@Composable
+private fun ProductLoadMessage(
+    message: String,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardWhite)
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(message, fontFamily = JungeFont, fontSize = 14.sp, color = SoftGray)
+        actionLabel?.let {
+            Spacer(modifier = Modifier.height(12.dp))
+            TextButton(onClick = onAction) {
+                Text(it, fontFamily = JungeFont, color = DarkGreen)
+            }
+        }
     }
 }

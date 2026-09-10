@@ -439,9 +439,15 @@ fun WeGlowApp() {
             }
 
             composable(Destination.Discover.route) {
+                LaunchedEffect(Unit) {
+                    discoverViewModel.loadProducts()
+                }
 
                 DiscoverScreen(
-                    products = discoverState.products
+                    products = discoverState.products,
+                    isLoading = discoverState.isLoading,
+                    errorMessage = discoverState.errorMessage,
+                    onRetry = discoverViewModel::loadProducts,
                 )
             }
 
