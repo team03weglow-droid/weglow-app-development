@@ -57,7 +57,7 @@ curl.exe -F "image=@C:/path/to/photo.jpg" http://127.0.0.1:8000/v1/acne/predict
 
 `requirements.lock` records the original reference-server environment;
 `requirements-export.txt` records the export dependencies. The reference API
-uses confidence 0.25, IoU 0.7, maximum 300 detections, and CPU by default. It
+uses confidence 0.05 (5%), IoU 0.7, maximum 300 detections, and CPU by default. It
 returns class names, confidence values, normalized boxes, image dimensions, and
 the model version. It applies EXIF orientation before inference and does not
 save uploaded photos or prediction plots.

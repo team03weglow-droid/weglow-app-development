@@ -77,7 +77,7 @@ fun ScanResultsScreen(
         Spacer(Modifier.height(20.dp))
         Text("${result.detections.size} detections · ${labels.size} concern types", fontSize = 18.sp, color = DarkGreen)
         Spacer(Modifier.height(8.dp))
-        Text("Model predictions, with confidence shown for each detected area.", color = SoftGray, fontSize = 13.sp)
+        Text("Model-detected areas from your scan.", color = SoftGray, fontSize = 13.sp)
         Spacer(Modifier.height(20.dp))
         if (result.detections.isEmpty()) {
             Text("No acne detected above the model’s ${(result.confidenceThreshold * 100).roundToInt()}% confidence threshold.", color = PrimaryBlack)
@@ -94,11 +94,6 @@ fun ScanResultsScreen(
                     Box(Modifier.size(18.dp).background(colors.getValue(label), RoundedCornerShape(4.dp)))
                     Text("$label · ${detections.size} detected", fontSize = 17.sp, color = PrimaryBlack)
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Confidence: " + detections.joinToString { "${(it.confidence * 100).roundToInt()}%" },
-                    color = SoftGray, fontSize = 13.sp,
-                )
             }
         }
         Spacer(Modifier.height(12.dp))
