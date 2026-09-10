@@ -49,7 +49,7 @@ private val insights = listOf(
 )
 
 @Composable
-fun HomeScreen(onScanClick: () -> Unit, onDiscoverClick: () -> Unit) {
+fun HomeScreen(onScanClick: () -> Unit, onDiscoverClick: () -> Unit, displayName: String? = null) {
     val skinScore = 74
     val scoreDelta = 3
     val hydration = 0.82f
@@ -100,7 +100,7 @@ fun HomeScreen(onScanClick: () -> Unit, onDiscoverClick: () -> Unit) {
 
         Column(modifier = Modifier.padding(horizontal = 24.dp)) {
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Hello, Team 03", fontFamily = JungeFont, fontSize = 32.sp, color = TextBlack)
+            Text(text = displayName?.let { "Hello, $it" } ?: "Hello there", fontFamily = JungeFont, fontSize = 32.sp, color = TextBlack)
 
             Spacer(modifier = Modifier.height(20.dp))
 

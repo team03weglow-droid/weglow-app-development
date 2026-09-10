@@ -9,6 +9,8 @@ import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 class SupabaseAuthRepository(
     private val client: SupabaseClient,
@@ -68,4 +70,16 @@ class SupabaseAuthRepository(
 
     override fun hasActiveSession(): Boolean =
         client.auth.currentUserOrNull() != null
+
+    override fun currentUserDisplayName(): String? {
+        val metadata = client.auth.currentUserOrNull()?.userMetadata ?: return null
+        return DISPLAY_NAME_KEYS
+            .asSequence()
+            .mapNotNull { key -> (metadata[key] as? JsonPrimitive)?.contentOrNull?.trim() }
+            .firstOrNull { it.isNotBlank() }
+    }
+
+    private companion object {
+        val DISPLAY_NAME_KEYS = listOf("full_name", "name", "user_name", "preferred_username")
+    }
 }

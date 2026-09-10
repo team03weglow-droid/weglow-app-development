@@ -28,7 +28,17 @@ class OnboardingViewModel(
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
-    fun start(fullName: String) { _uiState.value = OnboardingUiState(fullName = fullName) }
+    /**
+     * Begins (or restarts) onboarding with a clean state so answers from a previous
+     * attempt or a different user can never survive. [fullName] is the name captured
+     * during manual signup; when it is absent (sign-in, Google, restored session) the
+     * name falls back to the authenticated identity provider's metadata, otherwise "".
+     */
+    fun start(fullName: String? = null) {
+        val resolvedName = fullName?.trim()?.takeIf { it.isNotBlank() }
+            ?: authRepository.currentUserDisplayName()?.trim()?.takeIf { it.isNotBlank() }
+        _uiState.value = OnboardingUiState(fullName = resolvedName.orEmpty())
+    }
     fun setAge(value: String) { _uiState.value = _uiState.value.copy(ageRange = value) }
     fun setSkinType(value: String?) { _uiState.value = _uiState.value.copy(skinType = value) }
     fun setGender(value: String) { _uiState.value = _uiState.value.copy(gender = value) }
@@ -55,6 +65,7 @@ class OnboardingViewModel(
                     skinType = state.skinType,
                     gender = state.gender,
                     isSkinSensitive = state.isSkinSensitive,
+                    onboardingCompleted = true,
                 )
             ).onSuccess {
                 _uiState.value = _uiState.value.copy(isSaving = false, saveCompleted = true)

@@ -24,6 +24,7 @@ import com.example.weglow.feature.auth.StartupDestination
 import com.example.weglow.feature.discover.DiscoverViewModel
 import com.example.weglow.feature.hairstyle.HairstyleViewModel
 import com.example.weglow.feature.onboarding.OnboardingViewModel
+import com.example.weglow.feature.profile.ProfileViewModel
 import com.example.weglow.feature.scan.ScanViewModel
 import com.example.weglow.ui.components.WeGlowBottomNavigation
 import com.example.weglow.ui.components.WeGlowNavItem
@@ -78,11 +79,21 @@ fun WeGlowApp() {
         }
     )
 
+    val profileViewModel: ProfileViewModel = viewModel(
+        factory = viewModelFactory {
+            ProfileViewModel(
+                container.authRepository,
+                container.profileRepository
+            )
+        }
+    )
+
     val authState by authViewModel.uiState.collectAsState()
     val startupDestination by authViewModel.startupDestination.collectAsState()
     val onboardingState by onboardingViewModel.uiState.collectAsState()
     val scanState by scanViewModel.uiState.collectAsState()
     val discoverState by discoverViewModel.uiState.collectAsState()
+    val profileState by profileViewModel.uiState.collectAsState()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -154,8 +165,12 @@ fun WeGlowApp() {
                         StartupDestination.LOGIN ->
                             Destination.Login.route
 
-                        StartupDestination.ONBOARDING ->
+                        StartupDestination.ONBOARDING -> {
+                            // Restored session with unfinished onboarding: reset the
+                            // wizard and resolve identity before the first question.
+                            onboardingViewModel.start()
                             Destination.AgeSelection.route
+                        }
 
                         StartupDestination.HOME ->
                             Destination.Home.route
@@ -210,6 +225,10 @@ fun WeGlowApp() {
                                 ) {
                                     Destination.Home
                                 } else {
+                                    // Sign-in / Google for a user who has not
+                                    // finished onboarding: reset the wizard and
+                                    // resolve identity before the first question.
+                                    onboardingViewModel.start()
                                     Destination.AgeSelection
                                 }
 
@@ -393,7 +412,11 @@ fun WeGlowApp() {
 
             composable(Destination.Home.route) {
 
+                LaunchedEffect(Unit) { profileViewModel.refresh() }
+
                 HomeScreen(
+
+                    displayName = profileState.displayName,
 
                     onScanClick = {
 
@@ -527,7 +550,10 @@ fun WeGlowApp() {
 
             composable(Destination.Profile.route) {
 
+                LaunchedEffect(Unit) { profileViewModel.refresh() }
+
                 ProfileScreen(
+                    displayName = profileState.displayName,
                     onLogout = authViewModel::signOut
                 )
 

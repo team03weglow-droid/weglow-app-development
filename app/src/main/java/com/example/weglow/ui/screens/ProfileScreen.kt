@@ -31,7 +31,7 @@ import com.example.weglow.ui.theme.*
 
 
 @Composable
-fun ProfileScreen(onLogout: () -> Unit) {
+fun ProfileScreen(onLogout: () -> Unit, displayName: String? = null) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -90,7 +90,7 @@ fun ProfileScreen(onLogout: () -> Unit) {
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Team 03", fontFamily = JungeFont, fontSize = 30.sp, color = TextBlack)
+            Text(displayName ?: "Your Profile", fontFamily = JungeFont, fontSize = 30.sp, color = TextBlack)
             Spacer(modifier = Modifier.height(4.dp))
             Text("GLOW MEMBER", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
 

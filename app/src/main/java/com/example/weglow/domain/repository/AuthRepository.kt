@@ -29,4 +29,11 @@ interface AuthRepository {
     fun currentUserId(): String?
 
     fun hasActiveSession(): Boolean
+
+    /**
+     * Best-effort display name taken from the authenticated identity provider's
+     * user metadata (e.g. Google). Null when nothing usable is present. This is
+     * never a fabricated value and never a name supplied by the UI layer.
+     */
+    fun currentUserDisplayName(): String?
 }

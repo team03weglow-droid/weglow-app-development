@@ -11,6 +11,7 @@ data class ProfileRow(
     val skin_type: String? = null,
     val gender: String? = null,
     val is_skin_sensitive: Boolean? = null,
+    val onboarding_completed: Boolean = false,
 )
 
 fun UserProfile.toProfileRow() = ProfileRow(
@@ -20,4 +21,15 @@ fun UserProfile.toProfileRow() = ProfileRow(
     skin_type = skinType,
     gender = gender,
     is_skin_sensitive = isSkinSensitive,
+    onboarding_completed = onboardingCompleted,
+)
+
+fun ProfileRow.toUserProfile() = UserProfile(
+    id = id,
+    fullName = full_name,
+    ageRange = age_range,
+    skinType = skin_type,
+    gender = gender,
+    isSkinSensitive = is_skin_sensitive,
+    onboardingCompleted = onboarding_completed,
 )

@@ -88,6 +88,31 @@ class AuthViewModelTest {
         }
 
     @Test
+    fun restoredSession_withProfileRowButIncompleteOnboarding_routesToOnboarding() =
+        runTest(dispatcher) {
+
+            // A profiles row exists, but onboarding_completed is false. Routing must
+            // key off the flag, not the row's existence.
+            val viewModel = AuthViewModel(
+                FakeAuthRepository(active = true),
+                FakeProfileRepository(
+                    storedProfile = UserProfile(
+                        id = "user-1",
+                        ageRange = "14 - 25",
+                        onboardingCompleted = false,
+                    ),
+                ),
+            )
+
+            advanceUntilIdle()
+
+            assertEquals(
+                StartupDestination.ONBOARDING,
+                viewModel.startupDestination.value,
+            )
+        }
+
+    @Test
     fun signIn_routesCompletedProfileToHome() =
         runTest(dispatcher) {
 
@@ -315,10 +340,13 @@ private class FakeAuthRepository(
 
     override fun hasActiveSession(): Boolean =
         activeSession
+
+    override fun currentUserDisplayName(): String? = null
 }
 
 private class FakeProfileRepository(
-    private val completed: Boolean,
+    private val completed: Boolean = false,
+    private val storedProfile: UserProfile? = null,
 ) : ProfileRepository {
 
     override suspend fun saveProfile(
@@ -326,8 +354,13 @@ private class FakeProfileRepository(
     ): Result<Unit> =
         Result.success(Unit)
 
+    override suspend fun getProfile(
+        userId: String,
+    ): Result<UserProfile?> =
+        Result.success(storedProfile)
+
     override suspend fun hasCompletedOnboarding(
         userId: String,
     ): Result<Boolean> =
-        Result.success(completed)
+        Result.success(storedProfile?.onboardingCompleted ?: completed)
 }

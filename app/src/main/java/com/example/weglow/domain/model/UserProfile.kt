@@ -8,4 +8,6 @@ data class UserProfile(
     val skinType: String? = null,
     val gender: String? = null,
     val isSkinSensitive: Boolean? = null,
+    /** True only once every onboarding answer has been persisted successfully. */
+    val onboardingCompleted: Boolean = false,
 )

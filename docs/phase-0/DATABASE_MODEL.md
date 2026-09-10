@@ -11,6 +11,7 @@ The initial profile schema is implemented by `supabase/migrations/20260909000000
 - `skin_type`: nullable text
 - `gender`: nullable text
 - `is_skin_sensitive`: nullable boolean
+- `onboarding_completed`: `boolean not null default false` — added by `supabase/migrations/20260910000000_add_onboarding_completed.sql` (Phase 5). Set to `true` only as part of the successful final onboarding upsert; `hasCompletedOnboarding` reads this flag rather than treating row existence as completion.
 - `created_at`: creation timestamp
 - `updated_at`: last-update timestamp
 

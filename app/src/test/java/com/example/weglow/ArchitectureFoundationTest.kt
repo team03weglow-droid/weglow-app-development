@@ -15,6 +15,7 @@ class ArchitectureFoundationTest {
             skinType = "Combination",
             gender = "Prefer not to say",
             isSkinSensitive = true,
+            onboardingCompleted = true,
         )
 
         val row = profile.toProfileRow()
@@ -23,5 +24,6 @@ class ArchitectureFoundationTest {
         assertEquals("Test User", row.full_name)
         assertEquals("Combination", row.skin_type)
         assertEquals(true, row.is_skin_sensitive)
+        assertEquals(true, row.onboarding_completed)
     }
 }
