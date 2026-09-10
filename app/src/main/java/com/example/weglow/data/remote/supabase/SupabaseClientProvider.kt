@@ -8,18 +8,25 @@ import io.github.jan.supabase.postgrest.Postgrest
 /**
  * Single infrastructure-level owner of the Supabase client.
  *
- * The client is lazy so Phase 1 and offline UI development do not fail merely because backend
- * configuration is absent. A backend feature that actually accesses the client must be configured.
+ * The client is lazy so offline UI development does not fail merely because
+ * backend configuration is absent. A backend feature that actually accesses
+ * the client must be configured.
  */
 object SupabaseClientProvider {
+
     val client by lazy {
         AppConfig.requireSupabaseConfiguration()
+
         createSupabaseClient(
             supabaseUrl = AppConfig.supabaseUrl,
             supabaseKey = AppConfig.supabasePublishableKey,
         ) {
             install(Postgrest)
-            install(Auth)
+
+            install(Auth) {
+                scheme = "weglow"
+                host = "login-callback"
+            }
         }
     }
 }

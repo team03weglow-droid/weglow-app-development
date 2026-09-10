@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Required for Supabase / OAuth network requests -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Required for WeGlow camera / skin scan -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Camera is optional so devices without a camera can still install the app -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -13,18 +22,45 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Weglow">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Weglow"
             android:windowSoftInputMode="adjustResize">
+
+            <!-- Normal app launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+                Supabase OAuth callback.
+
+                Google/Facebook
+                    ↓
+                Supabase
+                    ↓
+                weglow://login-callback
+                    ↓
+                MainActivity
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="weglow"
+                    android:host="login-callback" />
+            </intent-filter>
+
         </activity>
+
     </application>
 
 </manifest>
