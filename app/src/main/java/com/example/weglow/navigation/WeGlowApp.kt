@@ -181,6 +181,10 @@ fun WeGlowApp() {
                 LoginScreen(
                     onLoginClick = authViewModel::signIn,
 
+                    onGoogleLoginClick = {
+                        authViewModel.signInWithGoogle()
+                    },
+
                     onCreateAccountClick = {
                         navController.navigate(
                             Destination.Signup.route
