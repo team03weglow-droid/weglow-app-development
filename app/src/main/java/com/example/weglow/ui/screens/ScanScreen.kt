@@ -372,7 +372,6 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
     val galleryLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> if (uri != null) onPhotoReady(uri) }
-
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = { ctx ->
@@ -383,7 +382,9 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
                     val preview = Preview.Builder().build().also {
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
-                    val capture = ImageCapture.Builder().build()
+                    val capture = ImageCapture.Builder()
+                        .setTargetRotation(previewView.display.rotation)
+                        .build()
                     imageCapture = capture
 
                     try {
@@ -402,10 +403,21 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
             modifier = Modifier.fillMaxSize()
         )
 
+        // Figma-inspired vignette keeps camera content visible while improving text contrast.
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to DarkGreen.copy(alpha = 0.48f),
+                    0.5f to Color.Transparent,
+                    1f to DarkGreen.copy(alpha = 0.82f),
+                )
+            )
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 40.dp, start = 16.dp, end = 16.dp),
+                .padding(top = 10.dp, start = 16.dp, end = 16.dp),
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
@@ -420,7 +432,7 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
                 modifier = Modifier.fillMaxWidth()
             )
             Text(
-                "within the guide to begin analysis",
+                "within the guide to begin skin analysis",
                 fontFamily = JungeFont,
                 fontSize = 14.sp,
                 color = Color.White.copy(alpha = 0.85f),
@@ -430,13 +442,17 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
         }
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val guideRadius = size.width * 0.42f
-            val center = Offset(size.width / 2f, size.height * 0.42f)
-            drawCircle(
+            // Keep the face guide clearly oval and leave comfortable space above it
+            // for the instructions and below it for the camera controls.
+            val guideWidth = size.width * 0.76f
+            val guideHeight = size.height * 0.58f
+            val left = (size.width - guideWidth) / 2f
+            val top = size.height * 0.21f
+            drawOval(
                 color = Color.White.copy(alpha = 0.9f),
-                radius = guideRadius,
-                center = center,
-                style = Stroke(width = 2.dp.toPx())
+                topLeft = Offset(left, top),
+                size = androidx.compose.ui.geometry.Size(guideWidth, guideHeight),
+                style = Stroke(width = 2.dp.toPx()),
             )
         }
 
@@ -444,7 +460,7 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 48.dp, start = 32.dp, end = 32.dp),
+                .padding(bottom = 24.dp, start = 32.dp, end = 32.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -467,7 +483,14 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
                     .clickable {
                         val capture = imageCapture ?: return@clickable
                         val photoFile = File(context.cacheDir, "weglow_scan_${System.currentTimeMillis()}.jpg")
-                        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+                        val metadata = ImageCapture.Metadata().apply {
+                            // Match the mirrored front-camera preview so the saved photo
+                            // appears exactly as the user saw it while taking the scan.
+                            isReversedHorizontal = true
+                        }
+                        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile)
+                            .setMetadata(metadata)
+                            .build()
                         capture.takePicture(
                             outputOptions,
                             ContextCompat.getMainExecutor(context),

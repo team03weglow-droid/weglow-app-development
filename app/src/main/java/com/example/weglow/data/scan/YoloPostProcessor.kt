@@ -25,7 +25,7 @@ object YoloPostProcessor {
         output: Array<FloatArray>,
         labels: List<String>,
         letterbox: Letterbox,
-        confidenceThreshold: Float = 0.05f,
+        confidenceThreshold: Float = 0.15f,
         iouThreshold: Float = 0.7f,
         maxDetections: Int = 300,
     ): List<AcneDetection> {

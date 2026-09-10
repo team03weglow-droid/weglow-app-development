@@ -121,7 +121,7 @@ def create_app(predictor=None) -> FastAPI:
     async def lifespan(application):
         application.state.predictor = predictor or YoloPredictor(
             Path(os.getenv("ACNE_MODEL_PATH", str(Path(__file__).parent / "models" / "best.pt"))),
-            float(os.getenv("ACNE_CONFIDENCE", "0.05")),
+            float(os.getenv("ACNE_CONFIDENCE", "0.15")),
         )
         yield
 

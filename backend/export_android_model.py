@@ -58,7 +58,7 @@ def main():
         "model_sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
         "input_name": input_node.name, "output_name": output_node.name,
         "input_size": 640, "prediction_count": 8400, "labels": labels,
-        "confidence_threshold": 0.05, "iou_threshold": 0.7, "max_detections": 300,
+        "confidence_threshold": 0.15, "iou_threshold": 0.7, "max_detections": 300,
         "output_layout": "1,4+classes,8400", "box_format": "cxcywh_pixels",
         "ultralytics_version": ultralytics.__version__, "onnxruntime_version": ort.__version__,
     }

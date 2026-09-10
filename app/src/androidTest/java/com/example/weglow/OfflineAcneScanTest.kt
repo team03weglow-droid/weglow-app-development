@@ -31,8 +31,8 @@ class OfflineAcneScanTest {
             assertEquals(480, result.imageWidth)
             assertEquals(640, result.imageHeight)
             assertEquals(12, result.modelVersion.length)
-            assertEquals(0.05f, result.confidenceThreshold, 0f)
-            assertTrue(result.detections.all { it.confidence > 0.05f && it.left in 0f..1f && it.bottom in 0f..1f })
+            assertEquals(0.15f, result.confidenceThreshold, 0f)
+            assertTrue(result.detections.all { it.confidence > 0.15f && it.left in 0f..1f && it.bottom in 0f..1f })
         } finally {
             bitmap.recycle()
             image.delete()

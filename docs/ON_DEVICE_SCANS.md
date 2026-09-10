@@ -26,7 +26,7 @@ and scan. No `WEGLOW_ACNE_API_URL`, `adb reverse`, or Python service is used.
   and inference use the same sampled decoder to keep box coordinates aligned.
 - The image is fitted into a 640x640 square with gray (114) letterbox padding,
   then converted to RGB channel-first floats divided by 255.
-- Each candidate uses its highest class score, minimum confidence 0.05 (5%). There
+- Each candidate uses its highest class score, minimum confidence 0.15 (15%). There
   is no separate YOLOv8 objectness column. Class-aware NMS uses IoU 0.7 and a
   maximum of 300 detections, before mapping boxes back to the displayed photo.
 - The UI shows labels, counts, confidence and boxes. It does not invent skin
