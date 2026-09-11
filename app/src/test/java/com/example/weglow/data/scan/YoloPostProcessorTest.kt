@@ -29,8 +29,11 @@ class YoloPostProcessorTest {
     }
 
     @Test fun ignoresBelowThresholdInvalidAndPaddingOnlyDetections() {
+        // The bundled model's confidence_threshold is 0.15 (see acne/model.json), lowered
+        // deliberately from an earlier 0.25 default so weak-but-real detections still surface.
+        // This case must stay below the *current* default to keep testing rejection, not pass.
         val detections = YoloPostProcessor.decode(output(
-            floatArrayOf(320f, 320f, 100f, 100f, 0.25f, 0.1f),
+            floatArrayOf(320f, 320f, 100f, 100f, 0.1f, 0.05f),
             floatArrayOf(Float.NaN, 320f, 100f, 100f, 0.9f, 0.1f),
             floatArrayOf(320f, 30f, 20f, 20f, 0.9f, 0.1f),
         ), labels, Letterbox(640, 320, 640))

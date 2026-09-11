@@ -368,6 +368,14 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var camera by remember { mutableStateOf<Camera?>(null) }
     var flashOn by remember { mutableStateOf(false) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    // CameraX binds to the Activity's lifecycleOwner, not this composable's, so the
+    // preview/capture session otherwise keeps the camera hardware open (streaming,
+    // torch left on) after the user navigates away from this screen to analyze a photo.
+    DisposableEffect(Unit) {
+        onDispose { cameraProvider?.unbindAll() }
+    }
 
     val galleryLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -378,7 +386,8 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
                 val previewView = PreviewView(ctx)
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                 cameraProviderFuture.addListener({
-                    val cameraProvider = cameraProviderFuture.get()
+                    val provider = cameraProviderFuture.get()
+                    cameraProvider = provider
                     val preview = Preview.Builder().build().also {
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
@@ -388,8 +397,8 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
                     imageCapture = capture
 
                     try {
-                        cameraProvider.unbindAll()
-                        camera = cameraProvider.bindToLifecycle(
+                        provider.unbindAll()
+                        camera = provider.bindToLifecycle(
                             lifecycleOwner,
                             CameraSelector.DEFAULT_FRONT_CAMERA,
                             preview,
