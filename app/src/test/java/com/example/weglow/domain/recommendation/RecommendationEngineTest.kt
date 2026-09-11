@@ -139,4 +139,38 @@ class RecommendationEngineTest {
 
         assertEquals(listOf("2", "1"), result.recommendations.map { it.product.id })
     }
+
+    @Test
+    fun unrelatedConcern_doesNotMatchAndProductIsExcluded() {
+        // A detected concern that shares no letters with the catalog's Target_Concerns text
+        // must never contribute score or appear as a false match.
+        val product = product("1", targetConcerns = "Blackheads")
+
+        val result = RecommendationEngine.recommend(null, listOf("freckles"), listOf(product))
+
+        assertTrue(result.recommendations.isEmpty())
+    }
+
+    @Test
+    fun moreThanTwelveMatches_areCappedAtTwelve() {
+        // 20 equally-scoring products; only the top 12 (by the sort's tie-break) may be returned.
+        val products = (1..20).map { index ->
+            product(id = "p$index", name = "Product %02d".format(index), targetSkinType = "Oily")
+        }
+
+        val result = RecommendationEngine.recommend(profile(skinType = "Oily"), null, products)
+
+        assertEquals(12, result.recommendations.size)
+    }
+
+    @Test
+    fun equalScoringProducts_tieBreakAlphabeticallyByName() {
+        val zebra = product("1", name = "Zebra Cream", targetSkinType = "Oily")
+        val apple = product("2", name = "Apple Cream", targetSkinType = "Oily")
+        val mango = product("3", name = "Mango Cream", targetSkinType = "Oily")
+
+        val result = RecommendationEngine.recommend(profile(skinType = "Oily"), null, listOf(zebra, apple, mango))
+
+        assertEquals(listOf("Apple Cream", "Mango Cream", "Zebra Cream"), result.recommendations.map { it.product.name })
+    }
 }

@@ -223,7 +223,10 @@ fun DiscoverScreen(
                 verticalAlignment = Alignment.Top
             ) {
                 Text(
-                    "Recommended for your Dry Skin",
+                    // This section is not personalized from the signed-in user's real skin
+                    // type (that lives in Recommendations, driven by RecommendationEngine) -
+                    // it must never claim a specific skin type it hasn't actually matched.
+                    "Featured Products",
                     fontFamily = JungeFont,
                     fontSize = 24.sp,
                     color = TextBlack,
@@ -258,7 +261,9 @@ fun DiscoverScreen(
                     ) {
                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = DarkGreen, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("98% Match", fontFamily = JungeFont, fontSize = 12.sp, color = TextBlack)
+                        // No real per-user match score is computed here; a specific percentage
+                        // would be fabricated, so this only claims "Featured" placement.
+                        Text("Featured", fontFamily = JungeFont, fontSize = 12.sp, color = TextBlack)
                     }
                 }
                 Column(modifier = Modifier.padding(16.dp)) {

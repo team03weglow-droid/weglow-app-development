@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
 import com.example.weglow.domain.model.RoutinePlan
+import com.example.weglow.feature.routine.routineStepKey
 import com.example.weglow.ui.components.ProfileAvatar
 import com.example.weglow.ui.components.WeGlowErrorView
 import com.example.weglow.ui.components.WeGlowLoadingView
@@ -68,6 +69,10 @@ fun RoutinesScreen(
     var isMorning by remember { mutableStateOf(true) }
     var selectedDay by remember { mutableStateOf(2) }
 
+    // Session-only completion tracking: no routine-history table/persistence exists in this
+    // app, so this intentionally does not survive an app restart. Keys are built by
+    // routineStepKey(selectedDay, isMorning, ...) so each date's checkmarks - and Morning vs.
+    // Evening - stay independent instead of one date's progress silently showing on another.
     var doneState by remember { mutableStateOf(setOf<String>()) }
 
     var selectedFeeling by remember { mutableStateOf<String?>(null) }
@@ -251,7 +256,9 @@ fun RoutinesScreen(
                 color = SoftGray,
             )
             else -> activeSteps.forEachIndexed { index, step ->
-                val stepKey = "${if (isMorning) "AM" else "PM"}-$index-${step.product?.id}"
+                // Keyed by the selected date so completion never leaks between dates (each date
+                // gets its own independent checkmarks for this session) - see routineStepKey.
+                val stepKey = routineStepKey(selectedDay, isMorning, index, step.product?.id)
                 val done = stepKey in doneState
                 val product = step.product
 

@@ -276,7 +276,9 @@ fun ProfileScreen(
                     Text("Skin Score", fontFamily = JungeFont, fontSize = 20.sp, color = TextBlack)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        "Your botanical glow index is improving.",
+                        // No real skin-scoring measurement exists yet (a scan only yields
+                        // acne detections, never a numeric score) - never claim otherwise.
+                        "Complete a skin scan to see your results here.",
                         fontFamily = JungeFont,
                         fontSize = 13.sp,
                         color = SoftGray
@@ -297,16 +299,9 @@ fun ProfileScreen(
                             radius = size.minDimension / 2 - 6.dp.toPx(),
                             style = Stroke(width = 6.dp.toPx())
                         )
-                        drawArc(
-                            color = DarkGreen,
-                            startAngle = -90f,
-                            sweepAngle = 360f * 0.84f,
-                            useCenter = false,
-                            style = Stroke(width = 6.dp.toPx())
-                        )
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("84", fontFamily = JungeFont, fontSize = 22.sp, color = TextBlack)
+                        Text("--", fontFamily = JungeFont, fontSize = 22.sp, color = TextBlack)
                         Text("/100", fontFamily = JungeFont, fontSize = 11.sp, color = SoftGray)
                     }
                 }
@@ -343,7 +338,9 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Latest Scan", fontFamily = JungeFont, fontSize = 16.sp, color = TextBlack)
-                    Text("2 days ago · Hydration focused", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+                    // No scan history is persisted by the app yet, so this must never invent a
+                    // date or a detected concern for a scan that may not have happened.
+                    Text("No scan yet. Analyze your skin to see results here.", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
                 }
                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SoftGray)
             }
@@ -362,13 +359,15 @@ fun ProfileScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
                 ShelfCard(
                     title = "Morning Routine",
-                    itemCount = "4 items",
+                    // The real step count lives on the Routines tab and can vary per user;
+                    // never restate a specific item count here that the routine may not match.
+                    itemCount = "View steps",
                     imageRes = R.drawable.shelf_morning_routine,
                     modifier = Modifier.weight(1f)
                 )
                 ShelfCard(
                     title = "Night Repair",
-                    itemCount = "3 items",
+                    itemCount = "View steps",
                     imageRes = R.drawable.shelf_night_repair,
                     modifier = Modifier.weight(1f)
                 )

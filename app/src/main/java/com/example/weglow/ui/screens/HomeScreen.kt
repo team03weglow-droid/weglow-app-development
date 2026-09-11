@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.NightsStay
@@ -60,11 +59,13 @@ fun HomeScreen(
     morningRoutine: List<RoutineStep> = emptyList(),
 ) {
     val avatarBitmap = rememberDecodedBitmap(profileImage)
-    val skinScore = 74
-    val scoreDelta = 3
-    val hydration = 0.82f
-    val clarity = 0.68f
-    val texture = 0.71f
+    // No real, on-device or Supabase-backed skin-scoring pipeline exists yet (a scan only
+    // yields acne detections, never a numeric score). Rather than fabricate a score/percentages,
+    // this card shows a neutral pending state until a genuine measurement exists.
+    val skinScore: Int? = null
+    val hydration: Float? = null
+    val clarity: Float? = null
+    val texture: Float? = null
 
     // Local, ephemeral "done today" state for the real routine steps below - not persisted,
     // matching the same pattern already used on the dedicated Routines screen.
@@ -112,11 +113,12 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text("THIS WEEK", fontFamily = JungeFont, fontSize = 11.sp, color = SoftGray)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.ArrowUpward, contentDescription = null, tint = CoralAccent, modifier = Modifier.size(13.dp))
-                        Text("+$scoreDelta from last scan", fontFamily = JungeFont, fontSize = 12.sp, color = CoralAccent)
-                    }
-                    Text("Your skin is improving!", fontFamily = JungeFont, fontSize = 14.sp, color = TextBlack)
+                    Text(
+                        "Complete a skin scan to see your results here.",
+                        fontFamily = JungeFont,
+                        fontSize = 13.sp,
+                        color = TextBlack,
+                    )
 
                     Spacer(modifier = Modifier.height(12.dp))
                     LabeledProgress("Hydration", hydration)
@@ -366,12 +368,13 @@ fun HomeScreen(
     }
 }
 
+/** [progress] is null when there is no real measurement yet - shown as "--", never a fake 0%. */
 @Composable
-private fun LabeledProgress(label: String, progress: Float) {
+private fun LabeledProgress(label: String, progress: Float?) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray, modifier = Modifier.width(64.dp))
         LinearProgressIndicator(
-            progress = { progress },
+            progress = { progress ?: 0f },
             color = CoralAccent,
             trackColor = MintChip,
             modifier = Modifier
@@ -380,7 +383,12 @@ private fun LabeledProgress(label: String, progress: Float) {
                 .clip(RoundedCornerShape(50))
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text("${(progress * 100).toInt()}%", fontFamily = JungeFont, fontSize = 11.sp, color = TextBlack)
+        Text(
+            progress?.let { "${(it * 100).toInt()}%" } ?: "--",
+            fontFamily = JungeFont,
+            fontSize = 11.sp,
+            color = TextBlack,
+        )
     }
 }
 
@@ -399,8 +407,9 @@ private fun InsightCard(icon: ImageVector, title: String, body: String, modifier
     }
 }
 
+/** [score] is null until a real skin-scoring measurement exists - shown as "--", never invented. */
 @Composable
-private fun SkinScoreRing(score: Int, modifier: Modifier = Modifier) {
+private fun SkinScoreRing(score: Int?, modifier: Modifier = Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidth = 10.dp.toPx()
@@ -412,7 +421,7 @@ private fun SkinScoreRing(score: Int, modifier: Modifier = Modifier) {
             val arcSize = Size(diameter, diameter)
 
             drawArc(
-                color = CoralAccent,
+                color = if (score != null) CoralAccent else MintChip,
                 startAngle = 0f,
                 sweepAngle = 360f,
                 useCenter = false,
@@ -422,7 +431,7 @@ private fun SkinScoreRing(score: Int, modifier: Modifier = Modifier) {
             )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("$score", fontFamily = JungeFont, fontSize = 34.sp, color = TextBlack)
+            Text(score?.toString() ?: "--", fontFamily = JungeFont, fontSize = 34.sp, color = TextBlack)
             Text("Skin Score", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
         }
     }
