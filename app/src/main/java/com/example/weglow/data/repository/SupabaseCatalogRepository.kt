@@ -1,0 +1,136 @@
+package com.example.weglow.data.repository
+
+import com.example.weglow.domain.model.Product
+import com.example.weglow.domain.repository.CatalogRepository
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+
+class SupabaseCatalogRepository(
+    private val client: SupabaseClient,
+) : CatalogRepository {
+    override suspend fun products(): Result<List<Product>> = runCatching {
+        val rows = client.postgrest[PRODUCTS_TABLE]
+            .select()
+            .decodeList<JsonObject>()
+        check(rows.isNotEmpty()) {
+            "No product rows are visible. Check the products SELECT policy in Supabase."
+        }
+
+        rows.mapNotNull { row -> row.toProductOrNull() }.also { products ->
+            check(products.isNotEmpty()) {
+                "Product rows were found, but their ID/name columns do not match the app mapping. " +
+                    "Available columns: ${rows.first().keys.sorted().joinToString()}"
+            }
+        }
+    }
+}
+
+internal fun JsonObject.toProductOrNull(): Product? {
+    val id = text("product_id", "id", "product_code", "sku", "uniq_id", "unique_id")
+        ?: return null
+    val name = text("product_name", "name", "title", "product", "product_title")
+        ?: return null
+    val price = text(
+        "price_lkr",
+        "price",
+        "lkr_price",
+        "product_price",
+        "selling_price",
+        "sale_price",
+    )
+
+    return Product(
+        id = id,
+        name = name,
+        priceLabel = price.toLkrLabel(),
+        priceLkr = price.toLkrAmount(),
+        imageUrl = imageUrl(
+            "image_url",
+            "product_image_url",
+            "product_image",
+            "image",
+            "images",
+            "image_urls",
+            "image_path",
+            "image_link",
+            "thumbnail",
+            "thumbnail_url",
+            "photo",
+            "photo_url",
+        ),
+        description = text(
+            "description",
+            "product_description",
+            "small_description",
+            "short_description",
+            "about_product",
+        ),
+        brandName = text("brand_name", "brand"),
+        category = text("category", "product_category", "type"),
+        ratingLabel = text("rating", "rating_label", "average_rating"),
+    )
+}
+
+private fun JsonObject.text(vararg keys: String): String? {
+    return matchingElement(*keys)?.let(::primitiveText)
+}
+
+private fun JsonObject.imageUrl(vararg keys: String): String? =
+    matchingElement(*keys)?.firstImageUrl()
+
+private fun JsonObject.matchingElement(vararg keys: String): JsonElement? {
+    keys.firstNotNullOfOrNull { key -> this[key] }?.let { return it }
+
+    val normalizedKeys = keys.mapTo(mutableSetOf(), String::normalizedColumnName)
+    return entries.firstOrNull { (columnName, _) ->
+        columnName.normalizedColumnName() in normalizedKeys
+    }?.value
+}
+
+private fun primitiveText(element: JsonElement?): String? =
+    (element as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf(String::isNotEmpty)
+
+private fun JsonElement.firstImageUrl(): String? = when (this) {
+    is JsonArray -> firstNotNullOfOrNull(JsonElement::firstImageUrl)
+    is JsonObject -> {
+        val preferredKeys = setOf("url", "src", "image", "imageurl", "publicurl")
+        entries.firstNotNullOfOrNull { (key, value) ->
+            if (key.normalizedColumnName() in preferredKeys) value.firstImageUrl() else null
+        } ?: values.firstNotNullOfOrNull(JsonElement::firstImageUrl)
+    }
+    is JsonPrimitive -> contentOrNull?.toImageUrl()
+}
+
+private fun String.toImageUrl(): String? {
+    val cleaned = trim().replace("\\/", "/")
+    val embeddedUrl = HTTPS_URL.find(cleaned)?.value
+    return when {
+        embeddedUrl != null -> embeddedUrl
+        cleaned.startsWith("//") -> "https:$cleaned"
+        cleaned.startsWith("data:image/") -> cleaned
+        else -> cleaned.takeIf(String::isNotEmpty)
+    }
+}
+
+private fun String.normalizedColumnName(): String =
+    lowercase().filter(Char::isLetterOrDigit)
+
+private fun String?.toLkrLabel(): String = when {
+    isNullOrBlank() -> "Price unavailable"
+    startsWith("LKR", ignoreCase = true) -> this
+    else -> "LKR $this"
+}
+
+private fun String?.toLkrAmount(): Double? = this
+    ?.replace(",", "")
+    ?.let { PRICE_NUMBER.find(it)?.value }
+    ?.toDoubleOrNull()
+
+private const val PRODUCTS_TABLE = "products"
+private val HTTPS_URL = Regex("https?://[^\\s\\\"'\\],}]+")
+private val PRICE_NUMBER = Regex("\\d+(?:\\.\\d+)?")

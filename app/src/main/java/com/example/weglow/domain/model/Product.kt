@@ -4,6 +4,10 @@ data class Product(
     val id: String,
     val name: String,
     val priceLabel: String,
-    val ratingLabel: String,
-    val imageRes: Int,
+    val imageUrl: String?,
+    val priceLkr: Double? = null,
+    val description: String? = null,
+    val brandName: String? = null,
+    val category: String? = null,
+    val ratingLabel: String? = null,
 )
