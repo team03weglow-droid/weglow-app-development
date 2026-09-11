@@ -439,12 +439,16 @@ fun WeGlowApp() {
 
             composable(Destination.Home.route) {
 
-                LaunchedEffect(Unit) { profileViewModel.refresh() }
+                LaunchedEffect(Unit) {
+                    profileViewModel.refresh()
+                    routineViewModel.load()
+                }
 
                 HomeScreen(
 
                     displayName = profileState.displayName,
                     profileImage = profileState.profileImage,
+                    morningRoutine = routineState.plan?.morning.orEmpty(),
 
                     onScanClick = {
 
@@ -478,6 +482,7 @@ fun WeGlowApp() {
             composable(Destination.Discover.route) {
                 LaunchedEffect(Unit) {
                     discoverViewModel.loadProducts()
+                    profileViewModel.refresh()
                 }
 
                 DiscoverScreen(
@@ -485,6 +490,7 @@ fun WeGlowApp() {
                     isLoading = discoverState.isLoading,
                     errorMessage = discoverState.errorMessage,
                     onRetry = discoverViewModel::loadProducts,
+                    profileImage = profileState.profileImage,
                 )
             }
 
@@ -602,6 +608,7 @@ fun WeGlowApp() {
 
                 LaunchedEffect(Unit) {
                     routineViewModel.load()
+                    profileViewModel.refresh()
                 }
 
                 RoutinesScreen(
@@ -609,6 +616,8 @@ fun WeGlowApp() {
                     errorMessage = routineState.errorMessage,
                     plan = routineState.plan,
                     onRetry = routineViewModel::load,
+                    displayName = profileState.displayName,
+                    profileImage = profileState.profileImage,
                 )
             }
 

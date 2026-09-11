@@ -96,6 +96,25 @@ class RoutineViewModelTest {
         val sunscreenStep = vm.uiState.value.plan?.morning?.first { it.label == "Sunscreen" }
         assertNull(sunscreenStep?.product)
     }
+
+    // Routines and Discover share the same catalog fetch, so revisiting the Routines tab
+    // should not re-query Supabase once a plan has already been built successfully.
+    @Test
+    fun load_whenPlanAlreadyBuilt_doesNotRefetchCatalog() = runTest(dispatcher) {
+        val catalog = FakeCatalogRepository(Result.success(listOf(cleanser, moisturizer)))
+        val vm = RoutineViewModel(
+            FakeAuthRepository("u1"),
+            FakeProfileRepository(UserProfile(id = "u1", skinType = "Oily")),
+            catalog,
+        )
+
+        vm.load()
+        dispatcher.scheduler.advanceUntilIdle()
+        vm.load()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, catalog.callCount)
+    }
 }
 
 private class FakeAuthRepository(private val userId: String?) : AuthRepository {
@@ -119,5 +138,11 @@ private class FakeProfileRepository(private val profile: UserProfile?) : Profile
 }
 
 private class FakeCatalogRepository(private val result: Result<List<Product>>) : CatalogRepository {
-    override suspend fun products(): Result<List<Product>> = result
+    var callCount: Int = 0
+        private set
+
+    override suspend fun products(): Result<List<Product>> {
+        callCount++
+        return result
+    }
 }

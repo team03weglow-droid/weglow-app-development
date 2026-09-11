@@ -71,3 +71,17 @@ class ScanViewModelTest {
         override suspend fun analyze(photoReference: String) = block()
     }
 }
+
+// Scan photos are privacy-sensitive; cache cleanup must only ever target a file this app
+// itself wrote for a scan capture, never a user's gallery photo.
+class ScanCacheFileOwnershipTest {
+    @Test fun ownScanCaptureFileName_isRecognized() {
+        assertTrue(isOwnedScanCacheFileName("weglow_scan_1699999999999.jpg"))
+    }
+
+    @Test fun unrelatedFileName_isNotTreatedAsOwned() {
+        assertFalse(isOwnedScanCacheFileName("IMG_20240101_120000.jpg"))
+        assertFalse(isOwnedScanCacheFileName("profile-camera-photo.jpg"))
+        assertFalse(isOwnedScanCacheFileName(""))
+    }
+}

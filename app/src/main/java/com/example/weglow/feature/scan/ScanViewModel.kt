@@ -9,10 +9,22 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+
+/** The exact prefix CameraCaptureScreen uses for a scan capture written to the app cache. */
+internal const val SCAN_CACHE_FILE_PREFIX = "weglow_scan_"
+
+/**
+ * True only for a file name this app itself wrote for a scan capture. Kept separate from
+ * [Uri] handling so it is unit-testable without the Android framework, and so cache cleanup
+ * can never be widened to delete a user-picked gallery file by mistake.
+ */
+internal fun isOwnedScanCacheFileName(fileName: String): Boolean =
+    fileName.startsWith(SCAN_CACHE_FILE_PREFIX)
 
 data class ScanUiState(
     val photoUri: Uri? = null,
@@ -29,7 +41,12 @@ class ScanViewModel(private val repository: AcneScanRepository) : ViewModel() {
 
     fun setPhoto(uri: Uri) {
         analysis?.cancel()
+        val previousPhoto = _uiState.value.photoUri
         _uiState.value = ScanUiState(photoUri = uri)
+        // A skin photo is privacy-sensitive; once it is replaced by a new capture it should
+        // not linger in the app cache indefinitely. Only ever deletes a file this app wrote
+        // for a scan capture - never a content:// gallery-picked photo.
+        if (previousPhoto != uri) deleteIfOwnedScanCacheFile(previousPhoto)
     }
 
     fun analyze() {
@@ -68,6 +85,16 @@ class ScanViewModel(private val repository: AcneScanRepository) : ViewModel() {
 
     fun clear() {
         analysis?.cancel()
+        deleteIfOwnedScanCacheFile(_uiState.value.photoUri)
         _uiState.value = ScanUiState()
+    }
+
+    private fun deleteIfOwnedScanCacheFile(uri: Uri?) {
+        if (uri == null || uri.scheme != "file") return
+        val path = uri.path ?: return
+        val file = File(path)
+        if (isOwnedScanCacheFileName(file.name)) {
+            runCatching { file.delete() }
+        }
     }
 }

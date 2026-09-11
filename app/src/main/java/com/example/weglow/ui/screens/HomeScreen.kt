@@ -36,12 +36,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
+import com.example.weglow.domain.model.RoutineStep
 import com.example.weglow.ui.components.ProfileAvatar
 import com.example.weglow.ui.components.rememberDecodedBitmap
 import com.example.weglow.ui.theme.*
 
 
-private data class RoutineStep(val name: String, val category: String, val duration: String, val imageRes: Int, val done: Boolean)
 private data class Insight(val icon: ImageVector, val title: String, val body: String)
 
 private val insights = listOf(
@@ -57,6 +57,7 @@ fun HomeScreen(
     onRecommendationsClick: () -> Unit,
     displayName: String? = null,
     profileImage: ByteArray? = null,
+    morningRoutine: List<RoutineStep> = emptyList(),
 ) {
     val avatarBitmap = rememberDecodedBitmap(profileImage)
     val skinScore = 74
@@ -65,19 +66,12 @@ fun HomeScreen(
     val clarity = 0.68f
     val texture = 0.71f
 
-    var morningSteps by remember {
-        mutableStateOf(
-            listOf(
-                RoutineStep("Gentle Foam Cleanser", "Cleanser", "60 sec", R.drawable.matcha_cleansing_foam, true),
-                RoutineStep("Niacinamide 10% + Zinc", "Serum", "30 sec", R.drawable.white_jasmine_facial_serum, true),
-                RoutineStep("Moisture Surge 100H", "Moisturizer", "30 sec", R.drawable.aloe_95_soothing_gel, false),
-                RoutineStep("SPF Daily Moisturizer", "Protect", "20 sec", R.drawable.chamomile_night_cream, false),
-            )
-        )
-    }
-
-    val doneCount = morningSteps.count { it.done }
-    val totalCount = morningSteps.size
+    // Local, ephemeral "done today" state for the real routine steps below - not persisted,
+    // matching the same pattern already used on the dedicated Routines screen.
+    var doneSteps by remember(morningRoutine) { mutableStateOf(setOf<Int>()) }
+    val stepsWithProduct = morningRoutine.filter { it.product != null }
+    val doneCount = stepsWithProduct.indices.count { it in doneSteps }
+    val totalCount = stepsWithProduct.size
 
     Column(
         modifier = Modifier
@@ -269,11 +263,21 @@ fun HomeScreen(
                 )
                 Spacer(modifier = Modifier.height(14.dp))
 
-                morningSteps.forEachIndexed { index, step ->
+                if (stepsWithProduct.isEmpty()) {
+                    Text(
+                        "Your personalized routine will appear here once it's ready.",
+                        fontFamily = JungeFont,
+                        fontSize = 12.sp,
+                        color = SoftGray,
+                    )
+                }
+
+                stepsWithProduct.forEachIndexed { index, step ->
+                    val done = index in doneSteps
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = if (index != morningSteps.lastIndex) 10.dp else 0.dp)
+                            .padding(bottom = if (index != stepsWithProduct.lastIndex) 10.dp else 0.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(SurfaceSubtle)
                             .padding(horizontal = 14.dp, vertical = 12.dp),
@@ -281,17 +285,15 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(step.name, fontFamily = JungeFont, fontSize = 14.sp, color = TextBlack)
-                            Text("${step.category} · ${step.duration}", fontFamily = JungeFont, fontSize = 11.sp, color = SoftGray)
+                            Text(step.product?.name.orEmpty(), fontFamily = JungeFont, fontSize = 14.sp, color = TextBlack)
+                            Text(step.label, fontFamily = JungeFont, fontSize = 11.sp, color = SoftGray)
                         }
                         Icon(
-                            imageVector = if (step.done) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+                            imageVector = if (done) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
                             contentDescription = "Mark step done",
-                            tint = if (step.done) DarkGreen else SoftGray,
+                            tint = if (done) DarkGreen else SoftGray,
                             modifier = Modifier.clickable {
-                                morningSteps = morningSteps.toMutableList().also {
-                                    it[index] = it[index].copy(done = !it[index].done)
-                                }
+                                doneSteps = if (done) doneSteps - index else doneSteps + index
                             }
                         )
                     }

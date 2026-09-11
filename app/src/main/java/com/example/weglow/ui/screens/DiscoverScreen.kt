@@ -25,14 +25,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
+import com.example.weglow.ui.components.ProfileAvatar
 import com.example.weglow.ui.components.WeGlowProductImage
+import com.example.weglow.ui.components.rememberDecodedBitmap
 import com.example.weglow.ui.theme.*
 import com.example.weglow.domain.model.Product
 
@@ -46,6 +47,7 @@ fun DiscoverScreen(
     isLoading: Boolean,
     errorMessage: String?,
     onRetry: () -> Unit,
+    profileImage: ByteArray? = null,
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All Products") }
@@ -119,14 +121,7 @@ fun DiscoverScreen(
                     contentDescription = null,
                     modifier = Modifier.size(24.dp)
                 )
-                Image(
-                    painter = painterResource(R.drawable.avatar_rukman),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                )
+                ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 36.dp)
             }
         }
 

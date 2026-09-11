@@ -17,14 +17,20 @@ class SupabaseCatalogRepository(
         val rows = client.postgrest[PRODUCTS_TABLE]
             .select()
             .decodeList<JsonObject>()
+        // This message reaches end users verbatim via Result.failure -> ViewModel ->
+        // UiState.errorMessage (there is no separate error-mapping layer), so it must never
+        // include internal details. The likely developer-facing cause - during setup or a
+        // Supabase config change - is a missing/incorrect SELECT policy on `products`.
         check(rows.isNotEmpty()) {
-            "No product rows are visible. Check the products SELECT policy in Supabase."
+            "Products are temporarily unavailable."
         }
 
         rows.mapNotNull { row -> row.toProductOrNull() }.also { products ->
+            // As above: the real cause here (if it ever fires) is the imported dataset's
+            // column names no longer matching the mapping in toProductOrNull() below - a
+            // build-time/integration problem, not something to expose to a user.
             check(products.isNotEmpty()) {
-                "Product rows were found, but their ID/name columns do not match the app mapping. " +
-                    "Available columns: ${rows.first().keys.sorted().joinToString()}"
+                "Products are temporarily unavailable."
             }
         }
     }

@@ -44,6 +44,41 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
         }
     }
 
+    private val environment: OrtEnvironment by lazy {
+        OrtEnvironment.getEnvironment().also { it.setTelemetry(false) }
+    }
+
+    /**
+     * Session creation (model load + graph optimization) is the expensive part of a scan, not
+     * the inference itself, so the session is built once and reused for every subsequent scan
+     * in this app session rather than rebuilt per [analyze] call. This changes nothing about
+     * preprocessing, the model graph, thresholds, or postprocessing - only how often the same
+     * immutable session is constructed. If construction fails (including the shape check), the
+     * partially-created session is closed and `lazy` retries on the next call, matching the
+     * previous per-call retry behaviour for a corrupted install.
+     */
+    private val sessionHandle: SessionHandle by lazy {
+        // Mapping the uncompressed asset avoids copying the weights into the Java heap. The
+        // mapped buffer and file handle are only needed for the duration of session creation.
+        val createdSession = application.assets.openFd("acne/model.onnx").use { asset ->
+            FileInputStream(asset.fileDescriptor).use { stream ->
+                val model = stream.channel.map(FileChannel.MapMode.READ_ONLY, asset.startOffset, asset.declaredLength)
+                OrtSession.SessionOptions().use { options ->
+                    options.setIntraOpNumThreads(Runtime.getRuntime().availableProcessors().coerceIn(1, 4))
+                    options.setInterOpNumThreads(1)
+                    options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+                    environment.createSession(model, options)
+                }
+            }
+        }
+        val shape = (createdSession.inputInfo.getValue(metadata.input_name).info as TensorInfo).shape
+        check(shape.contentEquals(longArrayOf(1, 3, 640, 640))) {
+            createdSession.close()
+            "The installed skin analysis model is incompatible."
+        }
+        SessionHandle(createdSession, shape)
+    }
+
     override suspend fun analyze(photoReference: String): AcneScanResult = withContext(Dispatchers.Default) {
         mutex.withLock {
             ensureActive()
@@ -53,39 +88,22 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
                     val geometry = Letterbox(photo.width, photo.height, metadata.input_size)
                     val pixels = prepareInput(photo, geometry)
                     ensureActive()
-                    val environment = OrtEnvironment.getEnvironment()
-                    environment.setTelemetry(false)
-                    // Mapping the uncompressed asset avoids copying the weights into the Java heap.
-                    application.assets.openFd("acne/model.onnx").use { asset ->
-                        FileInputStream(asset.fileDescriptor).use { stream ->
-                            val model = stream.channel.map(FileChannel.MapMode.READ_ONLY, asset.startOffset, asset.declaredLength)
-                            OrtSession.SessionOptions().use { options ->
-                                options.setIntraOpNumThreads(Runtime.getRuntime().availableProcessors().coerceIn(1, 4))
-                                options.setInterOpNumThreads(1)
-                                options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-                                // Close native sessions and tensors after each scan, including cancellation/error paths.
-                                environment.createSession(model, options).use { session ->
-                                    val shape = (session.inputInfo.getValue(metadata.input_name).info as TensorInfo).shape
-                                    check(shape.contentEquals(longArrayOf(1, 3, 640, 640))) { "The installed skin analysis model is incompatible." }
-                                    ensureActive()
-                                    OnnxTensor.createTensor(environment, pixels, shape).use { tensor ->
-                                        session.run(mapOf(metadata.input_name to tensor)).use { prediction ->
-                                            ensureActive()
-                                            val output = prediction.get(metadata.output_name).orElseThrow() as OnnxTensor
-                                            check(output.info.shape.contentEquals(longArrayOf(1, (4 + metadata.labels.size).toLong(), metadata.prediction_count.toLong()))) {
-                                                "The installed skin analysis model is incompatible."
-                                            }
-                                            @Suppress("UNCHECKED_CAST")
-                                            val rows = (output.value as Array<Array<FloatArray>>)[0]
-                                            val detections = YoloPostProcessor.decode(
-                                                rows, metadata.labels, geometry, metadata.confidence_threshold,
-                                                metadata.iou_threshold, metadata.max_detections,
-                                            )
-                                            AcneScanResult(detections, photo.width, photo.height, metadata.model_sha256.take(12), metadata.confidence_threshold)
-                                        }
-                                    }
-                                }
+                    val (session, inputShape) = sessionHandle
+                    OnnxTensor.createTensor(environment, pixels, inputShape).use { tensor ->
+                        // Only the tensor is closed per scan; the session itself is long-lived.
+                        session.run(mapOf(metadata.input_name to tensor)).use { prediction ->
+                            ensureActive()
+                            val output = prediction.get(metadata.output_name).orElseThrow() as OnnxTensor
+                            check(output.info.shape.contentEquals(longArrayOf(1, (4 + metadata.labels.size).toLong(), metadata.prediction_count.toLong()))) {
+                                "The installed skin analysis model is incompatible."
                             }
+                            @Suppress("UNCHECKED_CAST")
+                            val rows = (output.value as Array<Array<FloatArray>>)[0]
+                            val detections = YoloPostProcessor.decode(
+                                rows, metadata.labels, geometry, metadata.confidence_threshold,
+                                metadata.iou_threshold, metadata.max_detections,
+                            )
+                            AcneScanResult(detections, photo.width, photo.height, metadata.model_sha256.take(12), metadata.confidence_threshold)
                         }
                     }
                 } finally {
@@ -119,6 +137,8 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
         }
     }
 }
+
+private data class SessionHandle(val session: OrtSession, val inputShape: LongArray)
 
 @Serializable
 private data class ModelMetadata(

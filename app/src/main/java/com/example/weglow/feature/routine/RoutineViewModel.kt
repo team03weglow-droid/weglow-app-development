@@ -35,8 +35,15 @@ class RoutineViewModel(
 
     private var loadJob: Job? = null
 
+    /**
+     * Depends on the same catalog fetch as Discover, so a successful plan is kept and reused
+     * for the lifetime of this ViewModel rather than re-querying every time the Routines tab
+     * is revisited. A failed load still retries.
+     */
     fun load() {
         if (loadJob?.isActive == true) return
+        if (_uiState.value.plan != null && _uiState.value.errorMessage == null) return
+
         loadJob = viewModelScope.launch {
             _uiState.value = RoutineUiState(isLoading = true)
 

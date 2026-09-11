@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -26,9 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
 import com.example.weglow.domain.model.RoutinePlan
+import com.example.weglow.ui.components.ProfileAvatar
 import com.example.weglow.ui.components.WeGlowErrorView
 import com.example.weglow.ui.components.WeGlowLoadingView
 import com.example.weglow.ui.components.WeGlowProductImage
+import com.example.weglow.ui.components.rememberDecodedBitmap
 import com.example.weglow.ui.theme.*
 
 private data class DayEntry(
@@ -60,6 +61,8 @@ fun RoutinesScreen(
     errorMessage: String?,
     plan: RoutinePlan?,
     onRetry: () -> Unit,
+    displayName: String? = null,
+    profileImage: ByteArray? = null,
 ) {
 
     var isMorning by remember { mutableStateOf(true) }
@@ -100,24 +103,21 @@ fun RoutinesScreen(
                 modifier = Modifier.size(24.dp)
             )
 
-            Image(
-                painter = painterResource(R.drawable.avatar_rukman),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-            )
+            ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 36.dp)
         }
 
         Spacer(Modifier.height(14.dp))
 
         // GREETING
+        // Uses the real persisted profile name (via ProfileViewModel); falls back to neutral
+        // copy rather than a placeholder name when none is available yet.
+        val greetingName = displayName?.trim()?.takeIf(String::isNotEmpty)
         Text(
-            if (isMorning) {
-                "Good Morning, Team 03"
-            } else {
-                "Good Evening, Team 03"
+            when {
+                isMorning && greetingName != null -> "Good Morning, $greetingName"
+                isMorning -> "Good Morning"
+                greetingName != null -> "Good Evening, $greetingName"
+                else -> "Good Evening"
             },
             fontFamily = JungeFont,
             fontSize = 24.sp,
