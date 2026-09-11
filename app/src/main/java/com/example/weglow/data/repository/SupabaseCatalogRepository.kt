@@ -48,6 +48,7 @@ internal fun JsonObject.toProductOrNull(): Product? {
         id = id,
         name = name,
         priceLabel = price.toLkrLabel(),
+        priceLkr = price.toLkrAmount(),
         imageUrl = imageUrl(
             "image_url",
             "product_image_url",
@@ -125,5 +126,11 @@ private fun String?.toLkrLabel(): String = when {
     else -> "LKR $this"
 }
 
+private fun String?.toLkrAmount(): Double? = this
+    ?.replace(",", "")
+    ?.let { PRICE_NUMBER.find(it)?.value }
+    ?.toDoubleOrNull()
+
 private const val PRODUCTS_TABLE = "products"
 private val HTTPS_URL = Regex("https?://[^\\s\\\"'\\],}]+")
+private val PRICE_NUMBER = Regex("\\d+(?:\\.\\d+)?")
