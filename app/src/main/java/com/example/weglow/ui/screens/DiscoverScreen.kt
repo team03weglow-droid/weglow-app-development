@@ -31,8 +31,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.example.weglow.R
+import com.example.weglow.ui.components.WeGlowProductImage
 import com.example.weglow.ui.theme.*
 import com.example.weglow.domain.model.Product
 
@@ -246,7 +246,7 @@ fun DiscoverScreen(
                     .background(CardWhite)
             ) {
                 Box {
-                    ProductImage(
+                    WeGlowProductImage(
                         imageUrl = product.imageUrl,
                         contentDescription = product.name,
                         modifier = Modifier
@@ -306,7 +306,7 @@ fun DiscoverScreen(
                     .background(CardWhite)
             ) {
                 Box {
-                    ProductImage(
+                    WeGlowProductImage(
                         imageUrl = product.imageUrl,
                         contentDescription = product.name,
                         modifier = Modifier
@@ -421,7 +421,7 @@ fun DiscoverScreen(
 private fun ProductGridCard(product: Product, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Box {
-            ProductImage(
+            WeGlowProductImage(
                 imageUrl = product.imageUrl,
                 contentDescription = product.name,
                 modifier = Modifier
@@ -471,7 +471,7 @@ private fun ProductListCard(product: Product) {
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ProductImage(
+        WeGlowProductImage(
             imageUrl = product.imageUrl,
             contentDescription = product.name,
             modifier = Modifier
@@ -624,23 +624,6 @@ private fun String.filterPriceInput(): String {
 
 private fun Double.toPriceInput(): String =
     if (this % 1.0 == 0.0) toLong().toString() else toString()
-
-@Composable
-private fun ProductImage(
-    imageUrl: String?,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-) {
-    AsyncImage(
-        model = imageUrl,
-        contentDescription = contentDescription,
-        placeholder = painterResource(R.drawable.weglow_logo),
-        error = painterResource(R.drawable.weglow_logo),
-        fallback = painterResource(R.drawable.weglow_logo),
-        contentScale = ContentScale.Crop,
-        modifier = modifier.background(PillGray),
-    )
-}
 
 @Composable
 private fun ProductLoadMessage(

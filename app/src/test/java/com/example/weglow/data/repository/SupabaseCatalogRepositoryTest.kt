@@ -75,6 +75,39 @@ class SupabaseCatalogRepositoryTest {
     }
 
     @Test
+    fun productRow_mapsRealDatasetColumnCasing() {
+        // Mirrors the live Supabase schema: Product_ID, Target_Skin_Type, Target_Concerns, etc.
+        val product = buildJsonObject {
+            put("Product_ID", "p-99")
+            put("Product_Name", "Purifying Clay Mask")
+            put("Brand", "WeGlow Labs")
+            put("Category", "Treatment")
+            put("Price_LKR", "2500")
+            put("Target_Skin_Type", "Oily, Combination")
+            put("Target_Concerns", "Blackheads; Open Pores")
+            put("Texture", "Gel")
+        }.toProductOrNull()
+
+        requireNotNull(product)
+        assertEquals("p-99", product.id)
+        assertEquals("Oily, Combination", product.targetSkinType)
+        assertEquals("Blackheads; Open Pores", product.targetConcerns)
+        assertEquals("Gel", product.texture)
+    }
+
+    @Test
+    fun productRow_withoutTargetFields_leavesThemNull() {
+        val product = buildJsonObject {
+            put("product_id", "p-1")
+            put("product_name", "Basic Cleanser")
+        }.toProductOrNull()
+
+        requireNotNull(product)
+        assertNull(product.targetSkinType)
+        assertNull(product.targetConcerns)
+    }
+
+    @Test
     fun productRow_extractsUrlFromJsonWrappedString() {
         val product = buildJsonObject {
             put("id", "p-22")

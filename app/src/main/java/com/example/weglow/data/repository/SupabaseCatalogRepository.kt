@@ -42,6 +42,7 @@ internal fun JsonObject.toProductOrNull(): Product? {
         "product_price",
         "selling_price",
         "sale_price",
+        "price_text_raw",
     )
 
     return Product(
@@ -73,6 +74,9 @@ internal fun JsonObject.toProductOrNull(): Product? {
         brandName = text("brand_name", "brand"),
         category = text("category", "product_category", "type"),
         ratingLabel = text("rating", "rating_label", "average_rating"),
+        targetSkinType = text("target_skin_type", "skin_type_target", "suitable_skin_type"),
+        targetConcerns = text("target_concerns", "concern", "concerns", "skin_concerns"),
+        texture = text("texture", "product_texture"),
     )
 }
 

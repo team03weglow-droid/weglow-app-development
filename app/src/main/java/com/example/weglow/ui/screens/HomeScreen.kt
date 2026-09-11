@@ -54,6 +54,7 @@ private val insights = listOf(
 fun HomeScreen(
     onScanClick: () -> Unit,
     onDiscoverClick: () -> Unit,
+    onRecommendationsClick: () -> Unit,
     displayName: String? = null,
     profileImage: ByteArray? = null,
 ) {
@@ -198,6 +199,42 @@ fun HomeScreen(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(CardWhite)
+                    .clickable(onClick = onRecommendationsClick)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MintChip),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = DarkGreen)
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Recommended for You", fontFamily = JungeFont, fontSize = 16.sp, color = TextBlack)
+                        Text(
+                            "Products picked from your profile and latest scan",
+                            fontFamily = JungeFont,
+                            fontSize = 12.sp,
+                            color = SoftGray,
+                        )
+                    }
+                }
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = DarkGreen)
             }
 
             Spacer(modifier = Modifier.height(16.dp))

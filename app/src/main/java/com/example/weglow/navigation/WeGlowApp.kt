@@ -12,10 +12,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.weglow.app.AppContainer
 import com.example.weglow.app.viewModelFactory
 import com.example.weglow.feature.auth.AuthEvent
@@ -25,6 +27,8 @@ import com.example.weglow.feature.discover.DiscoverViewModel
 import com.example.weglow.feature.hairstyle.HairstyleViewModel
 import com.example.weglow.feature.onboarding.OnboardingViewModel
 import com.example.weglow.feature.profile.ProfileViewModel
+import com.example.weglow.feature.recommendation.RecommendationViewModel
+import com.example.weglow.feature.routine.RoutineViewModel
 import com.example.weglow.feature.scan.ScanViewModel
 import com.example.weglow.ui.components.WeGlowBottomNavigation
 import com.example.weglow.ui.components.WeGlowNavItem
@@ -89,12 +93,34 @@ fun WeGlowApp() {
         }
     )
 
+    val recommendationViewModel: RecommendationViewModel = viewModel(
+        factory = viewModelFactory {
+            RecommendationViewModel(
+                container.authRepository,
+                container.profileRepository,
+                container.catalogRepository,
+            )
+        }
+    )
+
+    val routineViewModel: RoutineViewModel = viewModel(
+        factory = viewModelFactory {
+            RoutineViewModel(
+                container.authRepository,
+                container.profileRepository,
+                container.catalogRepository,
+            )
+        }
+    )
+
     val authState by authViewModel.uiState.collectAsState()
     val startupDestination by authViewModel.startupDestination.collectAsState()
     val onboardingState by onboardingViewModel.uiState.collectAsState()
     val scanState by scanViewModel.uiState.collectAsState()
     val discoverState by discoverViewModel.uiState.collectAsState()
     val profileState by profileViewModel.uiState.collectAsState()
+    val recommendationState by recommendationViewModel.uiState.collectAsState()
+    val routineState by routineViewModel.uiState.collectAsState()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -437,6 +463,15 @@ fun WeGlowApp() {
                             launchSingleTop = true
                         }
                     },
+
+                    onRecommendationsClick = {
+
+                        navController.navigate(
+                            Destination.Recommendations.routeFor(fromScan = false)
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
 
@@ -513,20 +548,35 @@ fun WeGlowApp() {
                     onViewRecommendations = {
 
                         navController.navigate(
-                            Destination.Routines.route
+                            Destination.Recommendations.routeFor(fromScan = true)
                         ) {
-
-                            /*
-                             * Same stable main-app anchor used by
-                             * bottom navigation.
-                             */
-                            popUpTo(Destination.Home.route) {
-                                saveState = true
-                            }
-
                             launchSingleTop = true
-                            restoreState = true
                         }
+                    },
+                )
+            }
+
+            composable(
+                route = Destination.Recommendations.route,
+                arguments = listOf(navArgument("fromScan") { type = NavType.BoolType; defaultValue = false }),
+            ) { backStackEntry ->
+
+                val fromScan = backStackEntry.arguments?.getBoolean("fromScan") == true
+                val scanConcerns = if (fromScan) scanState.result?.detections?.map { it.label } else null
+
+                LaunchedEffect(Unit) {
+                    recommendationViewModel.load(scanConcerns)
+                }
+
+                RecommendationsScreen(
+                    isLoading = recommendationState.isLoading,
+                    result = recommendationState.result,
+                    errorMessage = recommendationState.errorMessage,
+                    onBack = {
+                        navController.popBackStack()
+                    },
+                    onRetry = {
+                        recommendationViewModel.load(scanConcerns)
                     },
                 )
             }
@@ -549,7 +599,17 @@ fun WeGlowApp() {
             // ---------------------------------------------------------
 
             composable(Destination.Routines.route) {
-                RoutinesScreen()
+
+                LaunchedEffect(Unit) {
+                    routineViewModel.load()
+                }
+
+                RoutinesScreen(
+                    isLoading = routineState.isLoading,
+                    errorMessage = routineState.errorMessage,
+                    plan = routineState.plan,
+                    onRetry = routineViewModel::load,
+                )
             }
 
             // ---------------------------------------------------------

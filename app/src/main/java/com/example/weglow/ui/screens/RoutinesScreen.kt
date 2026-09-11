@@ -25,96 +25,11 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
+import com.example.weglow.domain.model.RoutinePlan
+import com.example.weglow.ui.components.WeGlowErrorView
+import com.example.weglow.ui.components.WeGlowLoadingView
+import com.example.weglow.ui.components.WeGlowProductImage
 import com.example.weglow.ui.theme.*
-
-
-private data class RoutineStepData(
-    val id: Int,
-    val category: String,
-    val badge: String?,
-    val name: String,
-    val detail: String,
-    val imageRes: Int?,
-    val essential: Boolean = false,
-    val initialDone: Boolean = false
-)
-
-private val morningSteps = listOf(
-    RoutineStepData(
-        id = 101,
-        category = "CLEANSE",
-        badge = "PURIFYING",
-        name = "Purifying Neem Face Wash",
-        detail = "Himalaya",
-        imageRes = R.drawable.himalaya_neem_face_wash,
-        initialDone = true
-    ),
-    RoutineStepData(
-        id = 102,
-        category = "TONE",
-        badge = "1 MIN",
-        name = "Balancing Rose Water Toner",
-        detail = "Botanical Glow Essentials",
-        imageRes = R.drawable.radiance_serum,
-        essential = true
-    ),
-    RoutineStepData(
-        id = 103,
-        category = "MOISTURIZE",
-        badge = "HYDRATING",
-        name = "Clear Complexion Day Cream",
-        detail = "Himalaya",
-        imageRes = R.drawable.aloe_95_soothing_gel
-    ),
-)
-
-private val eveningSteps = listOf(
-    RoutineStepData(
-        id = 201,
-        category = "DOUBLE CLEANSE",
-        badge = null,
-        name = "Green Tea and Matcha Cleansing Foam",
-        detail = "2 mins",
-        imageRes = R.drawable.matcha_cleansing_foam,
-        initialDone = true
-    ),
-    RoutineStepData(
-        id = 202,
-        category = "TONE",
-        badge = null,
-        name = "Organic Cucumber and Mint Toner",
-        detail = "1 min",
-        imageRes = R.drawable.botanica,
-        initialDone = true
-    ),
-    RoutineStepData(
-        id = 203,
-        category = "TREATMENT",
-        badge = null,
-        name = "Rosehip and Argan Hair Serum",
-        detail = "Apply to ends",
-        imageRes = R.drawable.aurora,
-        initialDone = true
-    ),
-    RoutineStepData(
-        id = 204,
-        category = "REPAIR",
-        badge = null,
-        name = "Chamomile Soothing Night Cream",
-        detail = "Massage in",
-        imageRes = R.drawable.chamomile_night_cream,
-        initialDone = true
-    ),
-    RoutineStepData(
-        id = 205,
-        category = "SLEEP SUPPORT",
-        badge = null,
-        name = "Lavender & Ashwagandha Mist",
-        detail = "Mist face & pillow",
-        imageRes = R.drawable.lavender_sleeping_mist,
-        essential = true
-    ),
-)
 
 private data class DayEntry(
     val label: String,
@@ -140,25 +55,25 @@ private val feelingChips = listOf(
 )
 
 @Composable
-fun RoutinesScreen() {
+fun RoutinesScreen(
+    isLoading: Boolean,
+    errorMessage: String?,
+    plan: RoutinePlan?,
+    onRetry: () -> Unit,
+) {
 
     var isMorning by remember { mutableStateOf(true) }
     var selectedDay by remember { mutableStateOf(2) }
 
-    var doneState by remember {
-        mutableStateOf(
-            (morningSteps + eveningSteps)
-                .associate { it.id to it.initialDone }
-        )
-    }
+    var doneState by remember { mutableStateOf(setOf<String>()) }
 
     var selectedFeeling by remember { mutableStateOf<String?>(null) }
     var observations by remember { mutableStateOf("") }
 
     val activeSteps = if (isMorning) {
-        morningSteps
+        plan?.morning.orEmpty()
     } else {
-        eveningSteps
+        plan?.evening.orEmpty()
     }
 
     Column(
@@ -326,195 +241,154 @@ fun RoutinesScreen() {
         Spacer(Modifier.height(10.dp))
 
         // ROUTINE STEPS
-        activeSteps.forEachIndexed { index, step ->
+        when {
+            isLoading -> WeGlowLoadingView(message = "Building your routine…")
+            errorMessage != null -> WeGlowErrorView(message = errorMessage, onRetry = onRetry)
+            activeSteps.isEmpty() -> Text(
+                "No routine steps are available yet.",
+                fontFamily = JungeFont,
+                fontSize = 13.sp,
+                color = SoftGray,
+            )
+            else -> activeSteps.forEachIndexed { index, step ->
+                val stepKey = "${if (isMorning) "AM" else "PM"}-$index-${step.product?.id}"
+                val done = stepKey in doneState
+                val product = step.product
 
-            val done = doneState[step.id] == true
-            val highlighted = step.essential && !done
-
-            Box(
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(CardWhite)
-                        .then(
-                            if (highlighted) {
-                                Modifier.border(
-                                    2.dp,
-                                    DarkGreen,
-                                    RoundedCornerShape(16.dp)
-                                )
-                            } else {
-                                Modifier
-                            }
-                        )
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier.padding(bottom = 16.dp)
                 ) {
 
-                    // PRODUCT IMAGE
-                    if (step.imageRes != null) {
-
-                        Image(
-                            painter = painterResource(
-                                id = step.imageRes
-                            ),
-                            contentDescription = step.name,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(
-                                    RoundedCornerShape(12.dp)
-                                )
-                        )
-
-                    } else {
-
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .background(PageBackground)
-                        )
-                    }
-
-                    Spacer(Modifier.width(12.dp))
-
-                    Column(
-                        modifier = Modifier.weight(1f)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(CardWhite)
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
+                        // PRODUCT IMAGE
+                        // A missing product for this step (no match found) is a different
+                        // state from a matched product whose image failed to load - only the
+                        // former gets an empty placeholder box. A matched product always goes
+                        // through WeGlowProductImage so a null/blank/malformed image_url or a
+                        // failed load falls back to the WeGlow logo instead of a blank square.
+                        if (product != null) {
+
+                            WeGlowProductImage(
+                                imageUrl = product.imageUrl,
+                                contentDescription = product.name,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                            )
+
+                        } else {
+
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(
+                                        RoundedCornerShape(12.dp)
+                                    )
+                                    .background(PageBackground)
+                            )
+                        }
+
+                        Spacer(Modifier.width(12.dp))
+
+                        Column(
+                            modifier = Modifier.weight(1f)
                         ) {
 
                             Text(
-                                "STEP ${index + 1} • ${step.category}",
+                                "STEP ${index + 1} • ${step.label.uppercase()}",
                                 fontFamily = JungeFont,
                                 fontSize = 11.sp,
                                 color = DarkGreen.copy(alpha = 0.65f)
                             )
 
-                            if (step.badge != null) {
-
-                                Spacer(Modifier.width(6.dp))
+                            if (product != null) {
+                                Text(
+                                    product.name,
+                                    fontFamily = JungeFont,
+                                    fontSize = 14.sp,
+                                    color = PrimaryBlack,
+                                    textDecoration = if (done) {
+                                        TextDecoration.LineThrough
+                                    } else {
+                                        TextDecoration.None
+                                    },
+                                    modifier = Modifier.padding(top = 3.dp)
+                                )
 
                                 Text(
-                                    step.badge,
+                                    listOfNotNull(product.brandName, product.priceLabel).joinToString(" · "),
                                     fontFamily = JungeFont,
-                                    fontSize = 9.sp,
-                                    color = DarkGreen,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(50))
-                                        .background(MintChip)
-                                        .padding(
-                                            horizontal = 6.dp,
-                                            vertical = 2.dp
-                                        )
+                                    fontSize = 12.sp,
+                                    color = SoftGray,
+                                    textDecoration = if (done) {
+                                        TextDecoration.LineThrough
+                                    } else {
+                                        TextDecoration.None
+                                    }
+                                )
+                            } else {
+                                Text(
+                                    "No suitable product found for this step yet",
+                                    fontFamily = JungeFont,
+                                    fontSize = 12.sp,
+                                    color = SoftGray,
+                                    modifier = Modifier.padding(top = 3.dp)
                                 )
                             }
                         }
 
-                        Text(
-                            step.name,
-                            fontFamily = JungeFont,
-                            fontSize = 14.sp,
-                            color = PrimaryBlack,
-                            textDecoration = if (done) {
-                                TextDecoration.LineThrough
-                            } else {
-                                TextDecoration.None
-                            },
-                            modifier = Modifier.padding(top = 3.dp)
-                        )
+                        Spacer(Modifier.width(8.dp))
 
-                        Text(
-                            step.detail,
-                            fontFamily = JungeFont,
-                            fontSize = 12.sp,
-                            color = SoftGray,
-                            textDecoration = if (done) {
-                                TextDecoration.LineThrough
-                            } else {
-                                TextDecoration.None
-                            }
-                        )
-                    }
-
-                    Spacer(Modifier.width(8.dp))
-
-                    // CHECK BUTTON
-                    Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (done) {
-                                    DoneGreen
-                                } else {
-                                    Color.Transparent
-                                }
-                            )
-                            .then(
-                                if (!done) {
-                                    Modifier.border(
-                                        1.5.dp,
-                                        SoftGray,
-                                        CircleShape
+                        // CHECK BUTTON
+                        if (product != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (done) {
+                                            DoneGreen
+                                        } else {
+                                            Color.Transparent
+                                        }
                                     )
-                                } else {
-                                    Modifier
+                                    .then(
+                                        if (!done) {
+                                            Modifier.border(
+                                                1.5.dp,
+                                                SoftGray,
+                                                CircleShape
+                                            )
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
+                                    .clickable {
+                                        doneState = if (done) doneState - stepKey else doneState + stepKey
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+
+                                if (done) {
+
+                                    Icon(
+                                        Icons.Filled.Check,
+                                        contentDescription = "Mark step undone",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
-                            )
-                            .clickable {
-
-                                doneState = doneState
-                                    .toMutableMap()
-                                    .also {
-                                        it[step.id] = !done
-                                    }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-
-                        if (done) {
-
-                            Icon(
-                                Icons.Filled.Check,
-                                contentDescription = "Mark step undone",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            }
                         }
                     }
-                }
-
-                // ESSENTIAL BADGE
-                if (highlighted) {
-
-                    Text(
-                        "Essential",
-                        fontFamily = JungeFont,
-                        fontSize = 10.sp,
-                        color = Color.White,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .offset(
-                                y = (-8).dp,
-                                x = (-8).dp
-                            )
-                            .clip(RoundedCornerShape(50))
-                            .background(CoralAccent)
-                            .padding(
-                                horizontal = 8.dp,
-                                vertical = 3.dp
-                            )
-                    )
                 }
             }
         }

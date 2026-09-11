@@ -126,7 +126,7 @@ fun ScanResultsScreen(
                 }
             }
             Text("Automated predictions can be incorrect. These results are not a medical diagnosis.", color = SoftGray, fontSize = 12.sp)
-            PillButton("View routines", onViewRecommendations)
+            PillButton("View Recommendations", onViewRecommendations)
             Spacer(Modifier.height(8.dp))
         }
     }
