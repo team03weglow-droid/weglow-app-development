@@ -63,6 +63,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import com.example.weglow.ui.components.WeGlowPrimaryButton
 import com.example.weglow.feature.scan.ScanUiState
+import com.example.weglow.feature.hairstyle.HairstyleUiState
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.saveable.rememberSaveable
 
@@ -74,8 +75,11 @@ private enum class ScanFlowState { MODE_SELECT, CAMERA, ANALYZING }
 fun ScanScreen(
     photoUri: Uri?,
     acneState: ScanUiState,
+    hairstyleState: HairstyleUiState,
     onAnalyzeAcne: () -> Unit,
     onCancelAcne: () -> Unit,
+    onAnalyzeHairstyle: (Uri) -> Unit,
+    onCancelHairstyle: () -> Unit,
     onPhotoCaptured: (Uri) -> Unit,
     onBack: () -> Unit,
     onAcneScanComplete: () -> Unit,
@@ -105,11 +109,11 @@ fun ScanScreen(
         if (uri != null) {
             onPhotoCaptured(uri)
             flowState = ScanFlowState.ANALYZING
-            if (scanMode == ScanMode.ACNE) beginAcneAnalysis()
+            if (scanMode == ScanMode.ACNE) beginAcneAnalysis() else onAnalyzeHairstyle(uri)
         }
     }
     BackHandler(flowState == ScanFlowState.ANALYZING) {
-        onCancelAcne()
+        if (scanMode == ScanMode.ACNE) onCancelAcne() else onCancelHairstyle()
         flowState = ScanFlowState.CAMERA
     }
     LaunchedEffect(acneState.result, flowState) {
@@ -120,6 +124,16 @@ fun ScanScreen(
             // Allow the UI progress animation to visibly finish at 100%.
             delay(750L)
             onAcneScanComplete()
+        }
+    }
+    LaunchedEffect(hairstyleState.result, flowState, scanMode) {
+        if (
+            flowState == ScanFlowState.ANALYZING &&
+            scanMode == ScanMode.HAIRSTYLE &&
+            hairstyleState.result != null
+        ) {
+            delay(500L)
+            onHairstyleScanComplete()
         }
     }
 
@@ -152,7 +166,7 @@ fun ScanScreen(
             ) {
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "WeGlow needs camera access to scan your skin.",
+                    "WeGlow needs camera access to scan your face.",
                     fontFamily = JungeFont,
                     fontSize = 16.sp,
                     textAlign = TextAlign.Center
@@ -172,22 +186,26 @@ fun ScanScreen(
 
         flowState == ScanFlowState.ANALYZING -> {
             AnalyzingScreen(
-                mode = scanMode,
                 photoUri = photoUri,
-                onFinished = {
-                    if (scanMode == ScanMode.HAIRSTYLE) onHairstyleScanComplete() else onAcneScanComplete()
+                state = hairstyleState,
+                onRetry = {
+                    photoUri?.let(onAnalyzeHairstyle)
                 },
-                onCancel = { flowState = ScanFlowState.CAMERA }
+                onCancel = {
+                    onCancelHairstyle()
+                    flowState = ScanFlowState.CAMERA
+                },
             )
         }
 
         else -> {
             CameraCaptureScreen(
+                mode = scanMode,
                 onBack = { flowState = ScanFlowState.MODE_SELECT },
                 onPhotoReady = { uri ->
                     onPhotoCaptured(uri)
                     flowState = ScanFlowState.ANALYZING
-                    if (scanMode == ScanMode.ACNE) beginAcneAnalysis()
+                    if (scanMode == ScanMode.ACNE) beginAcneAnalysis() else onAnalyzeHairstyle(uri)
                 }
             )
         }
@@ -361,7 +379,7 @@ private fun ScanTypeCard(icon: ImageVector, title: String, description: String, 
 }
 
 @Composable
-private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit) {
+private fun CameraCaptureScreen(mode: ScanMode, onBack: () -> Unit, onPhotoReady: (Uri) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -441,7 +459,11 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
                 modifier = Modifier.fillMaxWidth()
             )
             Text(
-                "within the guide to begin skin analysis",
+                if (mode == ScanMode.HAIRSTYLE) {
+                    "within the guide to detect your face shape"
+                } else {
+                    "within the guide to begin skin analysis"
+                },
                 fontFamily = JungeFont,
                 fontSize = 14.sp,
                 color = Color.White.copy(alpha = 0.85f),
@@ -547,7 +569,12 @@ private fun ScanCircleIconButton(
 }
 
 @Composable
-private fun AnalyzingScreen(mode: ScanMode, photoUri: Uri?, onFinished: () -> Unit, onCancel: () -> Unit) {
+private fun AnalyzingScreen(
+    photoUri: Uri?,
+    state: HairstyleUiState,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+) {
     val context = LocalContext.current
     var photoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
@@ -555,31 +582,17 @@ private fun AnalyzingScreen(mode: ScanMode, photoUri: Uri?, onFinished: () -> Un
         photoBitmap = photoUri?.let { loadImageBitmap(context, it) }
     }
 
-    val progress = remember { Animatable(0f) }
-    val messages = if (mode == ScanMode.HAIRSTYLE) {
-        listOf(
-            "Mapping facial contours..." to 0.2f,
-            "Detecting face shape..." to 0.55f,
-            "Matching hairstyles..." to 0.85f,
-            "Finishing up..." to 1.0f,
-        )
-    } else {
-        listOf(
-            "Detecting facial landmarks..." to 0.15f,
-            "Analyzing skin texture..." to 0.55f,
-            "Calculating skin score..." to 0.85f,
-            "Finishing up..." to 1.0f,
-        )
-    }
-    var currentMessage by remember { mutableStateOf(messages.first().first) }
-
-    LaunchedEffect(Unit) {
-        for ((message, target) in messages) {
-            currentMessage = message
-            progress.animateTo(target, animationSpec = tween(durationMillis = 700, easing = LinearEasing))
+    val progress = remember { Animatable(0.08f) }
+    LaunchedEffect(state.isAnalyzing) {
+        while (state.isAnalyzing) {
+            progress.animateTo(
+                (progress.value + 0.08f).coerceAtMost(0.92f),
+                animationSpec = tween(durationMillis = 240, easing = LinearEasing),
+            )
         }
-        delay(300)
-        onFinished()
+    }
+    LaunchedEffect(state.result) {
+        if (state.result != null) progress.animateTo(1f, tween(350))
     }
 
     Column(
@@ -629,7 +642,7 @@ private fun AnalyzingScreen(mode: ScanMode, photoUri: Uri?, onFinished: () -> Un
             verticalAlignment = Alignment.Bottom
         ) {
             Text(
-                currentMessage,
+                if (state.error == null) "Detecting face shape..." else "Analysis paused",
                 fontFamily = JungeFont,
                 fontSize = 26.sp,
                 color = Color.White,
@@ -643,25 +656,28 @@ private fun AnalyzingScreen(mode: ScanMode, photoUri: Uri?, onFinished: () -> Un
             )
         }
         Spacer(Modifier.height(10.dp))
-        LinearProgressIndicator(
-            progress = { progress.value },
-            color = CoralAccent,
-            trackColor = Color.White.copy(alpha = 0.2f),
-            strokeCap = StrokeCap.Round,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(50))
-        )
-        Spacer(Modifier.height(14.dp))
-        Text(
-            "AI analysis in progress...",
-            fontFamily = JungeFont,
-            fontSize = 13.sp,
-            color = Color.White.copy(alpha = 0.7f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (state.error == null) {
+            LinearProgressIndicator(
+                progress = { progress.value },
+                color = CoralAccent,
+                trackColor = Color.White.copy(alpha = 0.2f),
+                strokeCap = StrokeCap.Round,
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                "Running privately on your device. Your photo is not uploaded.",
+                fontFamily = JungeFont,
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            Text(state.error, color = Color.White, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(14.dp))
+            PillButton("Retry analysis", onRetry)
+        }
         Spacer(Modifier.height(24.dp))
     }
 }

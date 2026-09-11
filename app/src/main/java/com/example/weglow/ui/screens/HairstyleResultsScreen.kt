@@ -70,14 +70,14 @@ fun HairstyleResultsScreen(result: HairstyleResult, onBack: () -> Unit) {
                     Box(modifier = Modifier.padding(top = 4.dp).size(10.dp).clip(CircleShape).background(DarkGreen))
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        "Why Oval Works With Everything",
+                        "Your ${result.faceShape} Face Shape",
                         fontFamily = JungeFont,
                         fontSize = 20.sp,
                         color = TextBlack
                     )
                 }
                 Text(
-                    "IDEAL\nSYMMETRY",
+                    "${result.confidencePercent}%\nCONFIDENCE",
                     fontFamily = JungeFont,
                     fontSize = 10.sp,
                     color = TextBlack,
@@ -91,11 +91,14 @@ fun HairstyleResultsScreen(result: HairstyleResult, onBack: () -> Unit) {
             Text(description, fontFamily = JungeFont, fontSize = 13.sp, color = SoftGray)
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TraitChip(traits[0], Modifier.weight(1f, fill = false))
-                TraitChip(traits[1], Modifier.weight(1f, fill = false))
+                traits.take(2).forEach { trait ->
+                    TraitChip(trait, Modifier.weight(1f, fill = false))
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            TraitChip(traits[2])
+            traits.drop(2).firstOrNull()?.let { trait ->
+                Spacer(Modifier.height(8.dp))
+                TraitChip(trait)
+            }
         }
 
         Spacer(Modifier.height(28.dp))

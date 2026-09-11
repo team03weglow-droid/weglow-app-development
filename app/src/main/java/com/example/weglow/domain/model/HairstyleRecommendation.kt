@@ -9,6 +9,8 @@ data class HairstyleRecommendation(
 )
 
 data class HairstyleResult(
+    val faceShape: String,
+    val confidencePercent: Int,
     val traits: List<String>,
     val description: String,
     val recommendations: List<HairstyleRecommendation>,
