@@ -14,4 +14,12 @@ interface ProfileRepository {
      * The mere existence of a profile row is not treated as completion.
      */
     suspend fun hasCompletedOnboarding(userId: String): Result<Boolean>
+
+    /**
+     * Persists [path] (a Supabase Storage object path, or null to clear it) into
+     * the authenticated user's profile row, touching no other column. [userId]
+     * must be the authenticated identity resolved by the caller, never a value
+     * supplied by the UI.
+     */
+    suspend fun updateProfileImagePath(userId: String, path: String?): Result<Unit>
 }

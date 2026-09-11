@@ -4,10 +4,12 @@ import com.example.weglow.data.remote.supabase.SupabaseClientProvider
 import com.example.weglow.data.repository.InMemoryCatalogRepository
 import com.example.weglow.data.repository.InMemoryHairstyleRepository
 import com.example.weglow.data.repository.SupabaseAuthRepository
+import com.example.weglow.data.repository.SupabaseProfileImageRepository
 import com.example.weglow.data.repository.SupabaseProfileRepository
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.CatalogRepository
 import com.example.weglow.domain.repository.HairstyleRepository
+import com.example.weglow.domain.repository.ProfileImageRepository
 import com.example.weglow.domain.repository.ProfileRepository
 import android.content.Context
 import com.example.weglow.data.repository.LocalAcneScanRepository
@@ -27,6 +29,7 @@ class AppContainer {
 
     val authRepository: AuthRepository by lazy { SupabaseAuthRepository(supabaseClient) }
     val profileRepository: ProfileRepository by lazy { SupabaseProfileRepository(supabaseClient) }
+    val profileImageRepository: ProfileImageRepository by lazy { SupabaseProfileImageRepository(supabaseClient) }
     val catalogRepository: CatalogRepository by lazy { InMemoryCatalogRepository() }
     val hairstyleRepository: HairstyleRepository by lazy { InMemoryHairstyleRepository() }
 }

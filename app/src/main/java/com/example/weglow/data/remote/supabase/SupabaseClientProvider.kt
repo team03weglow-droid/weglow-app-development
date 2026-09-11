@@ -4,6 +4,7 @@ import com.example.weglow.core.config.AppConfig
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.storage.Storage
 
 /**
  * Single infrastructure-level owner of the Supabase client.
@@ -22,6 +23,9 @@ object SupabaseClientProvider {
             supabaseKey = AppConfig.supabasePublishableKey,
         ) {
             install(Postgrest)
+
+            // Phase 6: private bucket "profile-images" for user profile pictures.
+            install(Storage)
 
             install(Auth) {
                 scheme = "weglow"

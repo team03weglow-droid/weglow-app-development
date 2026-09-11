@@ -30,6 +30,21 @@ class SupabaseProfileRepository(
             .decodeList<ProfileRow>()
             .isOnboardingCompleted()
     }
+
+    /**
+     * Targeted single-column update. It deliberately does not go through
+     * [saveProfile]'s upsert so a profile-picture change can never blank out
+     * `full_name`, onboarding answers, or the completion flag. The per-user
+     * UPDATE RLS policy still confines the write to `auth.uid() = id`.
+     */
+    override suspend fun updateProfileImagePath(userId: String, path: String?): Result<Unit> = runCatching {
+        client.postgrest["profiles"].update(
+            update = { set("profile_image_url", path) },
+        ) {
+            filter { eq("id", userId) }
+        }
+        Unit
+    }
 }
 
 /**

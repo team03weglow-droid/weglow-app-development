@@ -363,4 +363,10 @@ private class FakeProfileRepository(
         userId: String,
     ): Result<Boolean> =
         Result.success(storedProfile?.onboardingCompleted ?: completed)
+
+    override suspend fun updateProfileImagePath(
+        userId: String,
+        path: String?,
+    ): Result<Unit> =
+        Result.success(Unit)
 }

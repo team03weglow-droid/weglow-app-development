@@ -83,7 +83,8 @@ fun WeGlowApp() {
         factory = viewModelFactory {
             ProfileViewModel(
                 container.authRepository,
-                container.profileRepository
+                container.profileRepository,
+                container.profileImageRepository
             )
         }
     )
@@ -417,6 +418,7 @@ fun WeGlowApp() {
                 HomeScreen(
 
                     displayName = profileState.displayName,
+                    profileImage = profileState.profileImage,
 
                     onScanClick = {
 
@@ -554,6 +556,12 @@ fun WeGlowApp() {
 
                 ProfileScreen(
                     displayName = profileState.displayName,
+                    profileImage = profileState.profileImage,
+                    isUploadingImage = profileState.isUploadingImage,
+                    imageError = profileState.imageError,
+                    onProfileImagePicked = profileViewModel::onProfileImagePicked,
+                    onProfileImageUnreadable = profileViewModel::onProfileImageUnreadable,
+                    onConsumeImageError = profileViewModel::consumeImageError,
                     onLogout = authViewModel::signOut
                 )
 

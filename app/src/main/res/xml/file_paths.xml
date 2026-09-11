@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Phase 6 follow-up: the ONLY filesystem location shared with the system
+    camera app. A single private sub-directory of the app's internal cache
+    (context.getCacheDir()/profile-camera/). No other cache path, no files-dir,
+    and no external / SD-card storage is exposed.
+-->
+<paths>
+    <cache-path
+        name="profile-camera"
+        path="profile-camera/" />
+</paths>

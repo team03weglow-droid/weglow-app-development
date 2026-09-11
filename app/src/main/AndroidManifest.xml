@@ -61,6 +61,22 @@
 
         </activity>
 
+        <!--
+            Phase 6 follow-up: narrow FileProvider used ONLY to hand the system
+            camera a single private cache file for a profile-picture capture.
+            Not exported; URI access is granted per-launch and only to the
+            camera app that is started. No broad/external storage is involved.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 
 </manifest>

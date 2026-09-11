@@ -36,6 +36,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
+import com.example.weglow.ui.components.ProfileAvatar
+import com.example.weglow.ui.components.rememberDecodedBitmap
 import com.example.weglow.ui.theme.*
 
 
@@ -49,7 +51,13 @@ private val insights = listOf(
 )
 
 @Composable
-fun HomeScreen(onScanClick: () -> Unit, onDiscoverClick: () -> Unit, displayName: String? = null) {
+fun HomeScreen(
+    onScanClick: () -> Unit,
+    onDiscoverClick: () -> Unit,
+    displayName: String? = null,
+    profileImage: ByteArray? = null,
+) {
+    val avatarBitmap = rememberDecodedBitmap(profileImage)
     val skinScore = 74
     val scoreDelta = 3
     val hydration = 0.82f
@@ -88,14 +96,7 @@ fun HomeScreen(onScanClick: () -> Unit, onDiscoverClick: () -> Unit, displayName
                 contentDescription = null,
                 modifier = Modifier.size(24.dp)
             )
-            Image(
-                painter = painterResource(R.drawable.avatar_rukman),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-            )
+            ProfileAvatar(image = avatarBitmap, size = 36.dp)
         }
 
         Column(modifier = Modifier.padding(horizontal = 24.dp)) {

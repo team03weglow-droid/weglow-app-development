@@ -225,4 +225,7 @@ private class RecordingProfileRepository(
 
     override suspend fun hasCompletedOnboarding(userId: String): Result<Boolean> =
         Result.success(stored?.onboardingCompleted ?: false)
+
+    override suspend fun updateProfileImagePath(userId: String, path: String?): Result<Unit> =
+        Result.success(Unit)
 }

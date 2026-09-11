@@ -15,6 +15,7 @@ class ArchitectureFoundationTest {
             skinType = "Combination",
             gender = "Prefer not to say",
             isSkinSensitive = true,
+            profileImagePath = "user-1/1699999999999.jpg",
             onboardingCompleted = true,
         )
 
@@ -24,6 +25,7 @@ class ArchitectureFoundationTest {
         assertEquals("Test User", row.full_name)
         assertEquals("Combination", row.skin_type)
         assertEquals(true, row.is_skin_sensitive)
+        assertEquals("user-1/1699999999999.jpg", row.profile_image_url)
         assertEquals(true, row.onboarding_completed)
     }
 }

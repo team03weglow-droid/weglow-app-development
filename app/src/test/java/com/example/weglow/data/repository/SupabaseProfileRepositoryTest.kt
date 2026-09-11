@@ -85,6 +85,27 @@ class SupabaseProfileRepositoryTest {
         assertEquals(profile, profile.toProfileRow().toUserProfile())
     }
 
+    // Phase 6: the profile-picture storage reference round-trips through the
+    // profile_image_url column without leaking Supabase types into the domain.
+    @Test
+    fun profileImagePath_roundTripsThroughProfileImageUrlColumn() {
+        val profile = UserProfile(
+            id = "user-1",
+            fullName = "Sam Real",
+            profileImagePath = "user-1/1720000000000.jpg",
+            onboardingCompleted = true,
+        )
+
+        val row = profile.toProfileRow()
+        assertEquals("user-1/1720000000000.jpg", row.profile_image_url)
+        assertEquals(profile, row.toUserProfile())
+    }
+
+    @Test
+    fun profileRow_withoutImageUrl_mapsToNullPath() {
+        assertNull(ProfileRow(id = "user-1").toUserProfile().profileImagePath)
+    }
+
     @Test
     fun defaultProfileRow_isNotCompleted() {
         assertNull(ProfileRow(id = "user-1").skin_type)
