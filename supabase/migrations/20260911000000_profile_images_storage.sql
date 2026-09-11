@@ -38,7 +38,6 @@ set public = excluded.public,
 -- 2. Per-user object policies on storage.objects.
 --    RLS is already enabled on storage.objects by Supabase; the guard below is
 --    harmless if it is re-run.
-alter table storage.objects enable row level security;
 
 -- SELECT: a user may read only files inside their own folder in this bucket.
 drop policy if exists "profile-images read own" on storage.objects;
