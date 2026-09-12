@@ -1,5 +1,6 @@
 package com.example.weglow.feature.routine
 
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -15,32 +16,35 @@ class RoutineCompletionKeyTest {
 
     @Test
     fun differentDays_produceDifferentKeys_forAnOtherwiseIdenticalStep() {
-        val monday = routineStepKey(day = 0, isMorning = true, stepIndex = 0, productId = "p1")
-        val tuesday = routineStepKey(day = 1, isMorning = true, stepIndex = 0, productId = "p1")
+        val monday = routineStepKey(date = LocalDate.of(2026, 9, 14), isMorning = true, stepIndex = 0, productId = "p1")
+        val tuesday = routineStepKey(date = LocalDate.of(2026, 9, 15), isMorning = true, stepIndex = 0, productId = "p1")
 
         assertNotEquals(monday, tuesday)
     }
 
     @Test
     fun morningAndEvening_areIndependentForTheSameDayAndStepIndex() {
-        val morning = routineStepKey(day = 2, isMorning = true, stepIndex = 0, productId = "p1")
-        val evening = routineStepKey(day = 2, isMorning = false, stepIndex = 0, productId = "p1")
+        val date = LocalDate.of(2026, 9, 12)
+        val morning = routineStepKey(date = date, isMorning = true, stepIndex = 0, productId = "p1")
+        val evening = routineStepKey(date = date, isMorning = false, stepIndex = 0, productId = "p1")
 
         assertNotEquals(morning, evening)
     }
 
     @Test
     fun differentStepsOnTheSameDayAndPeriod_produceDifferentKeys() {
-        val cleanser = routineStepKey(day = 2, isMorning = true, stepIndex = 0, productId = "p1")
-        val moisturizer = routineStepKey(day = 2, isMorning = true, stepIndex = 1, productId = "p2")
+        val date = LocalDate.of(2026, 9, 12)
+        val cleanser = routineStepKey(date = date, isMorning = true, stepIndex = 0, productId = "p1")
+        val moisturizer = routineStepKey(date = date, isMorning = true, stepIndex = 1, productId = "p2")
 
         assertNotEquals(cleanser, moisturizer)
     }
 
     @Test
     fun sameDayPeriodStepAndProduct_alwaysProducesTheSameKey() {
-        val first = routineStepKey(day = 3, isMorning = false, stepIndex = 2, productId = "p9")
-        val second = routineStepKey(day = 3, isMorning = false, stepIndex = 2, productId = "p9")
+        val date = LocalDate.of(2026, 9, 12)
+        val first = routineStepKey(date = date, isMorning = false, stepIndex = 2, productId = "p9")
+        val second = routineStepKey(date = date, isMorning = false, stepIndex = 2, productId = "p9")
 
         assertEquals(first, second)
     }
@@ -50,8 +54,9 @@ class RoutineCompletionKeyTest {
         // A step with no matched product (RoutineBuilder leaves product == null rather than
         // inventing one) must not collide with a different missing-product step in the same
         // day/period just because both have a null product id.
-        val stepOne = routineStepKey(day = 0, isMorning = true, stepIndex = 0, productId = null)
-        val stepTwo = routineStepKey(day = 0, isMorning = true, stepIndex = 2, productId = null)
+        val date = LocalDate.of(2026, 9, 12)
+        val stepOne = routineStepKey(date = date, isMorning = true, stepIndex = 0, productId = null)
+        val stepTwo = routineStepKey(date = date, isMorning = true, stepIndex = 2, productId = null)
 
         assertNotEquals(stepOne, stepTwo)
     }
@@ -61,8 +66,8 @@ class RoutineCompletionKeyTest {
         // Reproduces the exact reported defect against the real Set<String> shape RoutinesScreen
         // uses for doneState: marking a step done on day 0 must not make the equivalent step on
         // day 1 appear done too.
-        val dayZeroKey = routineStepKey(day = 0, isMorning = true, stepIndex = 0, productId = "p1")
-        val dayOneKey = routineStepKey(day = 1, isMorning = true, stepIndex = 0, productId = "p1")
+        val dayZeroKey = routineStepKey(date = LocalDate.of(2026, 9, 12), isMorning = true, stepIndex = 0, productId = "p1")
+        val dayOneKey = routineStepKey(date = LocalDate.of(2026, 9, 13), isMorning = true, stepIndex = 0, productId = "p1")
 
         var doneState = setOf<String>()
         doneState = doneState + dayZeroKey // user marks the step done while day 0 is selected
@@ -76,8 +81,8 @@ class RoutineCompletionKeyTest {
         // Day A -> mark a step done -> switch to Day B -> switch back to Day A: A's completion
         // must still show, since completion is keyed independently per day rather than cleared
         // or overwritten when the selected date changes.
-        val dayAKey = routineStepKey(day = 0, isMorning = true, stepIndex = 0, productId = "p1")
-        val dayBKey = routineStepKey(day = 1, isMorning = true, stepIndex = 0, productId = "p1")
+        val dayAKey = routineStepKey(date = LocalDate.of(2026, 9, 12), isMorning = true, stepIndex = 0, productId = "p1")
+        val dayBKey = routineStepKey(date = LocalDate.of(2026, 9, 13), isMorning = true, stepIndex = 0, productId = "p1")
 
         var doneState = setOf<String>()
         doneState = doneState + dayAKey // complete the step while day A is selected
@@ -86,5 +91,15 @@ class RoutineCompletionKeyTest {
 
         assertTrue("day A's completion must survive switching away and back", dayAKey in doneState)
         assertFalse(dayBKey in doneState)
+    }
+
+    @Test
+    fun sameDayNumberInDifferentMonths_producesDifferentIsoDateKeys() {
+        val september = routineStepKey(LocalDate.of(2026, 9, 12), true, 0, "p1")
+        val october = routineStepKey(LocalDate.of(2026, 10, 12), true, 0, "p1")
+
+        assertNotEquals(september, october)
+        assertTrue(september.startsWith("2026-09-12"))
+        assertTrue(october.startsWith("2026-10-12"))
     }
 }
