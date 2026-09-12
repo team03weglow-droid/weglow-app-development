@@ -1,0 +1,7 @@
+{
+  "input_size": 224,
+  "labels": ["Heart", "Oblong", "Oval", "Round", "Square"],
+  "model_sha256": "0760ef833f4e5b512d2ef04ffe5894bab46a29a3f9ecdb8797fd13a4946d65a5",
+  "source_format": "Keras 3.13.2",
+  "source_url": "https://drive.google.com/file/d/1_4u2HwFPCOs2YGkgCw-7H12tZaKsjU-p/view"
+}

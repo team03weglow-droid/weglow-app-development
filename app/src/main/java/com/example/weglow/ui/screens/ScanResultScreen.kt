@@ -25,6 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.example.weglow.domain.model.AcneScanResult
 import com.example.weglow.ui.theme.*
 
@@ -53,11 +54,11 @@ fun ScanResultsScreen(
         }
         Box(Modifier.fillMaxWidth().height(320.dp).background(Color(0xFF1C1917))) {
             bitmap?.let { photo ->
-                Image(photo, "Scanned photo with detected areas", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                Image(photo, "Scanned photo with detected areas", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 Canvas(Modifier.fillMaxSize()) {
-                    // ContentScale.Fit can letterbox the photo inside the hero. Map the
-                    // model's normalized coordinates into the photo's actual rendered rect.
-                    val imageScale = minOf(size.width / result.imageWidth, size.height / result.imageHeight)
+                    // ContentScale.Crop fills the hero without black side strips. Map the
+                    // model's normalized coordinates into the cropped rendered rect.
+                    val imageScale = maxOf(size.width / result.imageWidth, size.height / result.imageHeight)
                     val renderedWidth = result.imageWidth * imageScale
                     val renderedHeight = result.imageHeight * imageScale
                     val imageLeft = (size.width - renderedWidth) / 2f
@@ -79,13 +80,13 @@ fun ScanResultsScreen(
                     }
                 }
             }
-            Row(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.align(Alignment.TopStart).fillMaxWidth().zIndex(1f).padding(horizontal = 16.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack, modifier = Modifier.size(40.dp).background(Color.Black.copy(alpha = 0.35f), CircleShape)) {
                     Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                 }
                 Spacer(Modifier.width(12.dp)); Text("Scan results", fontSize = 20.sp, color = Color.White)
             }
-            Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xE6171717)).padding(horizontal = 18.dp, vertical = 14.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().zIndex(1f).padding(16.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFF171717)).padding(horizontal = 18.dp, vertical = 14.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 ResultMetric("DETECTIONS", result.detections.size.toString())
                 Box(Modifier.width(1.dp).height(34.dp).background(Color.White.copy(alpha = 0.2f)))
                 ResultMetric("CONCERN TYPES", labels.size.toString())
