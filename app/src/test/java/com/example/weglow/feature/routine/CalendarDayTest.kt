@@ -22,26 +22,26 @@ class CalendarDayTest {
     }
 
     @Test
-    fun generatesSevenConsecutiveDaysCenteredOnAnchor() {
+    fun generatesSundayThroughSaturdayWeekContainingAnchor() {
         val anchor = LocalDate.of(2026, 9, 12)
 
         val days = calendarDays(anchor, anchor, anchor, locale)
 
         assertEquals(7, days.size)
-        assertEquals(anchor.minusDays(3), days.first().date)
-        assertEquals(anchor.plusDays(3), days.last().date)
-        assertEquals("SAT", days[3].dayName)
-        assertEquals("12", days[3].dayNumber)
+        assertEquals(LocalDate.of(2026, 9, 6), days.first().date)
+        assertEquals(LocalDate.of(2026, 9, 12), days.last().date)
+        assertEquals("SUN", days.first().dayName)
+        assertEquals("SAT", days.last().dayName)
     }
 
     @Test
     fun crossesEndOfMonth() {
-        val anchor = LocalDate.of(2026, 1, 30)
+        val anchor = LocalDate.of(2026, 4, 30)
 
         val dates = calendarDays(anchor, anchor, anchor, locale).map { it.date }
 
-        assertTrue(LocalDate.of(2026, 1, 31) in dates)
-        assertTrue(LocalDate.of(2026, 2, 1) in dates)
+        assertTrue(LocalDate.of(2026, 4, 30) in dates)
+        assertTrue(LocalDate.of(2026, 5, 1) in dates)
     }
 
     @Test
@@ -66,7 +66,7 @@ class CalendarDayTest {
     @Test
     fun anotherFullDateCanBeSelected() {
         val today = LocalDate.of(2026, 9, 12)
-        val selection = today.plusDays(2)
+        val selection = today.minusDays(2)
 
         val days = calendarDays(today, selection, today, locale)
 

@@ -12,14 +12,15 @@ data class CalendarDay(
     val isSelected: Boolean,
 )
 
-/** Builds the seven-day strip centered on [anchorDate]. */
+/** Builds the Sunday-through-Saturday week containing [anchorDate]. */
 internal fun calendarDays(
     anchorDate: LocalDate,
     selectedDate: LocalDate,
     today: LocalDate,
     locale: Locale = Locale.getDefault(),
 ): List<CalendarDay> {
-    val firstDate = anchorDate.minusDays(3)
+    val daysSinceSunday = anchorDate.dayOfWeek.value % 7
+    val firstDate = anchorDate.minusDays(daysSinceSunday.toLong())
 
     return List(7) { offset ->
         val date = firstDate.plusDays(offset.toLong())

@@ -1,5 +1,10 @@
 package com.example.weglow.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -37,9 +43,10 @@ import com.example.weglow.ui.components.rememberDecodedBitmap
 import com.example.weglow.ui.theme.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import kotlinx.coroutines.delay
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.time.LocalTime
 
 private val feelingChips = listOf(
     "Dry",
@@ -59,14 +66,15 @@ fun RoutinesScreen(
     profileImage: ByteArray? = null,
 ) {
 
-    var isMorning by remember { mutableStateOf(true) }
+    var isMorning by remember { mutableStateOf(LocalTime.now().hour < 12) }
     val initialToday = remember { LocalDate.now() }
     var today by remember { mutableStateOf(initialToday) }
     var selectedDate by remember { mutableStateOf(initialToday) }
     var calendarAnchor by remember { mutableStateOf(initialToday) }
 
-    fun refreshDeviceDate() {
+    fun refreshDeviceDateAndPeriod() {
         val deviceToday = LocalDate.now()
+        isMorning = LocalTime.now().hour < 12
         if (deviceToday != today) {
             val selectionWasToday = selectedDate == today
             today = deviceToday
@@ -80,7 +88,7 @@ fun RoutinesScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, today, selectedDate) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) refreshDeviceDate()
+            if (event == Lifecycle.Event.ON_RESUME) refreshDeviceDateAndPeriod()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -90,13 +98,11 @@ fun RoutinesScreen(
     LaunchedEffect(today, selectedDate) {
         while (true) {
             delay(30_000L)
-            refreshDeviceDate()
+            refreshDeviceDateAndPeriod()
         }
     }
 
     val locale = LocalConfiguration.current.locales[0]
-    val visibleDays = calendarDays(calendarAnchor, selectedDate, today, locale)
-    val monthYear = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", locale))
 
     // Session-only completion tracking: no routine-history table/persistence exists in this
     // app, so this intentionally does not survive an app restart. Keys are built by
@@ -142,53 +148,57 @@ fun RoutinesScreen(
 
         Spacer(Modifier.height(14.dp))
 
-        // GREETING
-        // Uses the real persisted profile name (via ProfileViewModel); falls back to neutral
-        // copy rather than a placeholder name when none is available yet.
-        val greetingName = displayName?.trim()?.takeIf(String::isNotEmpty)
-        Text(
-            when {
-                isMorning && greetingName != null -> "Good Morning, $greetingName"
-                isMorning -> "Good Morning"
-                greetingName != null -> "Good Evening, $greetingName"
-                else -> "Good Evening"
+        AnimatedContent(
+            targetState = calendarAnchor,
+            transitionSpec = {
+                if (targetState > initialState) {
+                    slideInHorizontally(
+                        animationSpec = tween(400),
+                        initialOffsetX = { fullWidth -> fullWidth },
+                    ) togetherWith slideOutHorizontally(
+                        animationSpec = tween(400),
+                        targetOffsetX = { fullWidth -> -fullWidth },
+                    )
+                } else {
+                    slideInHorizontally(
+                        animationSpec = tween(400),
+                        initialOffsetX = { fullWidth -> -fullWidth },
+                    ) togetherWith slideOutHorizontally(
+                        animationSpec = tween(400),
+                        targetOffsetX = { fullWidth -> fullWidth },
+                    )
+                }
             },
-            fontFamily = JungeFont,
-            fontSize = 24.sp,
-            color = PrimaryBlack
-        )
-
-        Text(
-            if (isMorning) {
-                "Your skin needs a little extra hydration today."
-            } else {
-                "Time to repair and recover overnight."
-            },
-            fontFamily = JungeFont,
-            fontSize = 14.sp,
-            color = PrimaryBlack,
-            modifier = Modifier.padding(
-                top = 2.dp,
-                bottom = 18.dp
-            )
-        )
-
-        // WEEK DAYS
-        Text(
-            monthYear,
-            fontFamily = JungeFont,
-            fontSize = 14.sp,
-            color = PrimaryBlack,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 10.dp),
-            textAlign = TextAlign.Center,
-        )
+                .fillMaxWidth(),
+            label = "Calendar week",
+        ) { weekAnchor ->
+            val visibleDays = calendarDays(weekAnchor, selectedDate, today, locale)
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+            Row(
+                modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(weekAnchor) {
+                    var horizontalDrag = 0f
+                    val swipeThreshold = 48.dp.toPx()
+                    detectHorizontalDragGestures(
+                        onDragStart = { horizontalDrag = 0f },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            horizontalDrag += dragAmount
+                        },
+                        onDragEnd = {
+                            if (kotlin.math.abs(horizontalDrag) >= swipeThreshold) {
+                                val dayOffset = if (horizontalDrag < 0f) 7L else -7L
+                                val newAnchor = weekAnchor.plusDays(dayOffset)
+                                calendarAnchor = newAnchor
+                                selectedDate = newAnchor
+                            }
+                        },
+                    )
+                    },
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
 
             visibleDays.forEach { day ->
                 key(day.date.toString()) {
@@ -222,10 +232,17 @@ fun RoutinesScreen(
                             .size(40.dp)
                             .clip(CircleShape)
                             .background(
-                                if (day.isSelected) {
-                                    DarkGreen
+                                when {
+                                    day.isSelected -> DarkGreen
+                                    day.isToday -> MintChip
+                                    else -> CardWhite
+                                }
+                            )
+                            .then(
+                                if (day.isToday && !day.isSelected) {
+                                    Modifier.border(2.dp, DarkGreen, CircleShape)
                                 } else {
-                                    CardWhite
+                                    Modifier
                                 }
                             ),
                         contentAlignment = Alignment.Center
@@ -242,6 +259,7 @@ fun RoutinesScreen(
                             }
                         )
                     }
+                }
                 }
             }
         }
@@ -273,7 +291,20 @@ fun RoutinesScreen(
             }
         }
 
-        Spacer(Modifier.height(20.dp))
+        Text(
+            if (isMorning) {
+                "Your skin needs a little extra hydration today."
+            } else {
+                "Time to repair and recover overnight."
+            },
+            fontFamily = JungeFont,
+            fontSize = 14.sp,
+            color = PrimaryBlack,
+            modifier = Modifier.padding(
+                top = 2.dp,
+                bottom = 18.dp
+            )
+        )
 
         Text(
             "Step-by-Step",
