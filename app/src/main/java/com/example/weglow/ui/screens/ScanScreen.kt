@@ -15,7 +15,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutSine
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -24,6 +23,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,7 +63,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import com.example.weglow.ui.components.WeGlowPrimaryButton
+import com.example.weglow.core.image.FaceValidationResult
+import com.example.weglow.core.image.errorMessage
 import com.example.weglow.feature.scan.ScanUiState
+import com.example.weglow.feature.hairstyle.HairstyleUiState
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.saveable.rememberSaveable
 
@@ -74,8 +78,11 @@ private enum class ScanFlowState { MODE_SELECT, CAMERA, ANALYZING }
 fun ScanScreen(
     photoUri: Uri?,
     acneState: ScanUiState,
+    hairstyleState: HairstyleUiState,
     onAnalyzeAcne: () -> Unit,
     onCancelAcne: () -> Unit,
+    onAnalyzeHairstyle: (Uri) -> Unit,
+    onCancelHairstyle: () -> Unit,
     onPhotoCaptured: (Uri) -> Unit,
     onBack: () -> Unit,
     onAcneScanComplete: () -> Unit,
@@ -94,10 +101,17 @@ fun ScanScreen(
 
     var flowState by rememberSaveable { mutableStateOf(ScanFlowState.MODE_SELECT) }
     var scanMode by rememberSaveable { mutableStateOf(ScanMode.ACNE) }
-    var acneAnalysisStartedAt by remember { mutableLongStateOf(0L) }
+    var analysisStartedAt by remember { mutableLongStateOf(0L) }
+    var displayedValidationError by remember { mutableStateOf<FaceValidationResult?>(null) }
     fun beginAcneAnalysis() {
-        acneAnalysisStartedAt = SystemClock.elapsedRealtime()
+        analysisStartedAt = SystemClock.elapsedRealtime()
+        displayedValidationError = null
         onAnalyzeAcne()
+    }
+    fun beginHairstyleAnalysis(uri: Uri) {
+        analysisStartedAt = SystemClock.elapsedRealtime()
+        displayedValidationError = null
+        onAnalyzeHairstyle(uri)
     }
     val galleryWithoutCamera = androidx.activity.compose.rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -105,21 +119,48 @@ fun ScanScreen(
         if (uri != null) {
             onPhotoCaptured(uri)
             flowState = ScanFlowState.ANALYZING
-            if (scanMode == ScanMode.ACNE) beginAcneAnalysis()
+            if (scanMode == ScanMode.ACNE) beginAcneAnalysis() else beginHairstyleAnalysis(uri)
         }
     }
     BackHandler(flowState == ScanFlowState.ANALYZING) {
-        onCancelAcne()
+        if (scanMode == ScanMode.ACNE) onCancelAcne() else onCancelHairstyle()
         flowState = ScanFlowState.CAMERA
     }
     LaunchedEffect(acneState.result, flowState) {
         if (flowState == ScanFlowState.ANALYZING && scanMode == ScanMode.ACNE && acneState.result != null) {
-            val elapsed = SystemClock.elapsedRealtime() - acneAnalysisStartedAt
+            val elapsed = SystemClock.elapsedRealtime() - analysisStartedAt
             val remaining = (5_000L - elapsed).coerceAtLeast(0L)
             if (remaining > 0L) delay(remaining)
             // Allow the UI progress animation to visibly finish at 100%.
             delay(750L)
             onAcneScanComplete()
+        }
+    }
+    LaunchedEffect(hairstyleState.result, flowState, scanMode) {
+        if (
+            flowState == ScanFlowState.ANALYZING &&
+            scanMode == ScanMode.HAIRSTYLE &&
+            hairstyleState.result != null
+        ) {
+            // Preserve the main branch's four-stage analyzer timing (4 x 700 ms + 300 ms).
+            val elapsed = SystemClock.elapsedRealtime() - analysisStartedAt
+            val remaining = (3_100L - elapsed).coerceAtLeast(0L)
+            if (remaining > 0L) delay(remaining)
+            onHairstyleScanComplete()
+        }
+    }
+    val currentValidationError = when (scanMode) {
+        ScanMode.ACNE -> null
+        ScanMode.HAIRSTYLE -> hairstyleState.validationError
+    }
+    LaunchedEffect(currentValidationError, flowState, scanMode) {
+        if (flowState == ScanFlowState.ANALYZING && currentValidationError != null) {
+            val elapsed = SystemClock.elapsedRealtime() - analysisStartedAt
+            val remaining = (650L - elapsed).coerceAtLeast(0L)
+            if (remaining > 0L) delay(remaining)
+            displayedValidationError = currentValidationError
+        } else {
+            displayedValidationError = null
         }
     }
 
@@ -134,6 +175,17 @@ fun ScanScreen(
                         permissionLauncher.launch(Manifest.permission.CAMERA)
                     }
                 }
+            )
+        }
+
+        flowState == ScanFlowState.ANALYZING && displayedValidationError != null -> {
+            PhotoValidationErrorScreen(
+                error = displayedValidationError!!,
+                onChooseAnotherPhoto = {
+                    if (scanMode == ScanMode.ACNE) onCancelAcne() else onCancelHairstyle()
+                    displayedValidationError = null
+                    flowState = ScanFlowState.CAMERA
+                },
             )
         }
 
@@ -152,7 +204,7 @@ fun ScanScreen(
             ) {
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "WeGlow needs camera access to scan your skin.",
+                    "WeGlow needs camera access to scan your face.",
                     fontFamily = JungeFont,
                     fontSize = 16.sp,
                     textAlign = TextAlign.Center
@@ -172,22 +224,26 @@ fun ScanScreen(
 
         flowState == ScanFlowState.ANALYZING -> {
             AnalyzingScreen(
-                mode = scanMode,
                 photoUri = photoUri,
-                onFinished = {
-                    if (scanMode == ScanMode.HAIRSTYLE) onHairstyleScanComplete() else onAcneScanComplete()
+                state = hairstyleState,
+                onRetry = {
+                    photoUri?.let(::beginHairstyleAnalysis)
                 },
-                onCancel = { flowState = ScanFlowState.CAMERA }
+                onCancel = {
+                    onCancelHairstyle()
+                    flowState = ScanFlowState.CAMERA
+                },
             )
         }
 
         else -> {
             CameraCaptureScreen(
+                mode = scanMode,
                 onBack = { flowState = ScanFlowState.MODE_SELECT },
                 onPhotoReady = { uri ->
                     onPhotoCaptured(uri)
                     flowState = ScanFlowState.ANALYZING
-                    if (scanMode == ScanMode.ACNE) beginAcneAnalysis()
+                    if (scanMode == ScanMode.ACNE) beginAcneAnalysis() else beginHairstyleAnalysis(uri)
                 }
             )
         }
@@ -195,12 +251,122 @@ fun ScanScreen(
 }
 
 @Composable
+private fun PhotoValidationErrorScreen(
+    error: FaceValidationResult,
+    onChooseAnotherPhoto: () -> Unit,
+) {
+    val guidance = when (error) {
+        FaceValidationResult.NoFace -> "Use a well-lit, front-facing photo where your face is easy to see."
+        FaceValidationResult.MultipleFaces -> "Choose a solo photo with no other people visible in the frame."
+        FaceValidationResult.FaceTooSmall -> "Move closer so your face fills more of the photo."
+        FaceValidationResult.FaceTooRotated -> "Keep your head upright and look toward the camera."
+        FaceValidationResult.FacePartiallyOutsideImage -> "Keep your forehead, chin, and both sides of your face inside the frame."
+        FaceValidationResult.ProcessingError -> "Try a different clear JPG or PNG photo."
+        FaceValidationResult.Valid -> ""
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Cream)
+            .padding(horizontal = 24.dp, vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.weight(1f))
+        Box(
+            modifier = Modifier
+                .size(112.dp)
+                .clip(CircleShape)
+                .background(CoralAccent.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Face,
+                contentDescription = null,
+                tint = CoralAccent,
+                modifier = Modifier.size(54.dp),
+            )
+        }
+        Spacer(Modifier.height(30.dp))
+        Text(
+            text = "Let's try another photo",
+            fontFamily = JungeFont,
+            fontSize = 30.sp,
+            lineHeight = 38.sp,
+            color = TextBlack,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = error.errorMessage.orEmpty(),
+            fontSize = 16.sp,
+            lineHeight = 24.sp,
+            color = TextBlack,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(24.dp))
+        Surface(
+            color = Color.White.copy(alpha = 0.72f),
+            shape = RoundedCornerShape(20.dp),
+        ) {
+            Text(
+                text = guidance,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
+                fontSize = 14.sp,
+                lineHeight = 21.sp,
+                color = ButtonGreen,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        WeGlowPrimaryButton(
+            text = "Choose another photo",
+            onClick = onChooseAnotherPhoto,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = "Your photo was not sent for analysis.",
+            fontSize = 12.sp,
+            color = SoftGray,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
 private fun FigmaAcneAnalyzingScreen(state: ScanUiState, onRetry: () -> Unit, onCancel: () -> Unit) {
+    FigmaAnalyzingScreen(
+        photoUri = state.photoUri,
+        isValidating = state.isValidating,
+        isAnalyzing = state.isAnalyzing,
+        resultReady = state.result != null,
+        error = state.error,
+        analysisLabel = "Analyzing skin\ntexture...",
+        onRetry = onRetry,
+        onCancel = onCancel,
+    )
+}
+
+@Composable
+private fun FigmaAnalyzingScreen(
+    photoUri: Uri?,
+    isValidating: Boolean,
+    isAnalyzing: Boolean,
+    resultReady: Boolean,
+    error: String?,
+    analysisLabel: String,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+) {
     val context = LocalContext.current
-    var photoBitmap by remember(state.photoUri) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(state.photoUri) { photoBitmap = state.photoUri?.let { loadImageBitmap(context, it) } }
-    val progress = remember { Animatable(0.26f) }
-    val scanLinePosition by rememberInfiniteTransition(label = "skin scan line").animateFloat(
+    var photoBitmap by remember(photoUri) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(photoUri) {
+        photoBitmap = photoUri?.let { loadImageBitmap(context, it) }
+    }
+
+    val progress = remember(photoUri) { Animatable(0.26f) }
+    val scanLinePosition by rememberInfiniteTransition(label = "analysis scan line").animateFloat(
         initialValue = 0.08f,
         targetValue = 0.92f,
         animationSpec = infiniteRepeatable(
@@ -209,45 +375,205 @@ private fun FigmaAcneAnalyzingScreen(state: ScanUiState, onRetry: () -> Unit, on
         ),
         label = "scan line position",
     )
-    LaunchedEffect(state.isAnalyzing) {
-        while (state.isAnalyzing) {
-            // Progress is deliberately capped until the real model result arrives.
+    LaunchedEffect(isValidating, isAnalyzing) {
+        while (isValidating || isAnalyzing) {
             progress.snapTo((progress.value + 0.008f).coerceAtMost(0.92f))
             delay(80)
         }
     }
-    LaunchedEffect(state.result) {
-        if (state.result != null) progress.animateTo(1f, tween(700, easing = EaseInOutSine))
+    LaunchedEffect(resultReady) {
+        if (resultReady) progress.animateTo(1f, tween(700, easing = EaseInOutSine))
     }
-    Column(Modifier.fillMaxSize().background(ButtonGreen).padding(horizontal = 20.dp)) {
-        Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.CenterStart) {
-            Box(Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)).clickable(onClick = onCancel), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Close, contentDescription = "Cancel analysis", tint = Color.White)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ButtonGreen),
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val particles = listOf(
+                0.63f to 0.80f, 0.02f to 0.58f, 0.58f to 0.64f, 0.25f to 0.28f,
+                0.78f to 0.78f, 0.49f to 0.59f, 0.61f to 0.12f, 0.26f to 0.73f,
+                0.86f to 0.81f, 0.14f to 0.66f, 0.08f to 0.42f, 0.81f to 0.87f,
+                0.26f to 0.15f, 0.76f to 0.90f, 0.76f to 0.19f, 0.34f to 0.70f,
+                0.36f to 0.28f, 0.03f to 0.69f, 0.56f to 0.42f, 0.17f to 0.22f,
+            )
+            particles.forEachIndexed { index, point ->
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.08f + (index % 5) * 0.025f),
+                    radius = (1.2f + index % 3) * density,
+                    center = Offset(size.width * point.first, size.height * point.second),
+                )
             }
         }
-        Column(Modifier.fillMaxSize().padding(bottom = 34.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Box(Modifier.fillMaxWidth(0.78f).aspectRatio(3f / 4f).clip(RoundedCornerShape(100.dp)).background(Color.White.copy(alpha = 0.06f)).padding(2.dp)) {
-                photoBitmap?.let { Image(it, "Your photo being analyzed", Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, ButtonGreen.copy(alpha = 0.45f)))))
-                Canvas(Modifier.fillMaxSize()) {
-                    val scanY = size.height * scanLinePosition
-                    drawLine(CoralAccent.copy(alpha = 0.9f), Offset(0f, scanY), Offset(size.width, scanY), 3.dp.toPx(), cap = StrokeCap.Round)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.10f))
+                        .clickable(onClick = onCancel),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Cancel analysis",
+                        tint = Color(0xFFF2F4F1),
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
-            Spacer(Modifier.height(48.dp))
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.Bottom) {
-                Text(if (state.error == null) "Analyzing skin\ntexture..." else "Analysis paused", fontFamily = JungeFont, fontSize = 28.sp, lineHeight = 36.sp, color = Color.White, modifier = Modifier.weight(1f))
-                Text("${(progress.value * 100).toInt()}%", fontSize = 14.sp, color = CoralAccent)
+
+            Spacer(Modifier.height(40.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 280.dp)
+                    .aspectRatio(0.75f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val lineColor = Sage.copy(alpha = 0.40f)
+                    val length = 32.dp.toPx()
+                    val inset = 1.dp.toPx()
+                    val stroke = 1.dp.toPx()
+                    drawLine(lineColor, Offset(inset, length), Offset(inset, inset), stroke)
+                    drawLine(lineColor, Offset(inset, inset), Offset(length, inset), stroke)
+                    drawLine(lineColor, Offset(size.width - length, inset), Offset(size.width - inset, inset), stroke)
+                    drawLine(lineColor, Offset(size.width - inset, inset), Offset(size.width - inset, length), stroke)
+                    drawLine(lineColor, Offset(inset, size.height - length), Offset(inset, size.height - inset), stroke)
+                    drawLine(lineColor, Offset(inset, size.height - inset), Offset(length, size.height - inset), stroke)
+                    drawLine(lineColor, Offset(size.width - length, size.height - inset), Offset(size.width - inset, size.height - inset), stroke)
+                    drawLine(lineColor, Offset(size.width - inset, size.height - length), Offset(size.width - inset, size.height - inset), stroke)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                        .border(2.dp, CoralAccent.copy(alpha = 0.40f), RoundedCornerShape(100.dp))
+                        .padding(2.dp)
+                        .clip(RoundedCornerShape(98.dp))
+                        .background(ButtonGreen),
+                ) {
+                    photoBitmap?.let { bitmap ->
+                        Image(
+                            bitmap = bitmap,
+                            contentDescription = "Your photo being analyzed",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    }
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Transparent, Color.Transparent, ButtonGreen.copy(alpha = 0.40f)),
+                                ),
+                            ),
+                    )
+                    Canvas(Modifier.fillMaxSize()) {
+                        val scanY = size.height * scanLinePosition
+                        drawLine(
+                            brush = Brush.horizontalGradient(
+                                listOf(Color.Transparent, Color.White.copy(alpha = 0.82f), Color.Transparent),
+                            ),
+                            start = Offset(0f, scanY),
+                            end = Offset(size.width, scanY),
+                            strokeWidth = 3.dp.toPx(),
+                            cap = StrokeCap.Round,
+                        )
+                    }
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            if (state.error == null) {
-                LinearProgressIndicator(progress = { progress.value }, color = Color.White, trackColor = Color.White.copy(alpha = 0.2f), modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)))
-                Spacer(Modifier.height(16.dp))
-                Text("AI analysis in progress...", color = Sage, fontSize = 14.sp, textAlign = TextAlign.Center)
-            } else {
-                Text(state.error, color = Color.White, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(16.dp))
-                PillButton("Retry analysis", onRetry)
+
+            Spacer(Modifier.height(40.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 384.dp)
+                    .padding(horizontal = 16.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Text(
+                        text = when {
+                            error != null -> "Analysis paused"
+                            isValidating -> "Checking your\nphoto..."
+                            else -> analysisLabel
+                        },
+                        fontFamily = JungeFont,
+                        fontSize = 28.sp,
+                        lineHeight = 36.sp,
+                        color = Color(0xFFF2F4F1),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = "${(progress.value * 100).toInt()}%",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.7.sp,
+                        color = Color(0xFFE28F6B),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                if (error == null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xFFE1E3E0).copy(alpha = 0.20f))
+                            .padding(1.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress.value)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(50))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(Color(0xFFF2F4F1), Color(0xFFE28F6B)),
+                                    ),
+                                ),
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = if (isValidating) {
+                            "Checking your photo privately on this device..."
+                        } else {
+                            "AI analysis in progress..."
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Sage.copy(alpha = 0.80f),
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                } else {
+                    Text(error, color = Color.White, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(16.dp))
+                    PillButton("Retry analysis", onRetry)
+                }
             }
         }
     }
@@ -361,7 +687,7 @@ private fun ScanTypeCard(icon: ImageVector, title: String, description: String, 
 }
 
 @Composable
-private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit) {
+private fun CameraCaptureScreen(mode: ScanMode, onBack: () -> Unit, onPhotoReady: (Uri) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -441,7 +767,11 @@ private fun CameraCaptureScreen(onBack: () -> Unit, onPhotoReady: (Uri) -> Unit)
                 modifier = Modifier.fillMaxWidth()
             )
             Text(
-                "within the guide to begin skin analysis",
+                if (mode == ScanMode.HAIRSTYLE) {
+                    "within the guide to detect your face shape"
+                } else {
+                    "within the guide to begin skin analysis"
+                },
                 fontFamily = JungeFont,
                 fontSize = 14.sp,
                 color = Color.White.copy(alpha = 0.85f),
@@ -547,123 +877,22 @@ private fun ScanCircleIconButton(
 }
 
 @Composable
-private fun AnalyzingScreen(mode: ScanMode, photoUri: Uri?, onFinished: () -> Unit, onCancel: () -> Unit) {
-    val context = LocalContext.current
-    var photoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-
-    LaunchedEffect(photoUri) {
-        photoBitmap = photoUri?.let { loadImageBitmap(context, it) }
-    }
-
-    val progress = remember { Animatable(0f) }
-    val messages = if (mode == ScanMode.HAIRSTYLE) {
-        listOf(
-            "Mapping facial contours..." to 0.2f,
-            "Detecting face shape..." to 0.55f,
-            "Matching hairstyles..." to 0.85f,
-            "Finishing up..." to 1.0f,
-        )
-    } else {
-        listOf(
-            "Detecting facial landmarks..." to 0.15f,
-            "Analyzing skin texture..." to 0.55f,
-            "Calculating skin score..." to 0.85f,
-            "Finishing up..." to 1.0f,
-        )
-    }
-    var currentMessage by remember { mutableStateOf(messages.first().first) }
-
-    LaunchedEffect(Unit) {
-        for ((message, target) in messages) {
-            currentMessage = message
-            progress.animateTo(target, animationSpec = tween(durationMillis = 700, easing = LinearEasing))
-        }
-        delay(300)
-        onFinished()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DarkGreen)
-            .padding(24.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.15f))
-                .clickable(onClick = onCancel),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Filled.Close, contentDescription = "Cancel", tint = Color.White)
-        }
-
-        Spacer(Modifier.height(40.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .aspectRatio(0.85f)
-                .clip(RoundedCornerShape(topStart = 90.dp, topEnd = 90.dp, bottomStart = 32.dp, bottomEnd = 32.dp))
-                .background(Color.White.copy(alpha = 0.08f)),
-            contentAlignment = Alignment.Center
-        ) {
-            val bitmap = photoBitmap
-            if (bitmap != null) {
-                Image(
-                    bitmap = bitmap,
-                    contentDescription = "Your captured photo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-
-        Spacer(Modifier.weight(1f))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            Text(
-                currentMessage,
-                fontFamily = JungeFont,
-                fontSize = 26.sp,
-                color = Color.White,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                "${(progress.value * 100).toInt()}%",
-                fontFamily = JungeFont,
-                fontSize = 22.sp,
-                color = CoralAccent
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-        LinearProgressIndicator(
-            progress = { progress.value },
-            color = CoralAccent,
-            trackColor = Color.White.copy(alpha = 0.2f),
-            strokeCap = StrokeCap.Round,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(50))
-        )
-        Spacer(Modifier.height(14.dp))
-        Text(
-            "AI analysis in progress...",
-            fontFamily = JungeFont,
-            fontSize = 13.sp,
-            color = Color.White.copy(alpha = 0.7f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(24.dp))
-    }
+private fun AnalyzingScreen(
+    photoUri: Uri?,
+    state: HairstyleUiState,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    FigmaAnalyzingScreen(
+        photoUri = photoUri,
+        isValidating = state.isValidating || state.validationError != null,
+        isAnalyzing = state.isAnalyzing,
+        resultReady = state.result != null,
+        error = state.error,
+        analysisLabel = "Analyzing face\nshape...",
+        onRetry = onRetry,
+        onCancel = onCancel,
+    )
 }
 
 @Composable

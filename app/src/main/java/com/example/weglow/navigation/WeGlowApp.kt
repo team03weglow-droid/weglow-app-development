@@ -68,7 +68,11 @@ fun WeGlowApp() {
 
     val context = LocalContext.current.applicationContext
     val scanViewModel: ScanViewModel = viewModel(
-        factory = viewModelFactory { ScanViewModel(container.acneScanRepository(context)) }
+        factory = viewModelFactory {
+            ScanViewModel(
+                container.acneScanRepository(context),
+            )
+        }
     )
 
     val discoverViewModel: DiscoverViewModel = viewModel(
@@ -79,7 +83,10 @@ fun WeGlowApp() {
 
     val hairstyleViewModel: HairstyleViewModel = viewModel(
         factory = viewModelFactory {
-            HairstyleViewModel(container.hairstyleRepository)
+            HairstyleViewModel(
+                container.hairstyleRepository(context),
+                container.faceValidator(context),
+            )
         }
     )
 
@@ -117,6 +124,7 @@ fun WeGlowApp() {
     val startupDestination by authViewModel.startupDestination.collectAsState()
     val onboardingState by onboardingViewModel.uiState.collectAsState()
     val scanState by scanViewModel.uiState.collectAsState()
+    val hairstyleState by hairstyleViewModel.uiState.collectAsState()
     val discoverState by discoverViewModel.uiState.collectAsState()
     val profileState by profileViewModel.uiState.collectAsState()
     val recommendationState by recommendationViewModel.uiState.collectAsState()
@@ -129,7 +137,9 @@ fun WeGlowApp() {
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = backStackEntry?.destination?.route
 
-            if (currentRoute in tabs.map { it.route }) {
+            // Scan owns its own camera/analyzing navigation. Keep it completely edge-to-edge;
+            // in particular, the Figma analyzing page must never show the tab bar.
+            if (currentRoute in tabs.map { it.route } && currentRoute != Destination.Scan.route) {
 
                 WeGlowBottomNavigation(
                     items = tabs,
@@ -503,8 +513,13 @@ fun WeGlowApp() {
                 ScanScreen(
                     photoUri = scanState.photoUri,
                     acneState = scanState,
+                    hairstyleState = hairstyleState,
                     onAnalyzeAcne = scanViewModel::analyze,
                     onCancelAcne = scanViewModel::cancelAnalysis,
+                    onAnalyzeHairstyle = { uri ->
+                        hairstyleViewModel.analyze(uri.toString(), onboardingState.gender)
+                    },
+                    onCancelHairstyle = hairstyleViewModel::cancelAnalysis,
                     onPhotoCaptured = scanViewModel::setPhoto,
 
                     onBack = {
@@ -588,16 +603,15 @@ fun WeGlowApp() {
             }
 
             composable(Destination.HairstyleResults.route) {
-
-                HairstyleResultsScreen(
-                    result = hairstyleViewModel.resultFor(
-                        onboardingState.gender
-                    ),
-
-                    onBack = {
-                        navController.popBackStack()
-                    },
-                )
+                val result = hairstyleState.result
+                if (result != null) {
+                    HairstyleResultsScreen(
+                        result = result,
+                        onBack = { navController.popBackStack() },
+                    )
+                } else {
+                    LaunchedEffect(Unit) { navController.popBackStack() }
+                }
             }
 
             // ---------------------------------------------------------
@@ -645,6 +659,7 @@ fun WeGlowApp() {
                     if (authState.event is AuthEvent.SignedOut) {
 
                         scanViewModel.clear()
+                        hairstyleViewModel.clear()
 
                         navController.navigate(
                             Destination.Login.route

@@ -65,9 +65,10 @@ android {
         compose = true
         buildConfig = true
     }
-    androidResources { noCompress += "onnx" }
+    androidResources { noCompress += listOf("onnx", "tflite") }
     testOptions.unitTests.all {
         it.systemProperty("weglow.model.assets", file("src/main/assets/acne").absolutePath)
+        it.systemProperty("weglow.hairstyle.assets", file("src/main/assets/hairstyle").absolutePath)
     }
 }
 
@@ -115,6 +116,7 @@ tasks.named("preBuild").configure { dependsOn(architectureCheck) }
 
 dependencies {
     implementation(libs.onnxruntime.android)
+    implementation(libs.litert)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
@@ -131,6 +133,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.mlkit.face.detection)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
