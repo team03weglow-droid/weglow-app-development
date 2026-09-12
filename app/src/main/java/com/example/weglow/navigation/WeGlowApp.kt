@@ -68,7 +68,11 @@ fun WeGlowApp() {
 
     val context = LocalContext.current.applicationContext
     val scanViewModel: ScanViewModel = viewModel(
-        factory = viewModelFactory { ScanViewModel(container.acneScanRepository(context)) }
+        factory = viewModelFactory {
+            ScanViewModel(
+                container.acneScanRepository(context),
+            )
+        }
     )
 
     val discoverViewModel: DiscoverViewModel = viewModel(
@@ -79,7 +83,10 @@ fun WeGlowApp() {
 
     val hairstyleViewModel: HairstyleViewModel = viewModel(
         factory = viewModelFactory {
-            HairstyleViewModel(container.hairstyleRepository(context))
+            HairstyleViewModel(
+                container.hairstyleRepository(context),
+                container.faceValidator(context),
+            )
         }
     )
 
@@ -130,7 +137,9 @@ fun WeGlowApp() {
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = backStackEntry?.destination?.route
 
-            if (currentRoute in tabs.map { it.route }) {
+            // Scan owns its own camera/analyzing navigation. Keep it completely edge-to-edge;
+            // in particular, the Figma analyzing page must never show the tab bar.
+            if (currentRoute in tabs.map { it.route } && currentRoute != Destination.Scan.route) {
 
                 WeGlowBottomNavigation(
                     items = tabs,

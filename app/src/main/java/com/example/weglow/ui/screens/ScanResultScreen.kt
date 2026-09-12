@@ -53,11 +53,11 @@ fun ScanResultsScreen(
         }
         Box(Modifier.fillMaxWidth().height(320.dp).background(Color(0xFF1C1917))) {
             bitmap?.let { photo ->
-                Image(photo, "Scanned photo with detected areas", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                Image(photo, "Scanned photo with detected areas", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 Canvas(Modifier.fillMaxSize()) {
-                    // ContentScale.Fit can letterbox the photo inside the hero. Map the
-                    // model's normalized coordinates into the photo's actual rendered rect.
-                    val imageScale = minOf(size.width / result.imageWidth, size.height / result.imageHeight)
+                    // ContentScale.Crop fills the hero without black side strips. Map the
+                    // model's normalized coordinates into the cropped rendered rect.
+                    val imageScale = maxOf(size.width / result.imageWidth, size.height / result.imageHeight)
                     val renderedWidth = result.imageWidth * imageScale
                     val renderedHeight = result.imageHeight * imageScale
                     val imageLeft = (size.width - renderedWidth) / 2f

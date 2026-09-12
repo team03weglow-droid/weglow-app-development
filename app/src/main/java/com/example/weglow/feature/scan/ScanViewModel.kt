@@ -28,12 +28,15 @@ internal fun isOwnedScanCacheFileName(fileName: String): Boolean =
 
 data class ScanUiState(
     val photoUri: Uri? = null,
+    val isValidating: Boolean = false,
     val isAnalyzing: Boolean = false,
     val result: AcneScanResult? = null,
     val error: String? = null,
 )
 
-class ScanViewModel(private val repository: AcneScanRepository) : ViewModel() {
+class ScanViewModel(
+    private val repository: AcneScanRepository,
+) : ViewModel() {
     private val _uiState = MutableStateFlow(ScanUiState())
     val uiState: StateFlow<ScanUiState> = _uiState.asStateFlow()
 
@@ -55,18 +58,28 @@ class ScanViewModel(private val repository: AcneScanRepository) : ViewModel() {
     }
 
     internal fun analyzeReference(reference: String) {
-        analysis?.cancel()
-        _uiState.value = _uiState.value.copy(isAnalyzing = true, result = null, error = null)
+        if (analysis?.isActive == true) return
+        _uiState.value = _uiState.value.copy(
+            isValidating = false,
+            isAnalyzing = true,
+            result = null,
+            error = null,
+        )
         analysis = viewModelScope.launch {
             try {
                 val result = repository.analyze(reference)
                 ensureActive()
-                _uiState.value = _uiState.value.copy(isAnalyzing = false, result = result)
+                _uiState.value = _uiState.value.copy(
+                    isValidating = false,
+                    isAnalyzing = false,
+                    result = result,
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 ensureActive()
                 _uiState.value = _uiState.value.copy(
+                    isValidating = false,
                     isAnalyzing = false,
                     error = when (error) {
                         is IOException -> "Cannot read this photo. Please choose it again or take a new photo."
@@ -80,13 +93,23 @@ class ScanViewModel(private val repository: AcneScanRepository) : ViewModel() {
 
     fun cancelAnalysis() {
         analysis?.cancel()
-        _uiState.value = _uiState.value.copy(isAnalyzing = false, result = null, error = null)
+        _uiState.value = _uiState.value.copy(
+            isValidating = false,
+            isAnalyzing = false,
+            result = null,
+            error = null,
+        )
     }
 
     fun clear() {
         analysis?.cancel()
         deleteIfOwnedScanCacheFile(_uiState.value.photoUri)
         _uiState.value = ScanUiState()
+    }
+
+    override fun onCleared() {
+        analysis?.cancel()
+        super.onCleared()
     }
 
     private fun deleteIfOwnedScanCacheFile(uri: Uri?) {

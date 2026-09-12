@@ -1,5 +1,7 @@
 package com.example.weglow.feature.hairstyle
 
+import com.example.weglow.core.image.FaceValidationResult
+import com.example.weglow.core.image.FaceValidator
 import com.example.weglow.domain.model.HairstyleResult
 import com.example.weglow.domain.repository.HairstyleRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -28,7 +30,7 @@ class HairstyleViewModelTest {
 
     @Test fun publishesRealModelResult() = runTest(dispatcher) {
         val prediction = CompletableDeferred<HairstyleResult>()
-        val viewModel = HairstyleViewModel(repository { _, _ -> prediction.await() })
+        val viewModel = HairstyleViewModel(repository { _, _ -> prediction.await() }, validator())
 
         viewModel.analyze("photo", "Female")
         dispatcher.scheduler.runCurrent()
@@ -44,7 +46,7 @@ class HairstyleViewModelTest {
         var shouldFail = true
         val viewModel = HairstyleViewModel(repository { _, _ ->
             if (shouldFail) error("model failed") else result
-        })
+        }, validator())
 
         viewModel.analyze("photo", null)
         dispatcher.scheduler.advanceUntilIdle()
@@ -58,10 +60,81 @@ class HairstyleViewModelTest {
         assertEquals(result, viewModel.uiState.value.result)
     }
 
+    @Test fun invalidPhotoNeverReachesHairstyleRepository() = runTest(dispatcher) {
+        var repositoryCalls = 0
+        val viewModel = HairstyleViewModel(
+            repository { _, _ ->
+                repositoryCalls++
+                result
+            },
+            validator(FaceValidationResult.MultipleFaces),
+        )
+
+        viewModel.analyze("photo", null)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, repositoryCalls)
+        assertEquals(FaceValidationResult.MultipleFaces, viewModel.uiState.value.validationError)
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test fun validPhotoContinuesToHairstyleRepository() = runTest(dispatcher) {
+        var repositoryCalls = 0
+        val viewModel = HairstyleViewModel(
+            repository { _, _ ->
+                repositoryCalls++
+                result
+            },
+            validator(),
+        )
+
+        viewModel.analyze("photo", "Female")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, repositoryCalls)
+        assertEquals(result, viewModel.uiState.value.result)
+    }
+
+    @Test fun duplicateAnalyzeRequestIsIgnoredWhileValidationIsRunning() = runTest(dispatcher) {
+        val validation = CompletableDeferred<FaceValidationResult>()
+        var validationCalls = 0
+        var repositoryCalls = 0
+        val viewModel = HairstyleViewModel(
+            repository { _, _ ->
+                repositoryCalls++
+                result
+            },
+            object : FaceValidator {
+                override suspend fun validate(photoReference: String): FaceValidationResult {
+                    validationCalls++
+                    return validation.await()
+                }
+            },
+        )
+
+        viewModel.analyze("photo", null)
+        dispatcher.scheduler.runCurrent()
+        assertTrue(viewModel.uiState.value.isValidating)
+        viewModel.analyze("photo", null)
+        dispatcher.scheduler.runCurrent()
+        assertEquals(1, validationCalls)
+        assertEquals(0, repositoryCalls)
+
+        validation.complete(FaceValidationResult.Valid)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, repositoryCalls)
+    }
+
     private fun repository(
         block: suspend (String, String?) -> HairstyleResult,
     ) = object : HairstyleRepository {
         override suspend fun analyze(photoReference: String, gender: String?) =
             block(photoReference, gender)
+    }
+
+    private fun validator(
+        validation: FaceValidationResult = FaceValidationResult.Valid,
+    ) = object : FaceValidator {
+        override suspend fun validate(photoReference: String) = validation
     }
 }

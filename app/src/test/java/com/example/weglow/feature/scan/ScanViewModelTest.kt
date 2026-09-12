@@ -67,9 +67,58 @@ class ScanViewModelTest {
         assertFalse(viewModel.uiState.value.isAnalyzing)
     }
 
+    @Test fun validPhotoContinuesToAcneRepository() = runTest(dispatcher) {
+        var repositoryCalls = 0
+        val viewModel = ScanViewModel(
+            repository {
+                repositoryCalls++
+                emptyResult
+            },
+        )
+
+        viewModel.analyzeReference("photo")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, repositoryCalls)
+        assertEquals(emptyResult, viewModel.uiState.value.result)
+    }
+
+    @Test fun duplicateAnalyzeRequestIsIgnoredWhileAnalysisIsRunning() = runTest(dispatcher) {
+        val prediction = CompletableDeferred<AcneScanResult>()
+        var repositoryCalls = 0
+        val viewModel = ScanViewModel(
+            repository {
+                repositoryCalls++
+                prediction.await()
+            },
+        )
+
+        viewModel.analyzeReference("photo")
+        dispatcher.scheduler.runCurrent()
+        assertTrue(viewModel.uiState.value.isAnalyzing)
+        viewModel.analyzeReference("photo")
+        dispatcher.scheduler.runCurrent()
+        assertEquals(1, repositoryCalls)
+        prediction.complete(emptyResult)
+        dispatcher.scheduler.advanceUntilIdle()
+    }
+
+    @Test fun acneAnalysisDoesNotPerformFaceValidation() = runTest(dispatcher) {
+        val prediction = CompletableDeferred<AcneScanResult>()
+        val viewModel = ScanViewModel(repository { prediction.await() })
+        viewModel.analyzeReference("photo")
+        dispatcher.scheduler.runCurrent()
+        assertTrue(viewModel.uiState.value.isAnalyzing)
+        assertFalse(viewModel.uiState.value.isValidating)
+        prediction.complete(emptyResult)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(emptyResult, viewModel.uiState.value.result)
+    }
+
     private fun repository(block: suspend () -> AcneScanResult) = object : AcneScanRepository {
         override suspend fun analyze(photoReference: String) = block()
     }
+
 }
 
 // Scan photos are privacy-sensitive; cache cleanup must only ever target a file this app

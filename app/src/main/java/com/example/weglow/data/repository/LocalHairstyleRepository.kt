@@ -11,12 +11,16 @@ import com.example.weglow.core.image.ScanPhotoDecoder
 import com.example.weglow.domain.model.HairstyleRecommendation
 import com.example.weglow.domain.model.HairstyleResult
 import com.example.weglow.domain.repository.HairstyleRepository
-import com.google.ai.edge.litert.CompiledModel
+import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.channels.FileChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.tensorflow.lite.Interpreter
 import kotlin.math.roundToInt
 
 /** Runs the bundled Keras-derived LiteRT classifier entirely on the Android device. */
@@ -24,11 +28,21 @@ class LocalHairstyleRepository(context: Context) : HairstyleRepository {
     private val application = context.applicationContext
     private val mutex = Mutex()
 
-    private val model: CompiledModel by lazy {
-        CompiledModel.create(
-            application.assets,
-            MODEL_ASSET,
-            CompiledModel.Options.CPU,
+    private val interpreter: Interpreter by lazy {
+        val model = application.assets.openFd(MODEL_ASSET).use { asset ->
+            FileInputStream(asset.fileDescriptor).use { stream ->
+                stream.channel.map(
+                    FileChannel.MapMode.READ_ONLY,
+                    asset.startOffset,
+                    asset.declaredLength,
+                )
+            }
+        }
+        Interpreter(
+            model,
+            Interpreter.Options().apply {
+                setNumThreads(Runtime.getRuntime().availableProcessors().coerceIn(1, 4))
+            },
         )
     }
 
@@ -44,29 +58,28 @@ class LocalHairstyleRepository(context: Context) : HairstyleRepository {
                     try {
                         val inputValues = prepareInput(photo)
                         ensureActive()
-                        val inputs = model.createInputBuffers()
-                        try {
-                            val outputs = model.createOutputBuffers()
-                            try {
-                                check(inputs.size == 1 && outputs.size == 1) {
-                                    "The installed face-shape model is incompatible."
-                                }
-                                inputs.single().writeFloat(inputValues)
-                                model.run(inputs, outputs)
-                                ensureActive()
-                                val probabilities = outputs.single().readFloat()
-                                check(probabilities.size == FACE_SHAPES.size && probabilities.all(Float::isFinite)) {
-                                    "The installed face-shape model returned an invalid result."
-                                }
-                                val bestIndex = probabilities.indices.maxBy { probabilities[it] }
-                                val confidence = (probabilities[bestIndex] * 100f).roundToInt().coerceIn(0, 100)
-                                recommendationResult(FACE_SHAPES[bestIndex], confidence, gender)
-                            } finally {
-                                outputs.forEach { it.close() }
-                            }
-                        } finally {
-                            inputs.forEach { it.close() }
+                        check(
+                            interpreter.inputTensorCount == 1 &&
+                                interpreter.outputTensorCount == 1 &&
+                                interpreter.getInputTensor(0).shape().contentEquals(
+                                    intArrayOf(1, INPUT_SIZE, INPUT_SIZE, 3),
+                                ) &&
+                                interpreter.getOutputTensor(0).shape().contentEquals(
+                                    intArrayOf(1, FACE_SHAPES.size),
+                                ),
+                        ) {
+                            "The installed face-shape model is incompatible."
                         }
+                        val output = Array(1) { FloatArray(FACE_SHAPES.size) }
+                        interpreter.run(inputValues, output)
+                        ensureActive()
+                        val probabilities = output.single()
+                        check(probabilities.all(Float::isFinite)) {
+                            "The installed face-shape model returned an invalid result."
+                        }
+                        val bestIndex = probabilities.indices.maxBy { probabilities[it] }
+                        val confidence = (probabilities[bestIndex] * 100f).roundToInt().coerceIn(0, 100)
+                        recommendationResult(FACE_SHAPES[bestIndex], confidence, gender)
                     } finally {
                         photo.recycle()
                     }
@@ -88,7 +101,7 @@ class LocalHairstyleRepository(context: Context) : HairstyleRepository {
      * The EfficientNet model contains its own 1/255 rescaling layer, so its float input must
      * remain in the training range 0..255. A centered square crop matches the camera face guide.
      */
-    private fun prepareInput(photo: Bitmap): FloatArray {
+    private fun prepareInput(photo: Bitmap): ByteBuffer {
         val side = minOf(photo.width, photo.height)
         val left = (photo.width - side) / 2
         val top = (photo.height - side) / 2
@@ -102,14 +115,16 @@ class LocalHairstyleRepository(context: Context) : HairstyleRepository {
             )
             val pixels = IntArray(INPUT_SIZE * INPUT_SIZE)
             resized.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
-            return FloatArray(pixels.size * 3).also { values ->
-                var output = 0
-                for (pixel in pixels) {
-                    values[output++] = ((pixel shr 16) and 0xff).toFloat()
-                    values[output++] = ((pixel shr 8) and 0xff).toFloat()
-                    values[output++] = (pixel and 0xff).toFloat()
+            return ByteBuffer.allocateDirect(pixels.size * 3 * Float.SIZE_BYTES)
+                .order(ByteOrder.nativeOrder())
+                .also { values ->
+                    for (pixel in pixels) {
+                        values.putFloat(((pixel shr 16) and 0xff).toFloat())
+                        values.putFloat(((pixel shr 8) and 0xff).toFloat())
+                        values.putFloat((pixel and 0xff).toFloat())
+                    }
+                    values.rewind()
                 }
-            }
         } finally {
             resized.recycle()
         }

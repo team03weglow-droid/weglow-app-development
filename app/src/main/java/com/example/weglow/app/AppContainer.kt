@@ -1,6 +1,8 @@
 package com.example.weglow.app
 
 import android.content.Context
+import com.example.weglow.core.image.FaceImageValidator
+import com.example.weglow.core.image.FaceValidator
 import com.example.weglow.data.remote.supabase.SupabaseClientProvider
 import com.example.weglow.data.repository.LocalHairstyleRepository
 import com.example.weglow.data.repository.LocalAcneScanRepository
@@ -30,6 +32,8 @@ class AppContainer {
 
     fun acneScanRepository(context: Context): AcneScanRepository =
         LocalAcneScanRepository(context)
+
+    fun faceValidator(context: Context): FaceValidator = FaceImageValidator(context)
 
     val authRepository: AuthRepository by lazy {
         SupabaseAuthRepository(supabaseClient)
