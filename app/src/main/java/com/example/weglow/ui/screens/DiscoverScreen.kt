@@ -41,6 +41,14 @@ import com.example.weglow.domain.model.Product
 private val CATEGORIES = listOf("All Products", "Trending", "Serums", "Moisturizers", "Hair")
 private enum class ProductViewMode { Gallery, List }
 
+internal fun matchesPriceRange(priceLkr: Double?, minimumPrice: Double?, maximumPrice: Double?): Boolean {
+    if (minimumPrice == null && maximumPrice == null) return true
+    return priceLkr?.let { price ->
+        (minimumPrice == null || price >= minimumPrice) &&
+            (maximumPrice == null || price <= maximumPrice)
+    } == true
+}
+
 @Composable
 fun DiscoverScreen(
     products: List<Product>,
@@ -71,14 +79,7 @@ fun DiscoverScreen(
             ).any { it.contains(searchQuery.trim(), ignoreCase = true) }
             val matchesCategory = selectedCategory == "All Products" ||
                 product.category?.contains(selectedCategory.removeSuffix("s"), ignoreCase = true) == true
-            val matchesPrice = if (minimumPrice == null && maximumPrice == null) {
-                true
-            } else {
-                product.priceLkr?.let { price ->
-                    (minimumPrice == null || price >= minimumPrice!!) &&
-                        (maximumPrice == null || price <= maximumPrice!!)
-                } == true
-            }
+            val matchesPrice = matchesPriceRange(product.priceLkr, minimumPrice, maximumPrice)
             matchesSearch && matchesCategory && matchesPrice
         }
     }

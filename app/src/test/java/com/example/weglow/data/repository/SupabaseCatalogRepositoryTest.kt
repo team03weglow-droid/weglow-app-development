@@ -117,4 +117,69 @@ class SupabaseCatalogRepositoryTest {
 
         assertEquals("https://example.com/face-wash.jpg", product?.imageUrl)
     }
+
+    @Test
+    fun productRow_withBlankPriceTextRaw_usesNumericPriceLkr() {
+        // Live-shaped row: Price_LKR = 2500, price_text_raw = "".
+        val product = buildJsonObject {
+            put("Product_ID", "p-30")
+            put("Product_Name", "Barrier Repair Cream")
+            put("Price_LKR", 2500)
+            put("price_text_raw", "")
+        }.toProductOrNull()
+
+        requireNotNull(product)
+        assertEquals(2500.0, product.priceLkr)
+    }
+
+    @Test
+    fun productRow_withConflictingPriceTextRaw_numericPriceLkrWins() {
+        val product = buildJsonObject {
+            put("Product_ID", "p-31")
+            put("Product_Name", "Soothing Toner")
+            put("Price_LKR", 2500)
+            put("price_text_raw", "9999")
+        }.toProductOrNull()
+
+        requireNotNull(product)
+        assertEquals(2500.0, product.priceLkr)
+    }
+
+    @Test
+    fun productRow_withDecimalPriceLkr_parsesDecimalValue() {
+        val product = buildJsonObject {
+            put("Product_ID", "p-32")
+            put("Product_Name", "Exfoliating Toner")
+            put("Price_LKR", "2499.50")
+            put("price_text_raw", "")
+        }.toProductOrNull()
+
+        requireNotNull(product)
+        assertEquals(2499.50, product.priceLkr)
+    }
+
+    @Test
+    fun productRow_withValidPriceLkrAndNonNumericPriceTextRaw_usesNumericPriceLkr() {
+        val product = buildJsonObject {
+            put("Product_ID", "p-33")
+            put("Product_Name", "Clarifying Gel")
+            put("Price_LKR", 3200)
+            put("price_text_raw", "Contact for price")
+        }.toProductOrNull()
+
+        requireNotNull(product)
+        assertEquals(3200.0, product.priceLkr)
+    }
+
+    @Test
+    fun productRow_withoutPriceLkr_fallsBackToPriceTextRaw() {
+        val product = buildJsonObject {
+            put("Product_ID", "p-34")
+            put("Product_Name", "Mineral Sunscreen")
+            put("price_text_raw", "1800")
+        }.toProductOrNull()
+
+        requireNotNull(product)
+        assertEquals(1800.0, product.priceLkr)
+    }
 }

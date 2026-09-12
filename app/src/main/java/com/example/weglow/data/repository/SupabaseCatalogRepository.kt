@@ -41,21 +41,26 @@ internal fun JsonObject.toProductOrNull(): Product? {
         ?: return null
     val name = text("product_name", "name", "title", "product", "product_title")
         ?: return null
-    val price = text(
+    // Price_LKR (and its known aliases) is the authoritative numeric price. price_text_raw is a
+    // free-text column that is looked up separately and only used as a fallback - matchingElement()
+    // resolves exact-name matches before normalized ones, so keeping price_text_raw in the same
+    // candidate list as price_lkr let it win over Price_LKR whenever both existed on a row.
+    val numericPrice = text(
         "price_lkr",
         "price",
         "lkr_price",
         "product_price",
         "selling_price",
         "sale_price",
-        "price_text_raw",
     )
+    val rawTextPrice = text("price_text_raw")
+    val price = numericPrice ?: rawTextPrice
 
     return Product(
         id = id,
         name = name,
         priceLabel = price.toLkrLabel(),
-        priceLkr = price.toLkrAmount(),
+        priceLkr = numericPrice.toLkrAmount() ?: rawTextPrice.toLkrAmount(),
         imageUrl = imageUrl(
             "image_url",
             "product_image_url",
