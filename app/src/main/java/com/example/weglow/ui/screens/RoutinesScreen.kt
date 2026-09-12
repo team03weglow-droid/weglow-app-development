@@ -13,6 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
 import com.example.weglow.domain.model.RoutinePlan
+import com.example.weglow.feature.routine.calendarDays
 import com.example.weglow.feature.routine.routineStepKey
 import com.example.weglow.ui.components.ProfileAvatar
 import com.example.weglow.ui.components.WeGlowErrorView
@@ -32,21 +35,11 @@ import com.example.weglow.ui.components.WeGlowLoadingView
 import com.example.weglow.ui.components.WeGlowProductImage
 import com.example.weglow.ui.components.rememberDecodedBitmap
 import com.example.weglow.ui.theme.*
-
-private data class DayEntry(
-    val label: String,
-    val dayNumber: Int
-)
-
-private val exampleWeek = listOf(
-    DayEntry("MON", 12),
-    DayEntry("TUE", 13),
-    DayEntry("WED", 14),
-    DayEntry("THU", 15),
-    DayEntry("FRI", 16),
-    DayEntry("SAT", 17),
-    DayEntry("SUN", 18),
-)
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.delay
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 private val feelingChips = listOf(
     "Dry",
@@ -67,11 +60,47 @@ fun RoutinesScreen(
 ) {
 
     var isMorning by remember { mutableStateOf(true) }
-    var selectedDay by remember { mutableStateOf(2) }
+    val initialToday = remember { LocalDate.now() }
+    var today by remember { mutableStateOf(initialToday) }
+    var selectedDate by remember { mutableStateOf(initialToday) }
+    var calendarAnchor by remember { mutableStateOf(initialToday) }
+
+    fun refreshDeviceDate() {
+        val deviceToday = LocalDate.now()
+        if (deviceToday != today) {
+            val selectionWasToday = selectedDate == today
+            today = deviceToday
+            if (selectionWasToday) {
+                selectedDate = deviceToday
+                calendarAnchor = deviceToday
+            }
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, today, selectedDate) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshDeviceDate()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Polling also catches midnight and device date/timezone changes while this screen stays open.
+    LaunchedEffect(today, selectedDate) {
+        while (true) {
+            delay(30_000L)
+            refreshDeviceDate()
+        }
+    }
+
+    val locale = LocalConfiguration.current.locales[0]
+    val visibleDays = calendarDays(calendarAnchor, selectedDate, today, locale)
+    val monthYear = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", locale))
 
     // Session-only completion tracking: no routine-history table/persistence exists in this
     // app, so this intentionally does not survive an app restart. Keys are built by
-    // routineStepKey(selectedDay, isMorning, ...) so each date's checkmarks - and Morning vs.
+    // routineStepKey(selectedDate, isMorning, ...) so each date's checkmarks - and Morning vs.
     // Evening - stay independent instead of one date's progress silently showing on another.
     var doneState by remember { mutableStateOf(setOf<String>()) }
 
@@ -145,32 +174,41 @@ fun RoutinesScreen(
         )
 
         // WEEK DAYS
+        Text(
+            monthYear,
+            fontFamily = JungeFont,
+            fontSize = 14.sp,
+            color = PrimaryBlack,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 10.dp),
+            textAlign = TextAlign.Center,
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
 
-            exampleWeek.forEachIndexed { index, day ->
-
-                val selected = selectedDay == index
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable {
-                        selectedDay = index
-                    }
-                ) {
+            visibleDays.forEach { day ->
+                key(day.date.toString()) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable {
+                            selectedDate = day.date
+                        }
+                    ) {
 
                     Text(
-                        day.label,
+                        day.dayName,
                         fontFamily = JungeFont,
                         fontSize = 11.sp,
-                        fontWeight = if (selected) {
+                        fontWeight = if (day.isSelected || day.isToday) {
                             FontWeight.Bold
                         } else {
                             FontWeight.Normal
                         },
-                        color = if (selected) {
+                        color = if (day.isSelected || day.isToday) {
                             PrimaryBlack
                         } else {
                             SoftGray
@@ -184,7 +222,7 @@ fun RoutinesScreen(
                             .size(40.dp)
                             .clip(CircleShape)
                             .background(
-                                if (selected) {
+                                if (day.isSelected) {
                                     DarkGreen
                                 } else {
                                     CardWhite
@@ -194,10 +232,10 @@ fun RoutinesScreen(
                     ) {
 
                         Text(
-                            "${day.dayNumber}",
+                            day.dayNumber,
                             fontFamily = JungeFont,
                             fontSize = 15.sp,
-                            color = if (selected) {
+                            color = if (day.isSelected) {
                                 Color.White
                             } else {
                                 PrimaryBlack
@@ -206,6 +244,7 @@ fun RoutinesScreen(
                     }
                 }
             }
+        }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -258,7 +297,7 @@ fun RoutinesScreen(
             else -> activeSteps.forEachIndexed { index, step ->
                 // Keyed by the selected date so completion never leaks between dates (each date
                 // gets its own independent checkmarks for this session) - see routineStepKey.
-                val stepKey = routineStepKey(selectedDay, isMorning, index, step.product?.id)
+                val stepKey = routineStepKey(selectedDate, isMorning, index, step.product?.id)
                 val done = stepKey in doneState
                 val product = step.product
 
