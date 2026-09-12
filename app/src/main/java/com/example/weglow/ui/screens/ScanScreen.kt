@@ -142,7 +142,10 @@ fun ScanScreen(
             scanMode == ScanMode.HAIRSTYLE &&
             hairstyleState.result != null
         ) {
-            delay(500L)
+            // Preserve the main branch's four-stage analyzer timing (4 x 700 ms + 300 ms).
+            val elapsed = SystemClock.elapsedRealtime() - analysisStartedAt
+            val remaining = (3_100L - elapsed).coerceAtLeast(0L)
+            if (remaining > 0L) delay(remaining)
             onHairstyleScanComplete()
         }
     }
