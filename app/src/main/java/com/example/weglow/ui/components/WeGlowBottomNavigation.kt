@@ -4,8 +4,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.example.weglow.ui.theme.CoralAccent
-import com.example.weglow.ui.theme.TextBlack
+import androidx.compose.ui.text.font.FontWeight
+import com.example.weglow.ui.theme.DarkGreen
+import com.example.weglow.ui.theme.SoftGray
 
 data class WeGlowNavItem(val route: String, val label: String, val icon: ImageVector)
 
@@ -15,20 +16,26 @@ fun WeGlowBottomNavigation(
     selectedRoute: String?,
     onSelect: (WeGlowNavItem) -> Unit,
 ) {
-    NavigationBar(containerColor = Color.White) {
+    NavigationBar(containerColor = com.example.weglow.ui.theme.PageBackground) {
         items.forEach { item ->
             val selected = selectedRoute == item.route
             NavigationBarItem(
                 selected = selected,
                 onClick = { onSelect(item) },
                 icon = { Icon(item.icon, contentDescription = item.label) },
-                label = { Text(item.label, style = MaterialTheme.typography.labelMedium) },
+                label = {
+                    Text(
+                        item.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    )
+                },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = CoralAccent,
-                    selectedTextColor = CoralAccent,
-                    unselectedIconColor = TextBlack,
-                    unselectedTextColor = TextBlack,
-                    indicatorColor = Color.Transparent,
+                    selectedIconColor = DarkGreen,
+                    selectedTextColor = DarkGreen,
+                    unselectedIconColor = SoftGray,
+                    unselectedTextColor = SoftGray,
+                    indicatorColor = com.example.weglow.ui.theme.CardWhite,
                 ),
             )
         }

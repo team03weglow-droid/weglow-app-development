@@ -1,6 +1,9 @@
 package com.example.weglow.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -16,6 +19,22 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.weglow.ui.theme.*
+
+/** Keeps the existing full-height composition, with scrolling when larger text needs room. */
+@Composable
+fun WeGlowOnboardingLayout(content: @Composable ColumnScope.() -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(PageBackground)) {
+        val viewportHeight = maxHeight
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = viewportHeight)
+                .padding(horizontal = WeGlowSpacing.lg),
+            content = content,
+        )
+    }
+}
 
 @Composable
 fun WeGlowPrimaryButton(
@@ -70,12 +89,15 @@ fun WeGlowTextField(
         value = value,
         onValueChange = onValueChange,
         enabled = enabled,
-        placeholder = { Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = SoftGray) },
+        textStyle = MaterialTheme.typography.bodyLarge,
+        placeholder = { Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = SoftGray) },
         singleLine = true,
         shape = RoundedCornerShape(WeGlowRadius.medium),
         visualTransformation = visualTransformation,
         trailingIcon = trailingIcon,
         colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = TextBlack,
+            unfocusedTextColor = TextBlack,
             unfocusedContainerColor = FieldWhite,
             focusedContainerColor = FieldWhite,
             disabledContainerColor = FieldWhite,

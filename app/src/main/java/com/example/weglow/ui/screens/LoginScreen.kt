@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
+import com.example.weglow.ui.components.WeGlowPlannedFeature
 import com.example.weglow.ui.components.WeGlowErrorView
 import com.example.weglow.ui.components.WeGlowPasswordField
 import com.example.weglow.ui.components.WeGlowPrimaryButton
@@ -99,20 +100,10 @@ fun LoginScreen(
             enabled = !isLoading,
         )
 
-        Text(
-            text = "Forgot password?",
-            style = MaterialTheme.typography.bodySmall,
-            color = SoftGray,
-            textAlign = TextAlign.End,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    top = 10.dp,
-                    end = 4.dp,
-                ),
-        )
+        Spacer(Modifier.height(24.dp))
 
-        Spacer(Modifier.height(20.dp))
+        WeGlowPlannedFeature("Forgot password?")
+        Spacer(Modifier.height(12.dp))
 
         // Email/password login
         WeGlowPrimaryButton(

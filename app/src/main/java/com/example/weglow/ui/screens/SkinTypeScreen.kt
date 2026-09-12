@@ -8,17 +8,20 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
 import com.example.weglow.ui.theme.*
+import com.example.weglow.ui.components.WeGlowOnboardingLayout
 
 private val CardGreen = CardWhite
 
@@ -29,23 +32,20 @@ private val SKIN_TYPES = listOf(
     SkinTypeOption("Combination", "Oily T-zone but normal or dry cheeks.", R.drawable.skin_type_combination),
     SkinTypeOption("Oily", "Shiny all over. Prone to enlarged pores.", R.drawable.skin_type_oily),
     SkinTypeOption("Sensitive", "Easily irritated, prone to redness.", R.drawable.skin_type_sensitive),
+    SkinTypeOption("Normal / Balanced", "Usually feels comfortable, neither oily nor dry.", R.drawable.skin_type_combination),
 )
 
 @Composable
 fun SkinTypeScreen(onNext: (String) -> Unit, onSkip: () -> Unit) {
-    var selected by remember { mutableStateOf<String?>(null) }
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    val columnCount = if (LocalDensity.current.fontScale > 1.15f) 1 else 2
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PageBackground)
-            .padding(horizontal = 24.dp)
-    ) {
+    WeGlowOnboardingLayout {
         Spacer(modifier = Modifier.height(24.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("STEP 2 OF 4", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
-            Text("SKIN TYPE", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+            Text("STEP 2 OF 4", style = MaterialTheme.typography.bodySmall, color = SoftGray)
+            Text("SKIN TYPE", style = MaterialTheme.typography.bodySmall, color = SoftGray)
         }
         Spacer(modifier = Modifier.height(10.dp))
         Row(
@@ -65,9 +65,8 @@ fun SkinTypeScreen(onNext: (String) -> Unit, onSkip: () -> Unit) {
         Spacer(modifier = Modifier.height(36.dp))
 
         Text(
-            text = "What's a skin type?",
-            fontFamily = JungeFont,
-            fontSize = 32.sp,
+            text = "What is your skin type?",
+            style = MaterialTheme.typography.headlineLarge,
             color = DarkGreen,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
@@ -76,7 +75,7 @@ fun SkinTypeScreen(onNext: (String) -> Unit, onSkip: () -> Unit) {
         Spacer(modifier = Modifier.height(28.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            SKIN_TYPES.chunked(2).forEach { rowItems ->
+            SKIN_TYPES.chunked(columnCount).forEach { rowItems ->
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     rowItems.forEach { option ->
                         val isSelected = option.label == selected
@@ -105,8 +104,7 @@ fun SkinTypeScreen(onNext: (String) -> Unit, onSkip: () -> Unit) {
                                 Text(
                                     text = option.label,
                                     color = TextBlack,
-                                    fontFamily = JungeFont,
-                                    fontSize = 18.sp,
+                                    style = MaterialTheme.typography.titleSmall,
                                     modifier = Modifier
                                         .align(Alignment.BottomStart)
                                         .padding(10.dp)
@@ -116,8 +114,7 @@ fun SkinTypeScreen(onNext: (String) -> Unit, onSkip: () -> Unit) {
                             }
                             Text(
                                 text = option.description,
-                                fontFamily = JungeFont,
-                                fontSize = 12.sp,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = TextBlack,
                                 modifier = Modifier.padding(12.dp)
                             )
@@ -127,6 +124,7 @@ fun SkinTypeScreen(onNext: (String) -> Unit, onSkip: () -> Unit) {
             }
         }
 
+        Spacer(modifier = Modifier.height(24.dp))
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
@@ -136,15 +134,14 @@ fun SkinTypeScreen(onNext: (String) -> Unit, onSkip: () -> Unit) {
             shape = RoundedCornerShape(999.dp),
             modifier = Modifier.fillMaxWidth().height(58.dp)
         ) {
-            Text("Next Step  →", fontFamily = JungeFont, fontSize = 16.sp)
+            Text("Next Step  →", style = MaterialTheme.typography.bodyLarge)
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Skip for now",
-            fontFamily = JungeFont,
-            fontSize = 13.sp,
+            text = "Not sure? Skip for now",
+            style = MaterialTheme.typography.bodyMedium,
             color = SoftGray,
             textAlign = TextAlign.Center,
             modifier = Modifier

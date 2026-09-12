@@ -52,8 +52,7 @@ fun WelcomeIntroScreen(onStartGlow: () -> Unit) {
 
         Text(
             text = "Divided by Acne",
-            fontFamily = JungeFont,
-            fontSize = 34.sp,
+            style = MaterialTheme.typography.headlineLarge,
             color = DarkGreen,
             textAlign = TextAlign.Center
         )
@@ -61,8 +60,7 @@ fun WelcomeIntroScreen(onStartGlow: () -> Unit) {
         Row {
             Text(
                 text = "United by ",
-                fontFamily = JungeFont,
-                fontSize = 34.sp,
+                style = MaterialTheme.typography.headlineLarge,
                 color = DarkGreen
             )
 
@@ -87,8 +85,7 @@ fun WelcomeIntroScreen(onStartGlow: () -> Unit) {
         ) {
             Text(
                 "Start your Glow",
-                fontFamily = JungeFont,
-                fontSize = 16.sp
+                style = MaterialTheme.typography.labelLarge
             )
         }
 

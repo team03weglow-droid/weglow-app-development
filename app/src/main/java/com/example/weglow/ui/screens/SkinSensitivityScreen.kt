@@ -1,6 +1,7 @@
 package com.example.weglow.ui.screens
 
 import com.example.weglow.ui.theme.*
+import com.example.weglow.ui.components.WeGlowOnboardingLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,20 +16,16 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun SkinSensitivityScreen(
     onAnswer: (Boolean) -> Unit,
+    onBack: () -> Unit = {},
     isSaving: Boolean = false,
     errorMessage: String? = null,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PageBackground)
-            .padding(horizontal = 24.dp)
-    ) {
+    WeGlowOnboardingLayout {
         Spacer(modifier = Modifier.height(24.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("STEP 3 OF 5", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
-            Text("GENDER", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+            Text("STEP 4 OF 4", style = MaterialTheme.typography.bodySmall, color = SoftGray)
+            Text("SENSITIVITY", style = MaterialTheme.typography.bodySmall, color = SoftGray)
         }
         Spacer(modifier = Modifier.height(10.dp))
         Row(
@@ -39,27 +36,25 @@ fun SkinSensitivityScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.6f)
+                    .fillMaxWidth()
                     .fillMaxHeight()
                     .background(DarkGreen, RoundedCornerShape(2.dp))
             )
         }
 
-        Spacer(modifier = Modifier.height(120.dp))
+        Spacer(modifier = Modifier.height(72.dp))
 
         Text(
             text = "Is your skin sensitive?",
-            fontFamily = JungeFont,
-            fontSize = 32.sp,
+            style = MaterialTheme.typography.headlineLarge,
             color = DarkGreen,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "Skin sensitivity has a big impact on some products lead to skin allergies.",
-            fontFamily = JungeFont,
-            fontSize = 14.sp,
+            text = "Some products can irritate sensitive skin. Your answer helps us choose gentler options.",
+            style = MaterialTheme.typography.bodyMedium,
             color = TextBlack,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
@@ -68,7 +63,7 @@ fun SkinSensitivityScreen(
         Spacer(modifier = Modifier.weight(1f))
 
         errorMessage?.let {
-            Text(it, fontFamily = JungeFont, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             Spacer(modifier = Modifier.height(10.dp))
         }
 
@@ -79,17 +74,21 @@ fun SkinSensitivityScreen(
             shape = RoundedCornerShape(999.dp),
             modifier = Modifier.fillMaxWidth().height(58.dp)
         ) {
-            Text("Yes", fontFamily = JungeFont, fontSize = 16.sp)
+            Text("Yes, it is sensitive", style = MaterialTheme.typography.labelLarge)
         }
         Spacer(modifier = Modifier.height(14.dp))
-        Button(
+        OutlinedButton(
             onClick = { onAnswer(false) },
             enabled = !isSaving,
-            colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = MaterialTheme.colorScheme.onPrimary),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = DarkGreen),
             shape = RoundedCornerShape(999.dp),
             modifier = Modifier.fillMaxWidth().height(58.dp)
         ) {
-            Text("No", fontFamily = JungeFont, fontSize = 16.sp)
+            Text("No, not usually", style = MaterialTheme.typography.labelLarge)
+        }
+
+        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+            Text("Back", style = MaterialTheme.typography.labelMedium, color = SoftGray)
         }
 
         Spacer(modifier = Modifier.height(24.dp))

@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.weglow.R
+import com.example.weglow.ui.components.WeGlowPlannedFeature
 import com.example.weglow.core.image.ProfileCameraImageStore
 import com.example.weglow.core.image.ProfileImageReader
 import com.example.weglow.domain.model.ProfileImageUpload
@@ -68,6 +69,10 @@ fun ProfileScreen(
     onProfileImagePicked: (ProfileImageUpload) -> Unit = {},
     onProfileImageUnreadable: () -> Unit = {},
     onConsumeImageError: () -> Unit = {},
+    onScanClick: () -> Unit = {},
+    onRoutinesClick: () -> Unit = {},
+    onDiscoverClick: () -> Unit = {},
+    onRecommendationsClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -235,16 +240,16 @@ fun ProfileScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            Text(displayName ?: "Your Profile", fontFamily = JungeFont, fontSize = 30.sp, color = TextBlack)
+            Text(displayName ?: "Your Profile", style = MaterialTheme.typography.headlineLarge, color = TextBlack)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("GLOW MEMBER", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+            Text("GLOW MEMBER", style = MaterialTheme.typography.bodySmall, color = SoftGray)
+            WeGlowPlannedFeature("Skin Score & View Details")
 
             if (imageError != null) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     imageError,
-                    fontFamily = JungeFont,
-                    fontSize = 12.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     color = LogoutRed,
                     modifier = Modifier.clickable(onClick = onConsumeImageError)
                 )
@@ -254,8 +259,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     cameraNotice ?: "",
-                    fontFamily = JungeFont,
-                    fontSize = 12.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     color = SoftGray,
                     modifier = Modifier.clickable { cameraNotice = null }
                 )
@@ -264,57 +268,11 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(CardWhite)
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Skin Score", fontFamily = JungeFont, fontSize = 20.sp, color = TextBlack)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        // No real skin-scoring measurement exists yet (a scan only yields
-                        // acne detections, never a numeric score) - never claim otherwise.
-                        "Complete a skin scan to see your results here.",
-                        fontFamily = JungeFont,
-                        fontSize = 13.sp,
-                        color = SoftGray
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    OutlinedButton(
-                        onClick = { },
-                        shape = RoundedCornerShape(999.dp),
-                        modifier = Modifier.height(38.dp)
-                    ) {
-                        Text("View Details", fontFamily = JungeFont, fontSize = 12.sp, color = TextBlack)
-                    }
-                }
-                Box(modifier = Modifier.size(90.dp), contentAlignment = Alignment.Center) {
-                    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                        drawCircle(
-                            color = TrackGray,
-                            radius = size.minDimension / 2 - 6.dp.toPx(),
-                            style = Stroke(width = 6.dp.toPx())
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("--", fontFamily = JungeFont, fontSize = 22.sp, color = TextBlack)
-                        Text("/100", fontFamily = JungeFont, fontSize = 11.sp, color = SoftGray)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Skin Analysis", fontFamily = JungeFont, fontSize = 24.sp, color = TextBlack)
-                Text("See all", fontFamily = JungeFont, fontSize = 14.sp, color = SoftGray)
+                Text("Skin Analysis", style = MaterialTheme.typography.headlineSmall, color = TextBlack)
+                Text("Start scan", style = MaterialTheme.typography.labelMedium, color = AccentText, modifier = Modifier.clickable(onClick = onScanClick).padding(8.dp))
             }
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -323,7 +281,7 @@ fun ProfileScreen(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(CardWhite)
-                    .clickable { }
+                    .clickable(onClick = onScanClick)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -337,10 +295,10 @@ fun ProfileScreen(
                 }
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Latest Scan", fontFamily = JungeFont, fontSize = 16.sp, color = TextBlack)
+                    Text("Skin scan", style = MaterialTheme.typography.bodyLarge, color = TextBlack)
                     // No scan history is persisted by the app yet, so this must never invent a
                     // date or a detected concern for a scan that may not have happened.
-                    Text("No scan yet. Analyze your skin to see results here.", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+                    Text("Analyze a clear photo to identify possible acne concerns.", style = MaterialTheme.typography.bodySmall, color = SoftGray)
                 }
                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SoftGray)
             }
@@ -349,8 +307,7 @@ fun ProfileScreen(
 
             Text(
                 "My Skincare Shelf",
-                fontFamily = JungeFont,
-                fontSize = 24.sp,
+                style = MaterialTheme.typography.headlineSmall,
                 color = TextBlack,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -363,37 +320,44 @@ fun ProfileScreen(
                     // never restate a specific item count here that the routine may not match.
                     itemCount = "View steps",
                     imageRes = R.drawable.shelf_morning_routine,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = onRoutinesClick,
                 )
                 ShelfCard(
                     title = "Night Repair",
                     itemCount = "View steps",
                     imageRes = R.drawable.shelf_night_repair,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = onRoutinesClick,
                 )
             }
 
             Spacer(modifier = Modifier.height(28.dp))
 
+            WeGlowPlannedFeature("Order History")
+            WeGlowPlannedFeature("Saved Products")
+            WeGlowPlannedFeature("Account Settings")
+            Spacer(Modifier.height(20.dp))
+            Text("Quick links", style = MaterialTheme.typography.headlineSmall, color = TextBlack, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(14.dp))
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(CardWhite)
             ) {
-                SettingsRow(icon = Icons.Default.ShoppingBag, label = "Order History")
+                SettingsRow(icon = Icons.Default.CameraAlt, label = "Analyze skin", onClick = onScanClick)
                 HorizontalDivider(color = TrackGray)
-                SettingsRow(icon = Icons.Default.FavoriteBorder, label = "Saved Products")
+                SettingsRow(icon = Icons.Default.FavoriteBorder, label = "Recommendations", onClick = onRecommendationsClick)
                 HorizontalDivider(color = TrackGray)
-                SettingsRow(icon = Icons.Default.Person, label = "Account Settings")
+                SettingsRow(icon = Icons.Default.ShoppingBag, label = "Discover products", onClick = onDiscoverClick)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
                 "Log Out",
-                fontFamily = JungeFont,
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.bodyLarge,
                 color = LogoutRed,
                 modifier = Modifier.clickable(onClick = onLogout)
             )
@@ -414,8 +378,7 @@ fun ProfileScreen(
                 ) {
                     Text(
                         "Update profile picture",
-                        fontFamily = JungeFont,
-                        fontSize = 18.sp,
+                        style = MaterialTheme.typography.titleMedium,
                         color = TextBlack
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -457,17 +420,18 @@ private fun ImageSourceRow(
     ) {
         Icon(icon, contentDescription = null, tint = DarkGreen)
         Spacer(modifier = Modifier.width(14.dp))
-        Text(label, fontFamily = JungeFont, fontSize = 16.sp, color = TextBlack)
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = TextBlack)
     }
 }
 
 @Composable
-private fun ShelfCard(title: String, itemCount: String, imageRes: Int, modifier: Modifier = Modifier) {
+private fun ShelfCard(title: String, itemCount: String, imageRes: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Column(
         modifier = modifier
-            .height(200.dp)
+            .heightIn(min = 200.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(CardWhite)
+            .clickable(onClick = onClick)
             .padding(12.dp)
     ) {
         Image(
@@ -480,17 +444,17 @@ private fun ShelfCard(title: String, itemCount: String, imageRes: Int, modifier:
                 .clip(RoundedCornerShape(12.dp))
         )
         Spacer(modifier = Modifier.height(10.dp))
-        Text(title, fontFamily = JungeFont, fontSize = 15.sp, color = TextBlack)
-        Text(itemCount, fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+        Text(title, style = MaterialTheme.typography.bodyLarge, color = TextBlack)
+        Text(itemCount, style = MaterialTheme.typography.bodySmall, color = SoftGray)
     }
 }
 
 @Composable
-private fun SettingsRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
+private fun SettingsRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 18.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -498,7 +462,7 @@ private fun SettingsRow(icon: androidx.compose.ui.graphics.vector.ImageVector, l
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, tint = DarkGreen)
             Spacer(modifier = Modifier.width(14.dp))
-            Text(label, fontFamily = JungeFont, fontSize = 16.sp, color = TextBlack)
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = TextBlack)
         }
         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SoftGray)
     }

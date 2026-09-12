@@ -33,7 +33,7 @@ fun WeGlowProductImage(
         placeholder = painterResource(R.drawable.weglow_logo),
         error = painterResource(R.drawable.weglow_logo),
         fallback = painterResource(R.drawable.weglow_logo),
-        contentScale = ContentScale.Crop,
+        contentScale = ContentScale.Fit,
         modifier = modifier.background(PillGray),
     )
 }

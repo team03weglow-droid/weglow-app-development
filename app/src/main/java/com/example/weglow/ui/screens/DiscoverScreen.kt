@@ -12,9 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
@@ -31,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
+import com.example.weglow.ui.components.WeGlowPlannedFeature
 import com.example.weglow.ui.components.ProfileAvatar
 import com.example.weglow.ui.components.WeGlowProductImage
 import com.example.weglow.ui.components.rememberDecodedBitmap
@@ -83,7 +82,6 @@ fun DiscoverScreen(
         }
     }
     val featuredProduct = filteredProducts.firstOrNull()
-    val pairedProduct = filteredProducts.getOrNull(1)
 
     if (showPriceFilter) {
         PriceFilterDialog(
@@ -127,12 +125,11 @@ fun DiscoverScreen(
 
         item {
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            Text("Discover", fontFamily = JungeFont, fontSize = 30.sp, color = TextBlack)
+            Text("Discover", style = MaterialTheme.typography.headlineLarge, color = TextBlack)
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                "Tips, trends and picks curated for your skin.",
-                fontFamily = JungeFont,
-                fontSize = 14.sp,
+                "Browse skincare and haircare products in the WeGlow catalog.",
+                style = MaterialTheme.typography.bodyMedium,
                 color = SoftGray
             )
 
@@ -141,7 +138,7 @@ fun DiscoverScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search for radiance...", fontFamily = JungeFont, color = SoftGray) },
+                placeholder = { Text("Search for radiance...", style = MaterialTheme.typography.bodyMedium, color = SoftGray) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = SoftGray) },
                 singleLine = true,
                 shape = RoundedCornerShape(999.dp),
@@ -163,13 +160,12 @@ fun DiscoverScreen(
                         modifier = Modifier
                             .clip(RoundedCornerShape(999.dp))
                             .background(if (isSelected) DarkGreen else CardWhite)
-                            .clickable { selectedCategory = category }
+                            .clickable(enabled = category != "Trending") { selectedCategory = category }
                             .padding(horizontal = 18.dp, vertical = 10.dp)
                     ) {
                         Text(
-                            category,
-                            fontFamily = JungeFont,
-                            fontSize = 13.sp,
+                            if (category == "Trending") "Trending · Coming soon" else category,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = if (isSelected) Color.White else TextBlack
                         )
                     }
@@ -192,7 +188,7 @@ fun DiscoverScreen(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         if (minimumPrice != null || maximumPrice != null) "Price filter on" else "Price filter",
-                        fontFamily = JungeFont,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
 
@@ -227,12 +223,11 @@ fun DiscoverScreen(
                     // type (that lives in Recommendations, driven by RecommendationEngine) -
                     // it must never claim a specific skin type it hasn't actually matched.
                     "Featured Products",
-                    fontFamily = JungeFont,
-                    fontSize = 24.sp,
+                    style = MaterialTheme.typography.headlineSmall,
                     color = TextBlack,
                     modifier = Modifier.weight(1f)
                 )
-                Text("✦", fontSize = 20.sp, color = Clay)
+                Text("✦", style = MaterialTheme.typography.titleLarge, color = Clay)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -263,101 +258,34 @@ fun DiscoverScreen(
                         Spacer(modifier = Modifier.width(4.dp))
                         // No real per-user match score is computed here; a specific percentage
                         // would be fabricated, so this only claims "Featured" placement.
-                        Text("Featured", fontFamily = JungeFont, fontSize = 12.sp, color = TextBlack)
+                        Text("Featured", style = MaterialTheme.typography.bodySmall, color = TextBlack)
                     }
                 }
                 Column(modifier = Modifier.padding(16.dp)) {
                     product.brandName?.let {
-                        Text(it, fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = SoftGray)
                         Spacer(modifier = Modifier.height(3.dp))
                     }
-                    Text(product.name, fontFamily = JungeFont, fontSize = 22.sp, color = TextBlack)
+                    Text(product.name, style = MaterialTheme.typography.titleLarge, color = TextBlack)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         product.description.orEmpty(),
-                        fontFamily = JungeFont,
-                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = SoftGray
                     )
                     Spacer(modifier = Modifier.height(14.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(product.priceLabel, fontFamily = JungeFont, fontSize = 18.sp, color = TextBlack)
-                        Button(
-                            onClick = { },
-                            colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = Color.White),
-                            shape = RoundedCornerShape(999.dp)
-                        ) {
-                            Text("Add to Bag", fontFamily = JungeFont, fontSize = 14.sp)
-                        }
-                    }
-                }
-            } }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            pairedProduct?.let { product -> Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(CardWhite)
-            ) {
-                Box {
-                    WeGlowProductImage(
-                        imageUrl = product.imageUrl,
-                        contentDescription = product.name,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(240.dp)
-                    )
-                    Row(
-                        modifier = Modifier
-                            .padding(12.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(PairingCoral)
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("♥", color = Color.White, fontSize = 12.sp)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Perfect Pairing", fontFamily = JungeFont, fontSize = 12.sp, color = Color.White)
-                    }
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(product.name, fontFamily = JungeFont, fontSize = 18.sp, color = TextBlack)
-                        product.brandName?.let { brand ->
-                            Text(brand, fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
-                        }
-                        Text(product.priceLabel, fontFamily = JungeFont, fontSize = 14.sp, color = SoftGray)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(PillGray),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = TextBlack)
-                    }
+                    Text(product.priceLabel, style = MaterialTheme.typography.titleMedium, color = TextBlack)
+                    WeGlowPlannedFeature("Add to Bag")
                 }
             } }
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            WeGlowPlannedFeature("Perfect Pairing")
+            Spacer(Modifier.height(16.dp))
             Text(
                 "All Products (${filteredProducts.size})",
-                fontFamily = JungeFont,
-                fontSize = 26.sp,
+                style = MaterialTheme.typography.headlineMedium,
                 color = TextBlack,
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -429,34 +357,25 @@ private fun ProductGridCard(product: Product, modifier: Modifier = Modifier) {
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(16.dp))
             )
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .align(Alignment.TopEnd)
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.FavoriteBorder, contentDescription = null, tint = TextBlack, modifier = Modifier.size(14.dp))
-            }
         }
         Spacer(modifier = Modifier.height(8.dp))
         product.ratingLabel?.let { rating ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Star, contentDescription = null, tint = WarmGold, modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(rating, fontFamily = JungeFont, fontSize = 12.sp, color = TextBlack)
+                Text(rating, style = MaterialTheme.typography.bodySmall, color = TextBlack)
             }
             Spacer(modifier = Modifier.height(2.dp))
         }
         product.brandName?.let { brand ->
-            Text(brand, fontFamily = JungeFont, fontSize = 11.sp, color = SoftGray)
+            Text(brand, style = MaterialTheme.typography.labelSmall, color = SoftGray)
             Spacer(modifier = Modifier.height(2.dp))
         }
-        Text(product.name, fontFamily = JungeFont, fontSize = 14.sp, color = TextBlack)
+        Text(product.name, style = MaterialTheme.typography.titleSmall, color = TextBlack)
         Spacer(modifier = Modifier.height(2.dp))
-        Text(product.priceLabel, fontFamily = JungeFont, fontSize = 13.sp, color = SoftGray)
+        Text(product.priceLabel, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
+        Spacer(Modifier.height(8.dp))
+        WeGlowPlannedFeature("Save")
     }
 }
 
@@ -480,16 +399,15 @@ private fun ProductListCard(product: Product) {
         )
         Column(modifier = Modifier.weight(1f)) {
             product.brandName?.let { brand ->
-                Text(brand, fontFamily = JungeFont, fontSize = 11.sp, color = SoftGray)
+                Text(brand, style = MaterialTheme.typography.labelSmall, color = SoftGray)
                 Spacer(modifier = Modifier.height(2.dp))
             }
-            Text(product.name, fontFamily = JungeFont, fontSize = 16.sp, color = TextBlack)
+            Text(product.name, style = MaterialTheme.typography.titleSmall, color = TextBlack)
             product.description?.takeIf(String::isNotBlank)?.let { description ->
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     description,
-                    fontFamily = JungeFont,
-                    fontSize = 12.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     color = SoftGray,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -501,7 +419,7 @@ private fun ProductListCard(product: Product) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(product.priceLabel, fontFamily = JungeFont, fontSize = 14.sp, color = TextBlack)
+                Text(product.priceLabel, style = MaterialTheme.typography.bodyMedium, color = TextBlack)
                 product.ratingLabel?.let { rating ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -511,7 +429,7 @@ private fun ProductListCard(product: Product) {
                             modifier = Modifier.size(14.dp),
                         )
                         Spacer(modifier = Modifier.width(3.dp))
-                        Text(rating, fontFamily = JungeFont, fontSize = 12.sp, color = TextBlack)
+                        Text(rating, style = MaterialTheme.typography.bodySmall, color = TextBlack)
                     }
                 }
             }
@@ -561,10 +479,10 @@ private fun PriceFilterDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Filter by price", fontFamily = JungeFont) },
+        title = { Text("Filter by price", style = MaterialTheme.typography.titleLarge) },
         text = {
             Column {
-                Text("Enter the price range in LKR.", fontFamily = JungeFont, color = SoftGray)
+                Text("Enter the price range in LKR.", style = MaterialTheme.typography.bodyMedium, color = SoftGray)
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = minimumInput,
@@ -591,7 +509,7 @@ private fun PriceFilterDialog(
                         if (invalidRange) "Minimum price cannot exceed maximum price."
                         else "Enter a valid price.",
                         color = MaterialTheme.colorScheme.error,
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
@@ -639,11 +557,11 @@ private fun ProductLoadMessage(
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(message, fontFamily = JungeFont, fontSize = 14.sp, color = SoftGray)
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
         actionLabel?.let {
             Spacer(modifier = Modifier.height(12.dp))
             TextButton(onClick = onAction) {
-                Text(it, fontFamily = JungeFont, color = DarkGreen)
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = DarkGreen)
             }
         }
     }

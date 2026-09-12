@@ -29,6 +29,7 @@ import com.example.weglow.feature.onboarding.OnboardingViewModel
 import com.example.weglow.feature.profile.ProfileViewModel
 import com.example.weglow.feature.recommendation.RecommendationViewModel
 import com.example.weglow.feature.routine.RoutineViewModel
+import com.example.weglow.feature.routine.RoutineJournalViewModel
 import com.example.weglow.feature.scan.ScanViewModel
 import com.example.weglow.ui.components.WeGlowBottomNavigation
 import com.example.weglow.ui.components.WeGlowNavItem
@@ -120,6 +121,11 @@ fun WeGlowApp() {
         }
     )
 
+    val journalViewModel: RoutineJournalViewModel = viewModel(
+        factory = viewModelFactory { RoutineJournalViewModel(context, container.authRepository) }
+    )
+    val journalState by journalViewModel.uiState.collectAsState()
+    var homeRoutineMorning by remember { mutableStateOf<Boolean?>(null) }
     val authState by authViewModel.uiState.collectAsState()
     val startupDestination by authViewModel.startupDestination.collectAsState()
     val onboardingState by onboardingViewModel.uiState.collectAsState()
@@ -394,6 +400,7 @@ fun WeGlowApp() {
 
                 SkinSensitivityScreen(
                     onAnswer = onboardingViewModel::setSensitivityAndSave,
+                    onBack = { navController.popBackStack() },
                     isSaving = onboardingState.isSaving,
                     errorMessage = onboardingState.errorMessage,
                 )
@@ -459,6 +466,16 @@ fun WeGlowApp() {
                     displayName = profileState.displayName,
                     profileImage = profileState.profileImage,
                     morningRoutine = routineState.plan?.morning.orEmpty(),
+                    eveningRoutine = routineState.plan?.evening.orEmpty(),
+                    isRoutineLoading = routineState.isLoading,
+                    routineError = journalState.errorMessage ?: routineState.errorMessage,
+                    onProfileClick = { navController.navigate(Destination.Profile.route) { launchSingleTop = true } },
+                    onRoutinesPeriodClick = { morning ->
+                        homeRoutineMorning = morning
+                        navController.navigate(Destination.Routines.route) { launchSingleTop = true }
+                    },
+                    completedRoutineKeys = journalState.completedKeys,
+                    onToggleRoutineStep = journalViewModel::toggleCompletion,
 
                     onScanClick = {
 
@@ -485,6 +502,9 @@ fun WeGlowApp() {
                         ) {
                             launchSingleTop = true
                         }
+                    },
+                    onRoutinesClick = {
+                        navController.navigate(Destination.Routines.route) { launchSingleTop = true }
                     },
                 )
             }
@@ -590,6 +610,8 @@ fun WeGlowApp() {
                 }
 
                 RecommendationsScreen(
+                    onScanClick = { navController.navigate(Destination.Scan.route) { launchSingleTop = true } },
+                    onDiscoverClick = { navController.navigate(Destination.Discover.route) { launchSingleTop = true } },
                     isLoading = recommendationState.isLoading,
                     result = recommendationState.result,
                     errorMessage = recommendationState.errorMessage,
@@ -629,6 +651,10 @@ fun WeGlowApp() {
                     isLoading = routineState.isLoading,
                     errorMessage = routineState.errorMessage,
                     plan = routineState.plan,
+                    journal = journalState,
+                    initialMorning = homeRoutineMorning,
+                    onToggleRoutineStep = journalViewModel::toggleCompletion,
+                    onSaveNote = journalViewModel::saveNote,
                     onRetry = routineViewModel::load,
                     displayName = profileState.displayName,
                     profileImage = profileState.profileImage,
@@ -651,6 +677,10 @@ fun WeGlowApp() {
                     onProfileImagePicked = profileViewModel::onProfileImagePicked,
                     onProfileImageUnreadable = profileViewModel::onProfileImageUnreadable,
                     onConsumeImageError = profileViewModel::consumeImageError,
+                    onScanClick = { navController.navigate(Destination.Scan.route) { launchSingleTop = true } },
+                    onRoutinesClick = { navController.navigate(Destination.Routines.route) { launchSingleTop = true } },
+                    onDiscoverClick = { navController.navigate(Destination.Discover.route) { launchSingleTop = true } },
+                    onRecommendationsClick = { navController.navigate(Destination.Recommendations.routeFor(false)) { launchSingleTop = true } },
                     onLogout = authViewModel::signOut
                 )
 

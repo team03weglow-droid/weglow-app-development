@@ -1,6 +1,7 @@
 package com.example.weglow.ui.screens
 
 import com.example.weglow.ui.theme.*
+import com.example.weglow.ui.components.WeGlowOnboardingLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -17,26 +19,21 @@ import androidx.compose.ui.unit.sp
 
 private val CardGreen = CheckboxGreen
 
-private val AGE_OPTIONS = listOf("Under 14", "14 - 25", "25 - 35", "36 - 45", "45 - 50")
+private val AGE_OPTIONS = listOf("Under 14", "14–24", "25–35", "36–45", "46–59", "60+")
 
 @Composable
 fun AgeSelectionScreen(onContinue: (String) -> Unit) {
-    var selected by remember { mutableStateOf("14 - 25") }
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PageBackground)
-            .padding(horizontal = 24.dp)
-    ) {
+    WeGlowOnboardingLayout {
         Spacer(modifier = Modifier.height(24.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("STEP 1 OF 4", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
-            Text("AGE", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+            Text("STEP 1 OF 4", style = MaterialTheme.typography.bodySmall, color = SoftGray)
+            Text("AGE", style = MaterialTheme.typography.bodySmall, color = SoftGray)
         }
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -58,8 +55,7 @@ fun AgeSelectionScreen(onContinue: (String) -> Unit) {
 
         Text(
             text = "How old are you?",
-            fontFamily = JungeFont,
-            fontSize = 34.sp,
+            style = MaterialTheme.typography.headlineLarge,
             color = DarkGreen,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
@@ -67,8 +63,7 @@ fun AgeSelectionScreen(onContinue: (String) -> Unit) {
         Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = "At different ages, your skin needs different skincare treatments. Tell us to personalize your routine.",
-            fontFamily = JungeFont,
-            fontSize = 14.sp,
+            style = MaterialTheme.typography.bodyMedium,
             color = TextBlack,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
@@ -95,20 +90,18 @@ fun AgeSelectionScreen(onContinue: (String) -> Unit) {
                         .clickable { selected = option }
                         .padding(horizontal = 20.dp, vertical = 18.dp)
                 ) {
-                    Text(option, fontFamily = JungeFont, fontSize = 18.sp, color = DarkGreen)
-                    Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .border(1.5.dp, SoftGray, CircleShape)
-                    )
+                    Text(option, style = MaterialTheme.typography.titleMedium, color = DarkGreen)
+                    RadioButton(selected = isSelected, onClick = { selected = option })
                 }
             }
         }
 
+        Spacer(modifier = Modifier.height(24.dp))
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
-            onClick = { onContinue(selected) },
+            onClick = { selected?.let(onContinue) },
+            enabled = selected != null,
             colors = ButtonDefaults.buttonColors(
                 containerColor = DarkGreen,
                 contentColor = MaterialTheme.colorScheme.onPrimary
@@ -118,7 +111,7 @@ fun AgeSelectionScreen(onContinue: (String) -> Unit) {
                 .fillMaxWidth()
                 .height(58.dp)
         ) {
-            Text("CONTINUE", fontFamily = JungeFont, fontSize = 15.sp)
+            Text("Continue", style = MaterialTheme.typography.labelLarge)
         }
 
         Spacer(modifier = Modifier.height(32.dp))

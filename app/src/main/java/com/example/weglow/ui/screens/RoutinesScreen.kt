@@ -35,6 +35,10 @@ import com.example.weglow.R
 import com.example.weglow.domain.model.RoutinePlan
 import com.example.weglow.feature.routine.calendarDays
 import com.example.weglow.feature.routine.routineStepKey
+import com.example.weglow.feature.routine.RoutineJournalState
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import java.time.format.DateTimeFormatter
 import com.example.weglow.ui.components.ProfileAvatar
 import com.example.weglow.ui.components.WeGlowErrorView
 import com.example.weglow.ui.components.WeGlowLoadingView
@@ -64,9 +68,13 @@ fun RoutinesScreen(
     onRetry: () -> Unit,
     displayName: String? = null,
     profileImage: ByteArray? = null,
+    journal: RoutineJournalState = RoutineJournalState(),
+    onToggleRoutineStep: (String) -> Unit = {},
+    onSaveNote: (String, String?, String) -> Unit = { _, _, _ -> },
+    initialMorning: Boolean? = null,
 ) {
 
-    var isMorning by remember { mutableStateOf(LocalTime.now().hour < 12) }
+    var isMorning by remember(initialMorning) { mutableStateOf(initialMorning ?: (LocalTime.now().hour < 12)) }
     val initialToday = remember { LocalDate.now() }
     var today by remember { mutableStateOf(initialToday) }
     var selectedDate by remember { mutableStateOf(initialToday) }
@@ -74,8 +82,8 @@ fun RoutinesScreen(
 
     fun refreshDeviceDateAndPeriod() {
         val deviceToday = LocalDate.now()
-        isMorning = LocalTime.now().hour < 12
         if (deviceToday != today) {
+            isMorning = LocalTime.now().hour < 12
             val selectionWasToday = selectedDate == today
             today = deviceToday
             if (selectionWasToday) {
@@ -104,14 +112,11 @@ fun RoutinesScreen(
 
     val locale = LocalConfiguration.current.locales[0]
 
-    // Session-only completion tracking: no routine-history table/persistence exists in this
-    // app, so this intentionally does not survive an app restart. Keys are built by
-    // routineStepKey(selectedDate, isMorning, ...) so each date's checkmarks - and Morning vs.
-    // Evening - stay independent instead of one date's progress silently showing on another.
-    var doneState by remember { mutableStateOf(setOf<String>()) }
-
-    var selectedFeeling by remember { mutableStateOf<String?>(null) }
-    var observations by remember { mutableStateOf("") }
+    val doneState = journal.completedKeys
+    val noteKey = selectedDate.toString()
+    val savedNote = journal.notes[noteKey]
+    var selectedFeeling by remember(noteKey, savedNote) { mutableStateOf(savedNote?.feeling) }
+    var observations by remember(noteKey, savedNote) { mutableStateOf(savedNote?.observations.orEmpty()) }
 
     val activeSteps = if (isMorning) {
         plan?.morning.orEmpty()
@@ -125,7 +130,7 @@ fun RoutinesScreen(
             .background(PageBackground)
             .verticalScroll(rememberScrollState())
             .padding(
-                horizontal = 20.dp,
+                horizontal = 24.dp,
                 vertical = 20.dp
             )
     ) {
@@ -147,6 +152,17 @@ fun RoutinesScreen(
         }
 
         Spacer(Modifier.height(14.dp))
+
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(calendarAnchor.format(DateTimeFormatter.ofPattern("MMMM yyyy", locale)),
+                style = MaterialTheme.typography.titleMedium, color = DarkGreen, modifier = Modifier.weight(1f))
+            TextButton(onClick = { selectedDate = today; calendarAnchor = today }) { Text("Today") }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = { calendarAnchor = calendarAnchor.minusWeeks(1) }) { Text("Previous week") }
+            TextButton(onClick = { calendarAnchor = calendarAnchor.plusWeeks(1) }) { Text("Next week") }
+        }
+        journal.errorMessage?.let { WeGlowErrorView(it) }
 
         AnimatedContent(
             targetState = calendarAnchor,
@@ -211,8 +227,7 @@ fun RoutinesScreen(
 
                     Text(
                         day.dayName,
-                        fontFamily = JungeFont,
-                        fontSize = 11.sp,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = if (day.isSelected || day.isToday) {
                             FontWeight.Bold
                         } else {
@@ -250,8 +265,7 @@ fun RoutinesScreen(
 
                         Text(
                             day.dayNumber,
-                            fontFamily = JungeFont,
-                            fontSize = 15.sp,
+                            style = MaterialTheme.typography.bodyLarge,
                             color = if (day.isSelected) {
                                 Color.White
                             } else {
@@ -293,12 +307,11 @@ fun RoutinesScreen(
 
         Text(
             if (isMorning) {
-                "Your skin needs a little extra hydration today."
+                "A simple routine to start your day."
             } else {
                 "Time to repair and recover overnight."
             },
-            fontFamily = JungeFont,
-            fontSize = 14.sp,
+            style = MaterialTheme.typography.bodyMedium,
             color = PrimaryBlack,
             modifier = Modifier.padding(
                 top = 2.dp,
@@ -308,8 +321,7 @@ fun RoutinesScreen(
 
         Text(
             "Step-by-Step",
-            fontFamily = JungeFont,
-            fontSize = 16.sp,
+            style = MaterialTheme.typography.bodyLarge,
             color = PrimaryBlack
         )
 
@@ -321,8 +333,7 @@ fun RoutinesScreen(
             errorMessage != null -> WeGlowErrorView(message = errorMessage, onRetry = onRetry)
             activeSteps.isEmpty() -> Text(
                 "No routine steps are available yet.",
-                fontFamily = JungeFont,
-                fontSize = 13.sp,
+                style = MaterialTheme.typography.bodyMedium,
                 color = SoftGray,
             )
             else -> activeSteps.forEachIndexed { index, step ->
@@ -381,16 +392,14 @@ fun RoutinesScreen(
 
                             Text(
                                 "STEP ${index + 1} • ${step.label.uppercase()}",
-                                fontFamily = JungeFont,
-                                fontSize = 11.sp,
-                                color = DarkGreen.copy(alpha = 0.65f)
+                                style = MaterialTheme.typography.labelSmall,
+                                color = SoftGray
                             )
 
                             if (product != null) {
                                 Text(
                                     product.name,
-                                    fontFamily = JungeFont,
-                                    fontSize = 14.sp,
+                                    style = MaterialTheme.typography.titleSmall,
                                     color = PrimaryBlack,
                                     textDecoration = if (done) {
                                         TextDecoration.LineThrough
@@ -402,8 +411,7 @@ fun RoutinesScreen(
 
                                 Text(
                                     listOfNotNull(product.brandName, product.priceLabel).joinToString(" · "),
-                                    fontFamily = JungeFont,
-                                    fontSize = 12.sp,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = SoftGray,
                                     textDecoration = if (done) {
                                         TextDecoration.LineThrough
@@ -414,8 +422,7 @@ fun RoutinesScreen(
                             } else {
                                 Text(
                                     "No suitable product found for this step yet",
-                                    fontFamily = JungeFont,
-                                    fontSize = 12.sp,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = SoftGray,
                                     modifier = Modifier.padding(top = 3.dp)
                                 )
@@ -426,44 +433,12 @@ fun RoutinesScreen(
 
                         // CHECK BUTTON
                         if (product != null) {
-                            Box(
-                                modifier = Modifier
-                                    .size(26.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (done) {
-                                            DoneGreen
-                                        } else {
-                                            Color.Transparent
-                                        }
-                                    )
-                                    .then(
-                                        if (!done) {
-                                            Modifier.border(
-                                                1.5.dp,
-                                                SoftGray,
-                                                CircleShape
-                                            )
-                                        } else {
-                                            Modifier
-                                        }
-                                    )
-                                    .clickable {
-                                        doneState = if (done) doneState - stepKey else doneState + stepKey
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-
-                                if (done) {
-
-                                    Icon(
-                                        Icons.Filled.Check,
-                                        contentDescription = "Mark step undone",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
+                            Checkbox(
+                                checked = done,
+                                onCheckedChange = { onToggleRoutineStep(stepKey) },
+                                modifier = Modifier.semantics { contentDescription = "Complete ${product.name}" },
+                                colors = CheckboxDefaults.colors(checkedColor = DarkGreen),
+                            )
                         }
                     }
                 }
@@ -483,15 +458,13 @@ fun RoutinesScreen(
 
             Text(
                 "Daily Skin Note",
-                fontFamily = JungeFont,
-                fontSize = 15.sp,
+                style = MaterialTheme.typography.bodyLarge,
                 color = PrimaryBlack
             )
 
             Text(
                 "How does your skin feel today?",
-                fontFamily = JungeFont,
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.bodySmall,
                 color = SoftGray,
                 modifier = Modifier.padding(
                     top = 2.dp,
@@ -541,8 +514,7 @@ fun RoutinesScreen(
 
             Text(
                 "Observations",
-                fontFamily = JungeFont,
-                fontSize = 13.sp,
+                style = MaterialTheme.typography.bodyMedium,
                 color = PrimaryBlack
             )
 
@@ -557,8 +529,7 @@ fun RoutinesScreen(
 
                     Text(
                         "Noticed anything different today? E.g., slight redness around nose after cleansing...",
-                        fontFamily = JungeFont,
-                        fontSize = 12.sp
+                        style = MaterialTheme.typography.bodySmall
                     )
                 },
                 shape = RoundedCornerShape(14.dp),
@@ -568,14 +539,19 @@ fun RoutinesScreen(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(90.dp)
+                    .heightIn(min = 112.dp)
             )
 
             Spacer(Modifier.height(12.dp))
 
+            Text("Notes stay on this device. No cloud sync.",
+                style = MaterialTheme.typography.bodySmall, color = SoftGray)
+            if (journal.lastSavedNoteKey == noteKey && savedNote != null && savedNote.feeling == selectedFeeling && savedNote.observations == observations.trim()) {
+                Text("Note saved", style = MaterialTheme.typography.labelMedium, color = DarkGreen)
+            }
             // SAVE NOTE BUTTON
             Button(
-                onClick = { },
+                onClick = { onSaveNote(noteKey, selectedFeeling, observations) },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = DarkGreen,
                     contentColor = Color.White
@@ -588,8 +564,7 @@ fun RoutinesScreen(
 
                 Text(
                     "Save Note",
-                    fontFamily = JungeFont,
-                    fontSize = 15.sp
+                    style = MaterialTheme.typography.labelLarge
                 )
             }
         }
@@ -607,8 +582,7 @@ private fun FeelingChip(
 
     Text(
         label,
-        fontFamily = JungeFont,
-        fontSize = 12.sp,
+        style = MaterialTheme.typography.bodySmall,
         color = if (selected) {
             DarkGreen
         } else {
@@ -655,8 +629,7 @@ private fun RowScope.ToggleHalf(
 
     Text(
         label,
-        fontFamily = JungeFont,
-        fontSize = 14.sp,
+        style = MaterialTheme.typography.bodyMedium,
         color = if (selected) {
             Color.White
         } else {
