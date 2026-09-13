@@ -1,7 +1,5 @@
 package com.example.weglow.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -11,7 +9,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -139,21 +136,44 @@ fun WeGlowApp() {
     val recommendationState by recommendationViewModel.uiState.collectAsState()
     val routineState by routineViewModel.uiState.collectAsState()
 
-    val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
-    val showFloatingNavigation = currentRoute in tabs.map { it.route } &&
-        currentRoute != Destination.Scan.route
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
 
-    Box(Modifier.fillMaxSize()) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-        ) { padding ->
+            val backStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = backStackEntry?.destination?.route
 
-            NavHost(
-                navController = navController,
-                startDestination = Destination.Loading.route,
-                modifier = Modifier.padding(padding),
-            ) {
+            // Scan owns its own camera/analyzing navigation. Keep it completely edge-to-edge;
+            // in particular, the Figma analyzing page must never show the tab bar.
+            if (currentRoute in tabs.map { it.route } && currentRoute != Destination.Scan.route) {
+
+                WeGlowBottomNavigation(
+                    items = tabs,
+                    selectedRoute = currentRoute,
+                    onSelect = { tab ->
+
+                        navController.navigate(tab.route) {
+
+                            // Phase 3:
+                            // Home is the stable anchor for main-app navigation.
+                            popUpTo(Destination.Home.route) {
+                                saveState = true
+                            }
+
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
+        }
+    ) { padding ->
+
+        NavHost(
+            navController = navController,
+            startDestination = Destination.Loading.route,
+            modifier = Modifier.padding(padding),
+        ) {
 
             // ---------------------------------------------------------
             // STARTUP
@@ -698,25 +718,6 @@ fun WeGlowApp() {
                         authViewModel.consumeEvent()
                     }
                 }
-            }
-            }
-        }
-
-        // The floating surface overlays scrollable content, which gives the translucent
-        // glass treatment its depth without changing any destination's layout.
-        if (showFloatingNavigation) {
-            Box(Modifier.align(Alignment.BottomCenter)) {
-                WeGlowBottomNavigation(
-                    items = tabs,
-                    selectedRoute = currentRoute,
-                    onSelect = { tab ->
-                        navController.navigate(tab.route) {
-                            popUpTo(Destination.Home.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                )
             }
         }
     }
