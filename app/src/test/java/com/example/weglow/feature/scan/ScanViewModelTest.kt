@@ -16,8 +16,7 @@ import org.junit.Test
 import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class codex
-ScanViewModelTest {
+class ScanViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val emptyResult = AcneScanResult(emptyList(), 640, 480, "test", 0.25f)
 
