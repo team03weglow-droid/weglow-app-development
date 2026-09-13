@@ -31,6 +31,8 @@ fun RecommendationsScreen(
     errorMessage: String?,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onScanClick: () -> Unit = {},
+    onDiscoverClick: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize().background(PageBackground)) {
         Row(
@@ -40,7 +42,7 @@ fun RecommendationsScreen(
             IconButton(onClick = onBack) {
                 Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = PrimaryBlack)
             }
-            Text("Recommended for You", fontFamily = JungeFont, fontSize = 20.sp, color = PrimaryBlack)
+            Text("Recommended for You", style = MaterialTheme.typography.titleLarge, color = PrimaryBlack)
         }
 
         when {
@@ -50,13 +52,14 @@ fun RecommendationsScreen(
             errorMessage != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 WeGlowErrorView(message = errorMessage, onRetry = onRetry)
             }
-            result == null -> Unit
+            result == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                TextButton(onClick = onRetry) { Text("Load recommendations") }
+            }
             !result.hasPersonalizationSignal -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "Add your skin type or run a scan",
-                        fontFamily = JungeFont,
-                        fontSize = 18.sp,
+                        style = MaterialTheme.typography.titleMedium,
                         color = PrimaryBlack,
                         textAlign = TextAlign.Center,
                     )
@@ -64,21 +67,24 @@ fun RecommendationsScreen(
                     Text(
                         "We need at least your skin profile or a recent scan to personalize recommendations.",
                         color = SoftGray,
-                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                     )
+                    Button(onClick = onScanClick) { Text("Start a scan") }
+                    TextButton(onClick = onDiscoverClick) { Text("Browse products") }
                 }
             }
             result.recommendations.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No matching products yet", fontFamily = JungeFont, fontSize = 18.sp, color = PrimaryBlack)
+                    Text("No matching products yet", style = MaterialTheme.typography.titleMedium, color = PrimaryBlack)
                     Spacer(Modifier.height(6.dp))
                     Text(
                         "None of the current products in Discover matched your profile or scan.",
                         color = SoftGray,
-                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                     )
+                    TextButton(onClick = onDiscoverClick) { Text("Browse products") }
                 }
             }
             else -> RecommendationsList(result)
@@ -91,7 +97,7 @@ private fun RecommendationsList(result: RecommendationResult) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-                Text(contextSummary(result), color = SoftGray, fontSize = 13.sp)
+                Text(contextSummary(result), color = SoftGray, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(16.dp))
             }
         }
@@ -104,7 +110,7 @@ private fun RecommendationsList(result: RecommendationResult) {
             Text(
                 "Recommendations are for general skincare guidance and are not medical advice.",
                 color = SoftGray,
-                fontSize = 11.sp,
+                style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
             )
             Spacer(Modifier.height(74.dp))
@@ -143,19 +149,19 @@ private fun RecommendationCard(recommendation: ProductRecommendation) {
         )
         Column(modifier = Modifier.weight(1f)) {
             product.brandName?.let { brand ->
-                Text(brand, fontFamily = JungeFont, fontSize = 11.sp, color = SoftGray)
+                Text(brand, style = MaterialTheme.typography.labelSmall, color = SoftGray)
                 Spacer(Modifier.height(2.dp))
             }
-            Text(product.name, fontFamily = JungeFont, fontSize = 15.sp, color = PrimaryBlack)
+            Text(product.name, style = MaterialTheme.typography.titleSmall, color = PrimaryBlack)
             Spacer(Modifier.height(3.dp))
-            Text(product.priceLabel, fontFamily = JungeFont, fontSize = 13.sp, color = PrimaryBlack)
+            Text(product.priceLabel, style = MaterialTheme.typography.bodyMedium, color = PrimaryBlack)
             if (recommendation.reasons.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
                 recommendation.reasons.forEach { reason ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(5.dp).clip(CircleShape).background(DarkGreen))
                         Spacer(Modifier.width(6.dp))
-                        Text(reason, color = DarkGreen, fontSize = 11.sp)
+                        Text(reason, color = DarkGreen, style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(Modifier.height(2.dp))
                 }

@@ -1,6 +1,7 @@
 package com.example.weglow.ui.screens
 
 import com.example.weglow.ui.theme.*
+import com.example.weglow.ui.components.WeGlowOnboardingLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -19,19 +21,14 @@ private val GENDER_OPTIONS = listOf("Female", "Male", "Other/Prefer not to say")
 
 @Composable
 fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
-    var selected by remember { mutableStateOf<String?>(null) }
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PageBackground)
-            .padding(horizontal = 24.dp)
-    ) {
+    WeGlowOnboardingLayout {
         Spacer(modifier = Modifier.height(24.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("STEP 3 OF 5", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
-            Text("GENDER", fontFamily = JungeFont, fontSize = 12.sp, color = SoftGray)
+            Text("STEP 3 OF 4", style = MaterialTheme.typography.bodySmall, color = SoftGray)
+            Text("GENDER", style = MaterialTheme.typography.bodySmall, color = SoftGray)
         }
         Spacer(modifier = Modifier.height(10.dp))
         Row(
@@ -42,7 +39,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.6f)
+                    .fillMaxWidth(0.75f)
                     .fillMaxHeight()
                     .background(DarkGreen, RoundedCornerShape(2.dp))
             )
@@ -52,8 +49,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
 
         Text(
             text = "What's your gender?",
-            fontFamily = JungeFont,
-            fontSize = 32.sp,
+            style = MaterialTheme.typography.headlineLarge,
             color = DarkGreen,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
@@ -61,8 +57,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = "Hormones have a big impact on how our skin looks and feels at every age.",
-            fontFamily = JungeFont,
-            fontSize = 14.sp,
+            style = MaterialTheme.typography.bodyMedium,
             color = TextBlack,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
@@ -85,7 +80,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
                         .clickable { selected = option }
                         .padding(horizontal = 20.dp, vertical = 18.dp)
                 ) {
-                    Text(option, fontFamily = JungeFont, fontSize = 17.sp, color = TextBlack)
+                    Text(option, style = MaterialTheme.typography.titleSmall, color = TextBlack)
                 }
             }
         }
@@ -98,7 +93,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
                 shape = RoundedCornerShape(999.dp),
                 modifier = Modifier.weight(1f).height(54.dp)
             ) {
-                Text("Back", fontFamily = JungeFont, fontSize = 15.sp, color = TextBlack)
+                Text("Back", style = MaterialTheme.typography.bodyLarge, color = TextBlack)
             }
             Button(
                 onClick = {
@@ -112,7 +107,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
                 shape = RoundedCornerShape(999.dp),
                 modifier = Modifier.weight(1f).height(54.dp)
             ) {
-                Text("Continue", fontFamily = JungeFont, fontSize = 15.sp)
+                Text("Continue", style = MaterialTheme.typography.bodyLarge)
             }
         }
 

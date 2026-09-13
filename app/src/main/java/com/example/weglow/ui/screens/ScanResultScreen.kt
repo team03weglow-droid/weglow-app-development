@@ -36,6 +36,8 @@ fun ScanResultsScreen(
     onBack: () -> Unit,
     onViewRecommendations: () -> Unit,
 ) {
+    var showAreas by remember { mutableStateOf(true) }
+    var showPhotoDetails by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var bitmap by remember(photoUri) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(photoUri) { bitmap = photoUri?.let { loadImageBitmap(context, it) } }
@@ -55,7 +57,7 @@ fun ScanResultsScreen(
         Box(Modifier.fillMaxWidth().height(320.dp).background(Color(0xFF1C1917))) {
             bitmap?.let { photo ->
                 Image(photo, "Scanned photo with detected areas", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                Canvas(Modifier.fillMaxSize()) {
+                if (showAreas) Canvas(Modifier.fillMaxSize()) {
                     // ContentScale.Crop fills the hero without black side strips. Map the
                     // model's normalized coordinates into the cropped rendered rect.
                     val imageScale = maxOf(size.width / result.imageWidth, size.height / result.imageHeight)
@@ -80,29 +82,37 @@ fun ScanResultsScreen(
                     }
                 }
             }
-            Row(Modifier.align(Alignment.TopStart).fillMaxWidth().zIndex(1f).padding(horizontal = 16.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.align(Alignment.TopStart).fillMaxWidth().zIndex(1f).background(DarkGreen.copy(alpha = 0.86f)).padding(horizontal = 16.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack, modifier = Modifier.size(40.dp).background(Color.Black.copy(alpha = 0.35f), CircleShape)) {
                     Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                 }
-                Spacer(Modifier.width(12.dp)); Text("Scan results", fontSize = 20.sp, color = Color.White)
+                Spacer(Modifier.width(12.dp)); Text("Scan results", style = MaterialTheme.typography.titleLarge, color = Color.White)
             }
             Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().zIndex(1f).padding(16.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFF171717)).padding(horizontal = 18.dp, vertical = 14.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 ResultMetric("DETECTIONS", result.detections.size.toString())
                 Box(Modifier.width(1.dp).height(34.dp).background(Color.White.copy(alpha = 0.2f)))
                 ResultMetric("CONCERN TYPES", labels.size.toString())
                 Box(Modifier.width(1.dp).height(34.dp).background(Color.White.copy(alpha = 0.2f)))
-                ResultMetric("PHOTO SIZE", "${result.imageWidth}×${result.imageHeight}")
+                ResultMetric("RESULT", "Preview")
             }
         }
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Detected Concerns", fontFamily = JungeFont, fontSize = 22.sp, color = PrimaryBlack)
-            Text("Possible skin concerns identified in your scan.", color = SoftGray, fontSize = 13.sp)
+        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Automated predictions can be incorrect. This is not a medical diagnosis.",
+                color = SoftGray, style = MaterialTheme.typography.bodyMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Show detected areas", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                Switch(checked = showAreas, onCheckedChange = { showAreas = it })
+            }
+            TextButton(onClick = { showPhotoDetails = !showPhotoDetails }) { Text(if (showPhotoDetails) "Hide photo details" else "Photo details") }
+            if (showPhotoDetails) Text("Photo size: ${result.imageWidth} × ${result.imageHeight}", style = MaterialTheme.typography.bodySmall, color = SoftGray)
+            Text("Detected Concerns", style = MaterialTheme.typography.titleLarge, color = PrimaryBlack)
+            Text("Possible skin concerns identified in your scan.", color = SoftGray, style = MaterialTheme.typography.bodyMedium)
             if (result.detections.isEmpty()) {
                 Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
                     Column(Modifier.padding(18.dp)) {
-                        Text("No concerns detected", fontSize = 17.sp, color = PrimaryBlack)
+                        Text("No concerns detected", style = MaterialTheme.typography.titleSmall, color = PrimaryBlack)
                         Spacer(Modifier.height(6.dp))
-                        Text("No findings were detected. This does not guarantee that the photo contains no acne.", color = SoftGray, fontSize = 13.sp)
+                        Text("No findings were detected. This does not guarantee that the photo contains no acne.", color = SoftGray, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             } else {
@@ -120,13 +130,13 @@ fun ScanResultsScreen(
                         }
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(label, fontFamily = JungeFont, fontSize = 16.sp, color = PrimaryBlack)
-                            Text("$count detected", color = SoftGray, fontSize = 12.sp)
+                            Text(label, style = MaterialTheme.typography.bodyLarge, color = PrimaryBlack)
+                            Text("$count detected", color = SoftGray, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
             }
-            Text("Automated predictions can be incorrect. These results are not a medical diagnosis.", color = SoftGray, fontSize = 12.sp)
+            Text("Automated predictions can be incorrect. These results are not a medical diagnosis.", color = SoftGray, style = MaterialTheme.typography.bodySmall)
             PillButton("View Recommendations", onViewRecommendations)
             Spacer(Modifier.height(8.dp))
         }
@@ -136,7 +146,7 @@ fun ScanResultsScreen(
 @Composable
 private fun ResultMetric(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, fontSize = 10.sp, color = Color(0xFFD4D4D4), letterSpacing = 0.5.sp)
-        Text(value, fontSize = 23.sp, color = Color.White)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color(0xFFD4D4D4), letterSpacing = 0.5.sp)
+        Text(value, style = MaterialTheme.typography.titleMedium, color = Color.White)
     }
 }

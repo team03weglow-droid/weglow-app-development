@@ -34,6 +34,7 @@ class RoutineViewModel(
     val uiState: StateFlow<RoutineUiState> = _uiState.asStateFlow()
 
     private var loadJob: Job? = null
+    private var loadedUserId: String? = null
 
     /**
      * Depends on the same catalog fetch as Discover, so a successful plan is kept and reused
@@ -41,6 +42,12 @@ class RoutineViewModel(
      * is revisited. A failed load still retries.
      */
     fun load() {
+        val currentUserId = authRepository.currentUserId()
+        if (loadedUserId != currentUserId) {
+            loadJob?.cancel()
+            _uiState.value = RoutineUiState()
+            loadedUserId = currentUserId
+        }
         if (loadJob?.isActive == true) return
         if (_uiState.value.plan != null && _uiState.value.errorMessage == null) return
 
