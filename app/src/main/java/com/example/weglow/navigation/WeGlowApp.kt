@@ -469,7 +469,19 @@ fun WeGlowApp() {
                     eveningRoutine = routineState.plan?.evening.orEmpty(),
                     isRoutineLoading = routineState.isLoading,
                     routineError = journalState.errorMessage ?: routineState.errorMessage,
-                    onProfileClick = { navController.navigate(Destination.Profile.route) { launchSingleTop = true } },
+                    onProfileClick = {
+                        navController.navigate(Destination.Profile.route) {
+                            // Match the bottom-nav tab convention (see onSelect below) so that
+                            // entering Profile from the Home avatar leaves the same back-stack
+                            // bookkeeping in place as entering it via the tab. Without this,
+                            // returning to Home restores Profile's saved state instead of Home's.
+                            popUpTo(Destination.Home.route) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                     onRoutinesPeriodClick = { morning ->
                         homeRoutineMorning = morning
                         navController.navigate(Destination.Routines.route) { launchSingleTop = true }
