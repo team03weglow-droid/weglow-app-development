@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -73,7 +73,12 @@ fun HomeScreen(
     }
     var isMorning by rememberSaveable { mutableStateOf(true) }
     var showNotifications by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    // Intentionally not rememberSaveable: this tab's NavBackStackEntry is
+    // destroyed and recreated when the bottom nav leaves and returns to it
+    // (saveState/restoreState still preserves the entry's other saved state),
+    // so a plain remember here resets the viewport to the top on return
+    // without touching any business/data state.
+    val listState = remember { LazyListState() }
     val scope = rememberCoroutineScope()
     val activeSteps = if (isMorning) morningRoutine else eveningRoutine
     val openRoutine = { onRoutinesPeriodClick?.invoke(isMorning) ?: onRoutinesClick() }

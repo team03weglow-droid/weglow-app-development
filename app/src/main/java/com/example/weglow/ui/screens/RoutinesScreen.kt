@@ -10,7 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -128,7 +128,11 @@ fun RoutinesScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(PageBackground)
-            .verticalScroll(rememberScrollState())
+            // Intentionally not rememberSaveable: this tab's NavBackStackEntry is
+            // destroyed and recreated when the bottom nav leaves and returns to it,
+            // so a plain remember resets the viewport to the top on return without
+            // touching any business/data state (routine plan, journal, calendar).
+            .verticalScroll(remember { ScrollState(0) })
             .padding(
                 horizontal = 24.dp,
                 vertical = 20.dp
