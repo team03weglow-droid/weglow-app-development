@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -103,6 +104,11 @@ fun DiscoverScreen(
     }
 
     LazyColumn(
+        // Intentionally not the default rememberSaveable-backed state: this tab's
+        // NavBackStackEntry is destroyed and recreated when the bottom nav leaves
+        // and returns to it, so a plain remember resets the viewport to the top
+        // on return without touching any business/data state.
+        state = remember { LazyListState() },
         modifier = Modifier
             .fillMaxSize()
             .background(PageBackground),

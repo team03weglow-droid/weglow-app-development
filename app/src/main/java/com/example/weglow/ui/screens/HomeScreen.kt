@@ -2,13 +2,12 @@ package com.example.weglow.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -73,7 +72,12 @@ fun HomeScreen(
     }
     var isMorning by rememberSaveable { mutableStateOf(true) }
     var showNotifications by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    // Intentionally not rememberSaveable: this tab's NavBackStackEntry is
+    // destroyed and recreated when the bottom nav leaves and returns to it
+    // (saveState/restoreState still preserves the entry's other saved state),
+    // so a plain remember here resets the viewport to the top on return
+    // without touching any business/data state.
+    val listState = remember { LazyListState() }
     val scope = rememberCoroutineScope()
     val activeSteps = if (isMorning) morningRoutine else eveningRoutine
     val openRoutine = { onRoutinesPeriodClick?.invoke(isMorning) ?: onRoutinesClick() }
@@ -90,34 +94,63 @@ fun HomeScreen(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().background(PageBackground).testTag("home"),
-        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 32.dp),
+        // top = 16.dp reproduces DiscoverScreen's header Row `padding(vertical = 16.dp)`:
+        // Discover applies that 16dp directly on its header Row (its LazyColumn has no
+        // contentPadding), while Home's horizontal 24dp is already supplied here for every
+        // item, so the header Row itself adds no additional padding of its own.
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item(key = "greeting") {
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF8FAF7))) {
+            // padding(bottom = 16.dp) placed after clip()/background() (same convention
+            // as HomeScanHero's own 20dp-corner card, padded by 20dp) so the clip's
+            // rounded-corner shape is computed over the full card including this gap:
+            // the last line of text then sits 16dp above the bottom edge, clearing the
+            // 16dp corner radius entirely instead of having its left edge (e.g. the "S"
+            // in "Skin sync") sliced by the bottom-left corner arc.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFF8FAF7))
+                    .padding(bottom = 16.dp),
+            ) {
+                // Header geometry matches DiscoverScreen's header Row exactly (same
+                // logo size, same avatar size, same SpaceBetween/CenterVertically
+                // convention); the notification icon is the only Home-only addition,
+                // inserted immediately before the avatar and capped to the avatar's
+                // size so it cannot make the row taller than Discover's.
                 Row(
-                    Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 5.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Image(painterResource(R.drawable.weglow_logo), "WeGlow", Modifier.size(width = 40.dp, height = 44.dp))
-                    Spacer(Modifier.weight(1f))
-                    IconButton(
-                        onClick = { showNotifications = true },
-                        modifier = Modifier.semantics { contentDescription = "Open alerts" },
-                    ) {
-                        Icon(Icons.Default.NotificationsNone, contentDescription = null, tint = DarkGreen)
-                    }
-                    IconButton(
-                        onClick = onProfileClick,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .border(1.dp, Color(0x338BA889), CircleShape)
-                            .semantics { contentDescription = "Open profile" },
-                    ) {
-                        ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 38.dp)
+                    Image(
+                        painter = painterResource(R.drawable.weglow_logo),
+                        contentDescription = "WeGlow",
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { showNotifications = true },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .semantics { contentDescription = "Open alerts" },
+                        ) {
+                            Icon(Icons.Default.NotificationsNone, contentDescription = null, tint = DarkGreen)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = onProfileClick)
+                                .semantics { contentDescription = "Open profile" },
+                        ) {
+                            ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 36.dp)
+                        }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
                 Text(today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())),
                     style = MaterialTheme.typography.labelMedium, color = SoftGray)
                 Spacer(Modifier.height(4.dp))
