@@ -45,6 +45,15 @@ class SupabaseProfileRepository(
         }
         Unit
     }
+
+    override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> = runCatching {
+        client.postgrest["profiles"].update(
+            update = { set("face_shape", faceShape) },
+        ) {
+            filter { eq("id", userId) }
+        }
+        Unit
+    }
 }
 
 /**

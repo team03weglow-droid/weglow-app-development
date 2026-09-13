@@ -228,4 +228,7 @@ private class RecordingProfileRepository(
 
     override suspend fun updateProfileImagePath(userId: String, path: String?): Result<Unit> =
         Result.success(Unit)
+
+    override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> =
+        Result.success(Unit)
 }

@@ -22,4 +22,7 @@ interface ProfileRepository {
      * supplied by the UI.
      */
     suspend fun updateProfileImagePath(userId: String, path: String?): Result<Unit>
+
+    /** Stores the last detected face shape for the authenticated profile only. */
+    suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit>
 }

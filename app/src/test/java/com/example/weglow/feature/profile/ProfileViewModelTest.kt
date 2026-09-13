@@ -322,6 +322,9 @@ private class FakeProfileRepository(
         }
         return updateImageResult
     }
+
+    override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> =
+        Result.success(Unit)
 }
 
 private class FakeProfileImageRepository(

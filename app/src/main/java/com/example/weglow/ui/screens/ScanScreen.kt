@@ -128,7 +128,11 @@ fun ScanScreen(
     }
     LaunchedEffect(acneState.result, flowState) {
         if (flowState == ScanFlowState.ANALYZING && scanMode == ScanMode.ACNE && acneState.result != null) {
-
+            val elapsed = SystemClock.elapsedRealtime() - analysisStartedAt
+            val remaining = (5_000L - elapsed).coerceAtLeast(0L)
+            if (remaining > 0L) delay(remaining)
+            // Allow the UI progress animation to visibly finish at 100%.
+            delay(750L)
             onAcneScanComplete()
         }
     }
@@ -138,7 +142,10 @@ fun ScanScreen(
             scanMode == ScanMode.HAIRSTYLE &&
             hairstyleState.result != null
         ) {
-
+            // Preserve the main branch's four-stage analyzer timing (4 x 700 ms + 300 ms).
+            val elapsed = SystemClock.elapsedRealtime() - analysisStartedAt
+            val remaining = (3_100L - elapsed).coerceAtLeast(0L)
+            if (remaining > 0L) delay(remaining)
             onHairstyleScanComplete()
         }
     }
@@ -198,7 +205,8 @@ fun ScanScreen(
                 Spacer(Modifier.weight(1f))
                 Text(
                     "WeGlow needs camera access to scan your face.",
-                    style = MaterialTheme.typography.bodyLarge,
+                    fontFamily = JungeFont,
+                    fontSize = 16.sp,
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(16.dp))
@@ -282,7 +290,8 @@ private fun PhotoValidationErrorScreen(
         Spacer(Modifier.height(30.dp))
         Text(
             text = "Let's try another photo",
-            style = MaterialTheme.typography.headlineLarge,
+            fontFamily = JungeFont,
+            fontSize = 30.sp,
             lineHeight = 38.sp,
             color = TextBlack,
             textAlign = TextAlign.Center,
@@ -290,7 +299,7 @@ private fun PhotoValidationErrorScreen(
         Spacer(Modifier.height(16.dp))
         Text(
             text = error.errorMessage.orEmpty(),
-            style = MaterialTheme.typography.bodyLarge,
+            fontSize = 16.sp,
             lineHeight = 24.sp,
             color = TextBlack,
             textAlign = TextAlign.Center,
@@ -303,7 +312,7 @@ private fun PhotoValidationErrorScreen(
             Text(
                 text = guidance,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-                style = MaterialTheme.typography.bodyMedium,
+                fontSize = 14.sp,
                 lineHeight = 21.sp,
                 color = ButtonGreen,
                 textAlign = TextAlign.Center,
@@ -318,7 +327,7 @@ private fun PhotoValidationErrorScreen(
         Spacer(Modifier.height(12.dp))
         Text(
             text = "Your photo was not sent for analysis.",
-            style = MaterialTheme.typography.bodySmall,
+            fontSize = 12.sp,
             color = SoftGray,
             textAlign = TextAlign.Center,
         )
@@ -356,7 +365,7 @@ private fun FigmaAnalyzingScreen(
         photoBitmap = photoUri?.let { loadImageBitmap(context, it) }
     }
 
-
+    val progress = remember(photoUri) { Animatable(0.26f) }
     val scanLinePosition by rememberInfiniteTransition(label = "analysis scan line").animateFloat(
         initialValue = 0.08f,
         targetValue = 0.92f,
@@ -366,7 +375,15 @@ private fun FigmaAnalyzingScreen(
         ),
         label = "scan line position",
     )
-
+    LaunchedEffect(isValidating, isAnalyzing) {
+        while (isValidating || isAnalyzing) {
+            progress.snapTo((progress.value + 0.008f).coerceAtMost(0.92f))
+            delay(80)
+        }
+    }
+    LaunchedEffect(resultReady) {
+        if (resultReady) progress.animateTo(1f, tween(700, easing = EaseInOutSine))
+    }
 
     Box(
         modifier = Modifier
@@ -503,14 +520,15 @@ private fun FigmaAnalyzingScreen(
                             isValidating -> "Checking your\nphoto..."
                             else -> analysisLabel
                         },
-                        style = MaterialTheme.typography.headlineMedium,
+                        fontFamily = JungeFont,
+                        fontSize = 28.sp,
                         lineHeight = 36.sp,
                         color = Color(0xFFF2F4F1),
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = if (resultReady) "Ready" else "",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "${(progress.value * 100).toInt()}%",
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.7.sp,
                         color = Color(0xFFE28F6B),
@@ -518,11 +536,26 @@ private fun FigmaAnalyzingScreen(
                 }
                 Spacer(Modifier.height(8.dp))
                 if (error == null) {
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFF2F4F1),
-                        trackColor = Color.White.copy(alpha = 0.2f),
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xFFE1E3E0).copy(alpha = 0.20f))
+                            .padding(1.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress.value)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(50))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(Color(0xFFF2F4F1), Color(0xFFE28F6B)),
+                                    ),
+                                ),
+                        )
+                    }
                     Spacer(Modifier.height(16.dp))
                     Text(
                         text = if (isValidating) {
@@ -531,8 +564,8 @@ private fun FigmaAnalyzingScreen(
                             "AI analysis in progress..."
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        color = TextOnDark,
-                        style = MaterialTheme.typography.bodyMedium,
+                        color = Sage.copy(alpha = 0.80f),
+                        fontSize = 14.sp,
                         lineHeight = 20.sp,
                         textAlign = TextAlign.Center,
                     )
@@ -556,7 +589,7 @@ private fun AcneAnalyzingScreen(state: ScanUiState, onRetry: () -> Unit, onCance
         if (state.isAnalyzing) {
             CircularProgressIndicator(color = CoralAccent)
             Spacer(Modifier.height(24.dp))
-            Text("Analyzing your photo…", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+            Text("Analyzing your photo…", color = Color.White, fontSize = 24.sp)
             Spacer(Modifier.height(12.dp))
             Text("Analyzing on your phone. Your photo stays on this device.", color = Color.White, textAlign = TextAlign.Center)
         } else if (state.error != null) {
@@ -582,7 +615,8 @@ private fun ScanModeSelectScreen(onBack: () -> Unit, onModeSelected: (ScanMode) 
     ) {
         Text(
             "Make a New Scan",
-            style = MaterialTheme.typography.headlineMedium,
+            fontFamily = JungeFont,
+            fontSize = 26.sp,
             color = Color.White,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)
@@ -640,11 +674,12 @@ private fun ScanTypeCard(icon: ImageVector, title: String, description: String, 
             Icon(icon, contentDescription = null, tint = DarkGreen, modifier = Modifier.size(32.dp))
         }
         Spacer(Modifier.height(14.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, color = TextBlack)
+        Text(title, fontFamily = JungeFont, fontSize = 18.sp, color = TextBlack)
         Spacer(Modifier.height(6.dp))
         Text(
             description,
-            style = MaterialTheme.typography.bodySmall,
+            fontFamily = JungeFont,
+            fontSize = 12.sp,
             color = SoftGray,
             textAlign = TextAlign.Center
         )
@@ -717,9 +752,7 @@ private fun CameraCaptureScreen(mode: ScanMode, onBack: () -> Unit, onPhotoReady
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 10.dp, start = 16.dp, end = 16.dp)
-                .background(DarkGreen.copy(alpha = 0.86f), RoundedCornerShape(20.dp))
-                .padding(bottom = 16.dp),
+                .padding(top = 10.dp, start = 16.dp, end = 16.dp),
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
@@ -727,7 +760,8 @@ private fun CameraCaptureScreen(mode: ScanMode, onBack: () -> Unit, onPhotoReady
             Spacer(Modifier.height(8.dp))
             Text(
                 "Align your face",
-                style = MaterialTheme.typography.headlineMedium,
+                fontFamily = JungeFont,
+                fontSize = 28.sp,
                 color = Color.White,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -738,8 +772,9 @@ private fun CameraCaptureScreen(mode: ScanMode, onBack: () -> Unit, onPhotoReady
                 } else {
                     "within the guide to begin skin analysis"
                 },
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextOnDark,
+                fontFamily = JungeFont,
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.85f),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
             )

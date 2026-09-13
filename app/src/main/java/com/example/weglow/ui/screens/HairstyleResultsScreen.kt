@@ -4,12 +4,17 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,12 +23,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import coil3.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
-import com.example.weglow.ui.components.WeGlowPlannedFeature
 import com.example.weglow.ui.theme.*
 import com.example.weglow.domain.model.HairstyleResult
 import com.example.weglow.domain.model.HairstyleRecommendation
@@ -40,13 +46,13 @@ fun HairstyleResultsScreen(result: HairstyleResult, onBack: () -> Unit) {
             .fillMaxSize()
             .background(PageBackground)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 12.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextBlack)
             }
-            Text("Hairstyle Match", style = MaterialTheme.typography.titleMedium, color = TextBlack)
+            Text("Hairstyle Match", fontFamily = JungeFont, fontSize = 18.sp, color = TextBlack)
         }
         Spacer(Modifier.height(8.dp))
 
@@ -66,13 +72,15 @@ fun HairstyleResultsScreen(result: HairstyleResult, onBack: () -> Unit) {
                     Spacer(Modifier.width(10.dp))
                     Text(
                         "Your ${result.faceShape} Face Shape",
-                        style = MaterialTheme.typography.titleLarge,
+                        fontFamily = JungeFont,
+                        fontSize = 20.sp,
                         color = TextBlack
                     )
                 }
                 Text(
                     "${result.confidencePercent}%\nCONFIDENCE",
-                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = JungeFont,
+                    fontSize = 10.sp,
                     color = TextBlack,
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
@@ -81,7 +89,7 @@ fun HairstyleResultsScreen(result: HairstyleResult, onBack: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(12.dp))
-            Text(description, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
+            Text(description, fontFamily = JungeFont, fontSize = 13.sp, color = SoftGray)
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 traits.take(2).forEach { trait ->
@@ -95,26 +103,59 @@ fun HairstyleResultsScreen(result: HairstyleResult, onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(28.dp))
-        Text("CURATED SELECTION", style = MaterialTheme.typography.labelSmall, color = DarkGreen)
-        Text("Recommended for you", style = MaterialTheme.typography.titleLarge, color = TextBlack)
+        Text("CURATED SELECTION", fontFamily = JungeFont, fontSize = 11.sp, color = DarkGreen)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Text("RECOMMENDED FOR YOU", fontFamily = JungeFont, fontSize = 22.sp, color = TextBlack)
+            Text(
+                "Filter (${styles.size})",
+                fontFamily = JungeFont,
+                fontSize = 13.sp,
+                color = TextBlack,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable { },
+            )
+        }
         Spacer(Modifier.height(14.dp))
 
-        WeGlowPlannedFeature("Style filters")
-        WeGlowPlannedFeature("AR Mirror")
-        Spacer(Modifier.height(14.dp))
+        if (styles.isEmpty()) {
+            Text(
+                "No hairstyles are available for this face shape and profile yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = SoftGray,
+            )
+            Spacer(Modifier.height(14.dp))
+        }
 
-        // Content-sized rows let the new type scale grow without cutting off card actions.
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            styles.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { style ->
-                        Box(Modifier.weight(1f)) { HairstyleCard(style) }
-                    }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
-                }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.height(((styles.size + 1) / 2 * 312).dp),
+        ) {
+            items(styles) { style ->
+                HairstyleCard(style)
             }
         }
 
+        Spacer(Modifier.height(20.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(50))
+                .background(DarkGreen)
+                .clickable { }
+                .padding(vertical = 16.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("Launch 3D AR Mirror", fontFamily = JungeFont, fontSize = 15.sp, color = Color.White)
+        }
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -130,7 +171,7 @@ private fun TraitChip(label: String, modifier: Modifier = Modifier) {
     ) {
         Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(DarkGreen))
         Spacer(Modifier.width(8.dp))
-        Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = TextBlack)
+        Text(label, fontFamily = JungeFont, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextBlack)
     }
 }
 
@@ -139,24 +180,34 @@ private fun HairstyleCard(style: HairstyleRecommendation) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 300.dp)
+            .height(300.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(SurfaceCool)
             .padding(12.dp)
     ) {
         Box {
-            Image(
-                painter = painterResource(style.imageRes),
-                contentDescription = style.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.85f)
-                    .clip(RoundedCornerShape(16.dp))
-            )
+            if (style.imageUrl != null) {
+                AsyncImage(
+                    model = style.imageUrl.trim().takeIf(String::isNotEmpty),
+                    contentDescription = style.title,
+                    placeholder = painterResource(R.drawable.weglow_logo),
+                    error = painterResource(R.drawable.weglow_logo),
+                    fallback = painterResource(R.drawable.weglow_logo),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(0.85f).clip(RoundedCornerShape(16.dp)),
+                )
+            } else {
+                Image(
+                    painter = painterResource(R.drawable.weglow_logo),
+                    contentDescription = style.title,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(0.85f).clip(RoundedCornerShape(16.dp)),
+                )
+            }
             Text(
-                "${style.matchPercent}% Match",
-                style = MaterialTheme.typography.labelSmall,
+                "Face shape match",
+                fontFamily = JungeFont,
+                fontSize = 11.sp,
                 color = Color.White,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -167,16 +218,31 @@ private fun HairstyleCard(style: HairstyleRecommendation) {
             )
         }
         Spacer(Modifier.height(10.dp))
-        WeGlowPlannedFeature("Try AR")
-        Text(style.category, style = MaterialTheme.typography.labelSmall, color = DarkGreen)
-        Text(style.title, style = MaterialTheme.typography.titleMedium, color = TextBlack, modifier = Modifier.padding(top = 2.dp))
+        Text(style.category, fontFamily = JungeFont, fontSize = 10.sp, color = DarkGreen)
+        Text(style.title, fontFamily = JungeFont, fontSize = 18.sp, color = TextBlack, modifier = Modifier.padding(top = 2.dp))
         Text(
             style.description,
-            style = MaterialTheme.typography.bodySmall,
+            fontFamily = JungeFont,
+            fontSize = 11.sp,
             color = SoftGray,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 4.dp)
         )
+        Spacer(modifier = Modifier.weight(1f))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(50))
+                .background(CardWhite)
+                .clickable { }
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Try in AR", fontFamily = JungeFont, fontSize = 12.sp, color = TextBlack)
+            Spacer(Modifier.width(6.dp))
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = TextBlack, modifier = Modifier.size(14.dp))
+        }
     }
 }

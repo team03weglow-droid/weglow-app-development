@@ -4,10 +4,10 @@ import android.content.Context
 import com.example.weglow.core.image.FaceImageValidator
 import com.example.weglow.core.image.FaceValidator
 import com.example.weglow.data.remote.supabase.SupabaseClientProvider
-import com.example.weglow.data.repository.LocalHairstyleRepository
 import com.example.weglow.data.repository.LocalAcneScanRepository
 import com.example.weglow.data.repository.SupabaseAuthRepository
 import com.example.weglow.data.repository.SupabaseCatalogRepository
+import com.example.weglow.data.repository.SupabaseHairstyleRepository
 import com.example.weglow.data.repository.SupabaseProfileImageRepository
 import com.example.weglow.data.repository.SupabaseProfileRepository
 import com.example.weglow.domain.repository.AcneScanRepository
@@ -52,5 +52,5 @@ class AppContainer {
     }
 
     fun hairstyleRepository(context: Context): HairstyleRepository =
-        LocalHairstyleRepository(context)
+        SupabaseHairstyleRepository(context, supabaseClient, authRepository, profileRepository)
 }

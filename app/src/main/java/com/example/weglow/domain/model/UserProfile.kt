@@ -7,6 +7,7 @@ data class UserProfile(
     val ageRange: String? = null,
     val skinType: String? = null,
     val gender: String? = null,
+    val faceShape: String? = null,
     val isSkinSensitive: Boolean? = null,
     /**
      * Stable Supabase Storage object path of the user's profile picture (for

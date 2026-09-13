@@ -85,6 +85,16 @@ class SupabaseProfileRepositoryTest {
         assertEquals(profile, profile.toProfileRow().toUserProfile())
     }
 
+    @Test
+    fun faceShape_roundTripsThroughProfileRow() {
+        val profile = UserProfile(id = "user-1", gender = "Female", faceShape = "Round")
+
+        val row = profile.toProfileRow()
+
+        assertEquals("Round", row.face_shape)
+        assertEquals(profile, row.toUserProfile())
+    }
+
     // Phase 6: the profile-picture storage reference round-trips through the
     // profile_image_url column without leaking Supabase types into the domain.
     @Test
