@@ -611,31 +611,35 @@ private fun ScanModeSelectScreen(onBack: () -> Unit, onModeSelected: (ScanMode) 
             .fillMaxSize()
             .background(DarkGreen.copy(alpha = 0.94f))
             .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            "Make a New Scan",
-            fontFamily = JungeFont,
-            fontSize = 26.sp,
-            color = Color.White,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            ScanTypeCard(
-                icon = Icons.Filled.Face,
-                title = "Skin Scan",
-                description = "See the condition of your skin",
-                modifier = Modifier.weight(1f),
-                onClick = { onModeSelected(ScanMode.ACNE) }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                "Make a New Scan",
+                fontFamily = JungeFont,
+                fontSize = 26.sp,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)
             )
-            ScanTypeCard(
-                icon = Icons.Filled.ContentCut,
-                title = "Face Shape",
-                description = "Get hairstyles matched to your face",
-                modifier = Modifier.weight(1f),
-                onClick = { onModeSelected(ScanMode.HAIRSTYLE) }
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                ScanTypeCard(
+                    icon = Icons.Filled.Face,
+                    title = "Skin Scan",
+                    description = "See the condition of your skin",
+                    modifier = Modifier.weight(1f),
+                    onClick = { onModeSelected(ScanMode.ACNE) }
+                )
+                ScanTypeCard(
+                    icon = Icons.Filled.ContentCut,
+                    title = "Face Shape",
+                    description = "Get hairstyles matched to your face",
+                    modifier = Modifier.weight(1f),
+                    onClick = { onModeSelected(ScanMode.HAIRSTYLE) }
+                )
+            }
         }
         Spacer(Modifier.height(24.dp))
         Box(
