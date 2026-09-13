@@ -136,6 +136,35 @@ fun WeGlowApp() {
     val recommendationState by recommendationViewModel.uiState.collectAsState()
     val routineState by routineViewModel.uiState.collectAsState()
 
+    // Global session-termination reaction, owned by the navigation root rather than by
+    // whichever screen happens to trigger sign-out. This must stay mounted for the whole
+    // app lifetime (not scoped to a single destination's composition) so a SignedOut event
+    // is always handled regardless of which screen is on screen when it fires. Screens that
+    // can initiate sign-out (currently only Profile) call authViewModel.signOut() and do not
+    // react to the result themselves.
+    LaunchedEffect(authState.event) {
+
+        if (authState.event is AuthEvent.SignedOut) {
+
+            scanViewModel.clear()
+            hairstyleViewModel.clear()
+
+            navController.navigate(
+                Destination.Login.route
+            ) {
+
+                // Completely clear authenticated navigation.
+                popUpTo(navController.graph.id) {
+                    inclusive = true
+                }
+
+                launchSingleTop = true
+            }
+
+            authViewModel.consumeEvent()
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
@@ -695,29 +724,6 @@ fun WeGlowApp() {
                     onRecommendationsClick = { navController.navigate(Destination.Recommendations.routeFor(false)) { launchSingleTop = true } },
                     onLogout = authViewModel::signOut
                 )
-
-                LaunchedEffect(authState.event) {
-
-                    if (authState.event is AuthEvent.SignedOut) {
-
-                        scanViewModel.clear()
-                        hairstyleViewModel.clear()
-
-                        navController.navigate(
-                            Destination.Login.route
-                        ) {
-
-                            // Completely clear authenticated navigation.
-                            popUpTo(navController.graph.id) {
-                                inclusive = true
-                            }
-
-                            launchSingleTop = true
-                        }
-
-                        authViewModel.consumeEvent()
-                    }
-                }
             }
         }
     }
