@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -244,7 +245,13 @@ fun ProfileScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            Text(displayName ?: "Your Profile", style = MaterialTheme.typography.headlineLarge, color = TextBlack)
+            Text(
+                displayName?.firstTwoNameParts()?.takeIf(String::isNotEmpty) ?: "Your Profile",
+                style = MaterialTheme.typography.headlineLarge,
+                color = TextBlack,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(modifier = Modifier.height(4.dp))
             Text("GLOW MEMBER", style = MaterialTheme.typography.bodySmall, color = SoftGray)
             WeGlowPlannedFeature("Skin Score & View Details")
@@ -407,6 +414,13 @@ fun ProfileScreen(
         }
     }
 }
+
+private fun String.firstTwoNameParts(): String =
+    trim()
+        .split(Regex("\\s+"))
+        .filter(String::isNotEmpty)
+        .take(2)
+        .joinToString(" ")
 
 @Composable
 private fun ImageSourceRow(
