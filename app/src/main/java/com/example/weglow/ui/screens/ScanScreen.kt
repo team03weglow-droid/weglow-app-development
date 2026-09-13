@@ -611,7 +611,7 @@ private fun ScanModeSelectScreen(onBack: () -> Unit, onModeSelected: (ScanMode) 
             .fillMaxSize()
             .background(DarkGreen.copy(alpha = 0.94f))
             .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.Bottom
+        verticalArrangement = Arrangement.Center
     ) {
         Text(
             "Make a New Scan",
