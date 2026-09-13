@@ -1,6 +1,5 @@
 package com.example.weglow.data.repository
 
-import android.content.Context
 import com.example.weglow.domain.model.HairstyleResult
 import com.example.weglow.domain.model.HairstyleRecommendation
 import com.example.weglow.domain.repository.HairstyleRepository
@@ -14,14 +13,18 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.coroutines.CancellationException
 
-/** Runs the on-device classifier, then loads the matching cards from Supabase. */
+/**
+ * Loads Supabase-backed hairstyle recommendation cards for the face shape produced by
+ * [classifier]. This class owns only the remote lookup; it does not construct or know how
+ * the classifier itself works (on-device model, remote model, or a test fake) — that
+ * decision belongs to whoever assembles this repository (see [com.example.weglow.app.AppContainer]).
+ */
 class SupabaseHairstyleRepository(
-    context: Context,
+    private val classifier: HairstyleRepository,
     private val client: SupabaseClient,
     private val authRepository: AuthRepository,
     private val profileRepository: ProfileRepository,
 ) : HairstyleRepository {
-    private val classifier = LocalHairstyleRepository(context)
 
     override suspend fun analyze(photoReference: String, gender: String?): HairstyleResult {
         val classified = classifier.analyze(photoReference, gender)
