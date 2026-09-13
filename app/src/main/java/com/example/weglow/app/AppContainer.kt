@@ -5,6 +5,7 @@ import com.example.weglow.core.image.FaceImageValidator
 import com.example.weglow.core.image.FaceValidator
 import com.example.weglow.data.remote.supabase.SupabaseClientProvider
 import com.example.weglow.data.repository.LocalAcneScanRepository
+import com.example.weglow.data.repository.LocalHairstyleRepository
 import com.example.weglow.data.repository.SupabaseAuthRepository
 import com.example.weglow.data.repository.SupabaseCatalogRepository
 import com.example.weglow.data.repository.SupabaseHairstyleRepository
@@ -52,5 +53,10 @@ class AppContainer {
     }
 
     fun hairstyleRepository(context: Context): HairstyleRepository =
-        SupabaseHairstyleRepository(context, supabaseClient, authRepository, profileRepository)
+        SupabaseHairstyleRepository(
+            classifier = LocalHairstyleRepository(context),
+            client = supabaseClient,
+            authRepository = authRepository,
+            profileRepository = profileRepository,
+        )
 }
