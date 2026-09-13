@@ -102,7 +102,19 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item(key = "greeting") {
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF8FAF7))) {
+            // padding(bottom = 16.dp) placed after clip()/background() (same convention
+            // as HomeScanHero's own 20dp-corner card, padded by 20dp) so the clip's
+            // rounded-corner shape is computed over the full card including this gap:
+            // the last line of text then sits 16dp above the bottom edge, clearing the
+            // 16dp corner radius entirely instead of having its left edge (e.g. the "S"
+            // in "Skin sync") sliced by the bottom-left corner arc.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFF8FAF7))
+                    .padding(bottom = 16.dp),
+            ) {
                 // Header geometry matches DiscoverScreen's header Row exactly (same
                 // logo size, same avatar size, same SpaceBetween/CenterVertically
                 // convention); the notification icon is the only Home-only addition,
