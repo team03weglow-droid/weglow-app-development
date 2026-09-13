@@ -74,6 +74,13 @@ class TypographyLayoutTest {
         screenshot("home")
     }
 
+    @Test fun homeGreetingUsesOnlyFirstAndMiddleNames() {
+        render {
+            HomeScreen({}, {}, {}, displayName = "Asher Israel Kanakarathne")
+        }
+        compose.onNodeWithText("Hello, Asher Israel").assertIsDisplayed()
+    }
+
     @Test fun homeActionsRemainReachableWithLargeText() {
         render(fontScale = 1.3f) {
             HomeScreen({}, {}, {}, displayName = "Amaya", morningRoutine = listOf(step))

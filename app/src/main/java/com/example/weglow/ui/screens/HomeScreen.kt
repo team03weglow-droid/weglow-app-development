@@ -2,6 +2,7 @@ package com.example.weglow.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,9 +10,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -91,33 +94,49 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item(key = "greeting") {
-            Column {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Image(painterResource(R.drawable.weglow_logo), "WeGlow", Modifier.size(28.dp))
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF8FAF7))) {
+                Row(
+                    Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Image(painterResource(R.drawable.weglow_logo), "WeGlow", Modifier.size(width = 40.dp, height = 44.dp))
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { showNotifications = true }) { Text("Alerts", color = SoftGray) }
-                    IconButton(onClick = onProfileClick, modifier = Modifier.semantics { contentDescription = "Open profile" }) {
-                        ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 36.dp)
+                    IconButton(
+                        onClick = { showNotifications = true },
+                        modifier = Modifier.semantics { contentDescription = "Open alerts" },
+                    ) {
+                        Icon(Icons.Default.NotificationsNone, contentDescription = null, tint = DarkGreen)
+                    }
+                    IconButton(
+                        onClick = onProfileClick,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .border(1.dp, Color(0x338BA889), CircleShape)
+                            .semantics { contentDescription = "Open profile" },
+                    ) {
+                        ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 38.dp)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())),
                     style = MaterialTheme.typography.labelMedium, color = SoftGray)
                 Spacer(Modifier.height(4.dp))
-                Text(displayName?.let { "Hello, $it" } ?: "Hello there",
+                Text(displayName?.let { "Hello, ${homeGreetingName(it)}" } ?: "Hello there",
                     style = MaterialTheme.typography.headlineLarge, color = DarkGreen)
                 Text("A little care, every day.", style = MaterialTheme.typography.bodyMedium, color = SoftGray)
                 Text("Skin sync · Coming soon", style = MaterialTheme.typography.bodySmall, color = SoftGray)
             }
         }
         item(key = "scan") { HomeScanHero(onScanClick) }
+        // Environment is an early daily decision point, so keep UV, humidity and air quality
+        // above the longer routine and editorial content.
+        item(key = "environment") { HomeEnvironment() }
         item(key = "routine") {
             HomeRoutine(
                 activeSteps, today, isMorning, { isMorning = it }, completedRoutineKeys,
                 onToggleRoutineStep, isRoutineLoading, routineError, openRoutine,
             )
         }
-        item(key = "environment") { HomeEnvironment() }
         item(key = "shortcuts") {
             val largeText = LocalDensity.current.fontScale > 1.15f
             val shortcuts: @Composable RowScope.() -> Unit = {
@@ -291,20 +310,22 @@ private fun HomeRoutine(
 @Composable
 private fun HomeEnvironment() {
     HomeSurface {
-        HomeSectionHeading("Today's Skin Environment", "Location & weather · Not connected")
+        HomeSectionHeading("Today's Skin Environment", "Your daily conditions at a glance")
         Image(painterResource(R.drawable.home_environment), null,
             modifier = Modifier.fillMaxWidth().height(88.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
-        HomeMetric("UV index", "Live readings coming soon", Modifier.fillMaxWidth())
+        HomeMetric("UV index", "Live reading · Coming soon", Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             HomeMetric("Humidity", "Not connected", Modifier.weight(1f))
             HomeMetric("Air quality", "Not connected", Modifier.weight(1f))
         }
-        Text("Local readings and peak UV times will appear here once weather is connected.",
+        Text("UV, humidity and air-quality readings will update here when weather access is connected.",
             style = MaterialTheme.typography.bodySmall, color = SoftGray)
-        Text("Last SPF layer · Logging not connected", style = MaterialTheme.typography.bodySmall, color = SoftGray)
         WeGlowPlannedFeature("Log SPF")
     }
 }
+
+private fun homeGreetingName(fullName: String): String =
+    fullName.trim().split(Regex("\\s+")).filter(String::isNotBlank).take(2).joinToString(" ")
 
 @Composable
 private fun HomeSurface(content: @Composable ColumnScope.() -> Unit) {

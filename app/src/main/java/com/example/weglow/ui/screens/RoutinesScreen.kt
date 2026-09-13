@@ -244,7 +244,7 @@ fun RoutinesScreen(
 
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(
                                 when {
@@ -306,20 +306,6 @@ fun RoutinesScreen(
         }
 
         Text(
-            if (isMorning) {
-                "A simple routine to start your day."
-            } else {
-                "Time to repair and recover overnight."
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = PrimaryBlack,
-            modifier = Modifier.padding(
-                top = 2.dp,
-                bottom = 18.dp
-            )
-        )
-
-        Text(
             "Step-by-Step",
             style = MaterialTheme.typography.bodyLarge,
             color = PrimaryBlack
@@ -351,8 +337,8 @@ fun RoutinesScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .background(CardWhite)
-                            .padding(12.dp),
+                            .background(SurfaceCool)
+                            .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
 
@@ -368,7 +354,7 @@ fun RoutinesScreen(
                                 imageUrl = product.imageUrl,
                                 contentDescription = product.name,
                                 modifier = Modifier
-                                    .size(56.dp)
+                                    .size(88.dp)
                                     .clip(RoundedCornerShape(12.dp)),
                             )
 
@@ -376,7 +362,7 @@ fun RoutinesScreen(
 
                             Box(
                                 modifier = Modifier
-                                    .size(56.dp)
+                                    .size(88.dp)
                                     .clip(
                                         RoundedCornerShape(12.dp)
                                     )
@@ -384,7 +370,7 @@ fun RoutinesScreen(
                             )
                         }
 
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(16.dp))
 
                         Column(
                             modifier = Modifier.weight(1f)
@@ -397,6 +383,7 @@ fun RoutinesScreen(
                             )
 
                             if (product != null) {
+                                RoutineStatusPill(if (done) "DONE" else if (index == activeSteps.indexOfFirst { it.product != null && routineStepKey(selectedDate, isMorning, activeSteps.indexOf(it), it.product?.id) !in doneState }) "UP NEXT" else "QUEUED")
                                 Text(
                                     product.name,
                                     style = MaterialTheme.typography.titleSmall,
@@ -431,13 +418,12 @@ fun RoutinesScreen(
 
                         Spacer(Modifier.width(8.dp))
 
-                        // CHECK BUTTON
+                        // Circular completion control, matching the Figma routine cards.
                         if (product != null) {
-                            Checkbox(
+                            CircleRoutineCheck(
                                 checked = done,
-                                onCheckedChange = { onToggleRoutineStep(stepKey) },
-                                modifier = Modifier.semantics { contentDescription = "Complete ${product.name}" },
-                                colors = CheckboxDefaults.colors(checkedColor = DarkGreen),
+                                onClick = { onToggleRoutineStep(stepKey) },
+                                contentDescription = "Complete ${product.name}",
                             )
                         }
                     }
@@ -570,6 +556,41 @@ fun RoutinesScreen(
         }
 
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun RoutineStatusPill(label: String) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = if (label == "UP NEXT") AccentText else DarkGreen,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (label == "UP NEXT") CoralAccent.copy(alpha = 0.18f) else MintChip.copy(alpha = 0.7f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
+}
+
+@Composable
+private fun CircleRoutineCheck(checked: Boolean, onClick: () -> Unit, contentDescription: String) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .semantics { this.contentDescription = contentDescription }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(if (checked) DarkGreen else Color.Transparent)
+                .then(if (checked) Modifier else Modifier.border(2.dp, SoftGray, CircleShape)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (checked) Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+        }
     }
 }
 
