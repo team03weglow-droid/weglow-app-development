@@ -11,6 +11,10 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.net.Uri
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.example.weglow.core.image.ScanPhotoDecoder
 import com.example.weglow.data.scan.Letterbox
 import com.example.weglow.data.scan.YoloPostProcessor
@@ -47,6 +51,12 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
     private val environment: OrtEnvironment by lazy {
         OrtEnvironment.getEnvironment().also { it.setTelemetry(false) }
     }
+
+    private val faceDetector = FaceDetection.getClient(
+        FaceDetectorOptions.Builder()
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+            .build(),
+    )
 
     /**
      * Session creation (model load + graph optimization) is the expensive part of a scan, not
@@ -100,10 +110,16 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
                             @Suppress("UNCHECKED_CAST")
                             val rows = (output.value as Array<Array<FloatArray>>)[0]
                             val detections = YoloPostProcessor.decode(
-                                rows, metadata.labels, geometry, metadata.confidence_threshold,
+                                rows, metadata.labels, geometry, 0.05f,
                                 metadata.iou_threshold, metadata.max_detections,
                             )
-                            AcneScanResult(detections, photo.width, photo.height, metadata.model_sha256.take(12), metadata.confidence_threshold)
+                            AcneScanResult(
+                                detections.filterToFace(photo),
+                                photo.width,
+                                photo.height,
+                                metadata.model_sha256.take(12),
+                                metadata.confidence_threshold,
+                            )
                         }
                     }
                 } finally {
@@ -136,6 +152,18 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
             input.recycle()
         }
     }
+
+    private fun List<com.example.weglow.domain.model.AcneDetection>.filterToFace(photo: Bitmap) =
+        Tasks.await(faceDetector.process(InputImage.fromBitmap(photo, 0)))
+            .maxByOrNull { it.boundingBox.width() * it.boundingBox.height() }
+            ?.let { face ->
+                filter { detection ->
+                    val x = (detection.left + detection.right) / 2 * photo.width
+                    val y = (detection.top + detection.bottom) / 2 * photo.height
+                    face.boundingBox.contains(x.toInt(), y.toInt())
+                }
+            }
+            .orEmpty()
 }
 
 private data class SessionHandle(val session: OrtSession, val inputShape: LongArray)
