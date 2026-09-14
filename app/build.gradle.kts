@@ -45,6 +45,7 @@ android {
             "SUPABASE_PUBLISHABLE_KEY",
             phaseOneConfig("WEGLOW_SUPABASE_PUBLISHABLE_KEY").asBuildConfigString(),
         )
+        buildConfigField("String", "WEATHER_API_KEY", phaseOneConfig("WEATHER_API_KEY").asBuildConfigString())
     }
 
     buildTypes {
@@ -134,6 +135,8 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.mlkit.face.detection)
+    implementation(libs.play.services.location)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

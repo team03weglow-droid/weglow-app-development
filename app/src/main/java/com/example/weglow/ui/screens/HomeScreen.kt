@@ -1,8 +1,11 @@
 package com.example.weglow.ui.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -21,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -30,7 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.painterResource
 import com.example.weglow.R
 import com.example.weglow.domain.model.RoutineStep
+import com.example.weglow.domain.model.UvDailyReading
 import com.example.weglow.feature.routine.routineStepKey
+import com.example.weglow.feature.environment.EnvironmentUiState
 import com.example.weglow.ui.components.ProfileAvatar
 import com.example.weglow.ui.components.WeGlowPlannedFeature
 import com.example.weglow.ui.components.WeGlowProductImage
@@ -52,6 +59,8 @@ fun HomeScreen(
     onDiscoverClick: () -> Unit,
     onRecommendationsClick: () -> Unit,
     onRoutinesClick: () -> Unit = {},
+    environmentState: EnvironmentUiState = EnvironmentUiState.Loading,
+    onEnvironmentRetry: () -> Unit = {},
     displayName: String? = null,
     profileImage: ByteArray? = null,
     morningRoutine: List<RoutineStep> = emptyList(),
@@ -163,7 +172,7 @@ fun HomeScreen(
         item(key = "scan") { HomeScanHero(onScanClick) }
         // Environment is an early daily decision point, so keep UV, humidity and air quality
         // above the longer routine and editorial content.
-        item(key = "environment") { HomeEnvironment() }
+        item(key = "environment") { HomeEnvironment(environmentState, onEnvironmentRetry) }
         item(key = "routine") {
             HomeRoutine(
                 activeSteps, today, isMorning, { isMorning = it }, completedRoutineKeys,
@@ -341,21 +350,100 @@ private fun HomeRoutine(
 }
 
 @Composable
-private fun HomeEnvironment() {
+private fun HomeEnvironment(environmentState: EnvironmentUiState, onRetry: () -> Unit) {
+    val uvHistory = (environmentState as? EnvironmentUiState.Success)?.environment?.uvDailyHistory.orEmpty()
+    val display = when (environmentState) {
+        EnvironmentUiState.Loading -> EnvironmentDisplay("Loading…", "Loading…", "Loading…", "Getting local conditions…")
+        EnvironmentUiState.PermissionRequired -> EnvironmentDisplay("Unavailable", "Unavailable", "Unavailable", "Location permission is needed for local readings.")
+        is EnvironmentUiState.Error -> EnvironmentDisplay("Unavailable", "Unavailable", "Unavailable", environmentState.message)
+        is EnvironmentUiState.Success -> environmentState.environment.let { environment ->
+            EnvironmentDisplay(
+                "${formatUv(environment.uvIndex)} · ${environment.uvCategory}",
+                "${environment.humidity}%",
+                environment.airQualityIndex?.let { "$it · ${environment.airQualityLabel}" } ?: environment.airQualityLabel,
+                environment.locationName?.let { "Current conditions for $it" } ?: "Current local conditions",
+            )
+        }
+    }
     HomeSurface {
         HomeSectionHeading("Today's Skin Environment", "Your daily conditions at a glance")
-        Image(painterResource(R.drawable.home_environment), null,
-            modifier = Modifier.fillMaxWidth().height(88.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
-        HomeMetric("UV index", "Live reading · Coming soon", Modifier.fillMaxWidth())
+        UvHistoryGraph(uvHistory)
+        HomeMetric("UV index", display.uv, Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            HomeMetric("Humidity", "Not connected", Modifier.weight(1f))
-            HomeMetric("Air quality", "Not connected", Modifier.weight(1f))
+            HomeMetric("Humidity", display.humidity, Modifier.weight(1f))
+            HomeMetric("Air quality", display.airQuality, Modifier.weight(1f))
         }
-        Text("UV, humidity and air-quality readings will update here when weather access is connected.",
+        Text(display.detail,
             style = MaterialTheme.typography.bodySmall, color = SoftGray)
+        if (environmentState is EnvironmentUiState.Error || environmentState is EnvironmentUiState.PermissionRequired) {
+            TextButton(onClick = onRetry) { Text("Retry", color = DarkGreen) }
+        }
         WeGlowPlannedFeature("Log SPF")
     }
 }
+
+@Composable
+private fun UvHistoryGraph(readings: List<UvDailyReading>) {
+    Column(
+        Modifier.fillMaxWidth().height(88.dp).clip(RoundedCornerShape(12.dp)).background(PageBackground).padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        if (readings.isEmpty()) {
+            Text("UV history unavailable", style = MaterialTheme.typography.bodySmall, color = SoftGray)
+        } else {
+            val scrollState = rememberScrollState()
+            Column(Modifier.fillMaxWidth().weight(1f).horizontalScroll(scrollState)) {
+            Canvas(
+                modifier = Modifier.width((readings.size * 44).dp).weight(1f).semantics {
+                    contentDescription = "31-day daily UV index history"
+                },
+            ) {
+                val maximum = maxOf(11.0, readings.maxOf { it.uvIndex })
+                val xStep = if (readings.size == 1) 0f else size.width / (readings.size - 1)
+                fun point(index: Int, uv: Double) = androidx.compose.ui.geometry.Offset(
+                    x = if (readings.size == 1) size.width / 2 else index * xStep,
+                    y = size.height - ((uv / maximum) * size.height).toFloat(),
+                )
+                drawLine(SoftGray.copy(alpha = 0.25f), start = androidx.compose.ui.geometry.Offset(0f, size.height), end = androidx.compose.ui.geometry.Offset(size.width, size.height))
+                val points = readings.mapIndexed { index, reading -> point(index, reading.uvIndex) }
+                if (points.size > 1) {
+                    // Catmull-Rom-style cubic Béziers smooth the real day-to-day values
+                    // without adding, averaging, or otherwise changing any data point.
+                    val path = Path().apply {
+                        moveTo(points.first().x, points.first().y)
+                        for (index in 0 until points.lastIndex) {
+                            val previous = points[(index - 1).coerceAtLeast(0)]
+                            val start = points[index]
+                            val end = points[index + 1]
+                            val following = points[(index + 2).coerceAtMost(points.lastIndex)]
+                            cubicTo(
+                                start.x + (end.x - previous.x) / 6f,
+                                start.y + (end.y - previous.y) / 6f,
+                                end.x - (following.x - start.x) / 6f,
+                                end.y - (following.y - start.y) / 6f,
+                                end.x,
+                                end.y,
+                            )
+                        }
+                    }
+                    drawPath(path, color = DarkGreen, style = Stroke(width = 3.dp.toPx()))
+                }
+                readings.forEachIndexed { index, reading -> drawCircle(CoralAccent, radius = 4.dp.toPx(), center = point(index, reading.uvIndex)) }
+            }
+            Row(Modifier.width((readings.size * 44).dp)) {
+                readings.forEach { reading ->
+                    Text("${reading.date.takeLast(5)}\n${formatUv(reading.uvIndex)}", modifier = Modifier.width(44.dp), style = MaterialTheme.typography.labelSmall, color = SoftGray)
+                }
+            }
+            }
+        }
+    }
+}
+
+private data class EnvironmentDisplay(val uv: String, val humidity: String, val airQuality: String, val detail: String)
+
+private fun formatUv(value: Double): String =
+    if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(Locale.US, value)
 
 private fun homeGreetingName(fullName: String): String =
     fullName.trim().split(Regex("\\s+")).filter(String::isNotBlank).take(2).joinToString(" ")

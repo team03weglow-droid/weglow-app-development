@@ -1,5 +1,9 @@
 package com.example.weglow.navigation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -11,6 +15,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -24,6 +32,7 @@ import com.example.weglow.feature.auth.AuthEvent
 import com.example.weglow.feature.auth.AuthViewModel
 import com.example.weglow.feature.auth.StartupDestination
 import com.example.weglow.feature.discover.DiscoverViewModel
+import com.example.weglow.feature.environment.EnvironmentViewModel
 import com.example.weglow.feature.hairstyle.HairstyleViewModel
 import com.example.weglow.feature.onboarding.OnboardingViewModel
 import com.example.weglow.feature.profile.ProfileViewModel
@@ -124,6 +133,20 @@ fun WeGlowApp() {
     val journalViewModel: RoutineJournalViewModel = viewModel(
         factory = viewModelFactory { RoutineJournalViewModel(context, container.authRepository) }
     )
+    val environmentViewModel: EnvironmentViewModel = viewModel(
+        factory = viewModelFactory {
+            EnvironmentViewModel(container.locationProvider(context), container.environmentRepository())
+        }
+    )
+    var hasLocationPermission by remember {
+        mutableStateOf(context.hasEnvironmentLocationPermission())
+    }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        hasLocationPermission = context.hasEnvironmentLocationPermission()
+        environmentViewModel.refresh(hasLocationPermission)
+    }
     val journalState by journalViewModel.uiState.collectAsState()
     var homeRoutineMorning by remember { mutableStateOf<Boolean?>(null) }
     val authState by authViewModel.uiState.collectAsState()
@@ -135,6 +158,7 @@ fun WeGlowApp() {
     val profileState by profileViewModel.uiState.collectAsState()
     val recommendationState by recommendationViewModel.uiState.collectAsState()
     val routineState by routineViewModel.uiState.collectAsState()
+    val environmentState by environmentViewModel.uiState.collectAsState()
 
     // Global session-termination reaction, owned by the navigation root rather than by
     // whichever screen happens to trigger sign-out. This must stay mounted for the whole
@@ -485,14 +509,37 @@ fun WeGlowApp() {
 
             composable(Destination.Home.route) {
 
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            hasLocationPermission = context.hasEnvironmentLocationPermission()
+                            if (hasLocationPermission) environmentViewModel.refresh(true)
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
+
                 LaunchedEffect(Unit) {
                     profileViewModel.refresh()
                     routineViewModel.load()
+                    if (hasLocationPermission) environmentViewModel.refresh(true)
+                    else locationPermissionLauncher.launch(
+                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                    )
                 }
 
                 HomeScreen(
 
                     displayName = profileState.displayName,
+                    environmentState = environmentState,
+                    onEnvironmentRetry = {
+                        if (hasLocationPermission) environmentViewModel.refresh(true)
+                        else locationPermissionLauncher.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                        )
+                    },
                     profileImage = profileState.profileImage,
                     morningRoutine = routineState.plan?.morning.orEmpty(),
                     eveningRoutine = routineState.plan?.evening.orEmpty(),
@@ -728,3 +775,7 @@ fun WeGlowApp() {
         }
     }
 }
+
+private fun android.content.Context.hasEnvironmentLocationPermission(): Boolean =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED

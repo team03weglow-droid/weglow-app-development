@@ -3,6 +3,7 @@ package com.example.weglow.app
 import android.content.Context
 import com.example.weglow.core.image.FaceImageValidator
 import com.example.weglow.core.image.FaceValidator
+import com.example.weglow.data.location.AndroidLocationProvider
 import com.example.weglow.data.remote.supabase.SupabaseClientProvider
 import com.example.weglow.data.repository.LocalAcneScanRepository
 import com.example.weglow.data.repository.LocalHairstyleRepository
@@ -11,12 +12,14 @@ import com.example.weglow.data.repository.SupabaseCatalogRepository
 import com.example.weglow.data.repository.SupabaseHairstyleRepository
 import com.example.weglow.data.repository.SupabaseProfileImageRepository
 import com.example.weglow.data.repository.SupabaseProfileRepository
+import com.example.weglow.data.repository.WeatherApiEnvironmentRepository
 import com.example.weglow.domain.repository.AcneScanRepository
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.CatalogRepository
 import com.example.weglow.domain.repository.HairstyleRepository
 import com.example.weglow.domain.repository.ProfileImageRepository
 import com.example.weglow.domain.repository.ProfileRepository
+import com.example.weglow.domain.repository.EnvironmentRepository
 
 /**
  * Application-level dependency container.
@@ -59,4 +62,8 @@ class AppContainer {
             authRepository = authRepository,
             profileRepository = profileRepository,
         )
+
+    fun environmentRepository(): EnvironmentRepository = WeatherApiEnvironmentRepository()
+
+    fun locationProvider(context: Context) = AndroidLocationProvider(context)
 }

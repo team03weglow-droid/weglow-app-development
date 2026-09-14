@@ -11,6 +11,7 @@ import com.example.weglow.BuildConfig
 object AppConfig {
     val supabaseUrl: String get() = BuildConfig.SUPABASE_URL
     val supabasePublishableKey: String get() = BuildConfig.SUPABASE_PUBLISHABLE_KEY
+    val weatherApiKey: String get() = BuildConfig.WEATHER_API_KEY
 
     fun requireSupabaseConfiguration() {
         check(supabaseUrl.isNotBlank()) {
