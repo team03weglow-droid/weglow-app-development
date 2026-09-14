@@ -4,9 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.core.image.FaceValidationResult
 import com.example.weglow.core.image.FaceValidator
+import com.example.weglow.domain.model.HairstyleFailure
+import com.example.weglow.domain.model.HairstyleFailureException
 import com.example.weglow.domain.model.HairstyleResult
 import com.example.weglow.domain.repository.HairstyleRepository
-import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -44,24 +45,24 @@ class HairstyleViewModel(
                     return@launch
                 }
                 _uiState.value = HairstyleUiState(isAnalyzing = true)
-                val result = repository.analyze(photoReference, gender)
+                val outcome = repository.analyze(photoReference, gender)
                 ensureActive()
-                _uiState.value = HairstyleUiState(result = result)
+                outcome.fold(
+                    onSuccess = { result -> _uiState.value = HairstyleUiState(result = result) },
+                    onFailure = { error ->
+                        _uiState.value = HairstyleUiState(error = error.toHairstyleFailure().toUserMessage())
+                    },
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 ensureActive()
                 val wasValidating = _uiState.value.isValidating
-                _uiState.value = HairstyleUiState(
-                    validationError = if (wasValidating) FaceValidationResult.ProcessingError else null,
-                    error = if (wasValidating) null else {
-                        when (error) {
-                            is IOException -> "Cannot read this photo. Please choose it again or take a new photo."
-                            is IllegalStateException -> error.message ?: "Face-shape analysis failed. Please retry."
-                            else -> "Face-shape analysis failed. Please retry or choose another photo."
-                        }
-                    },
-                )
+                _uiState.value = if (wasValidating) {
+                    HairstyleUiState(validationError = FaceValidationResult.ProcessingError)
+                } else {
+                    HairstyleUiState(error = HairstyleFailure.Unknown.toUserMessage())
+                }
             }
         }
     }
@@ -78,4 +79,23 @@ class HairstyleViewModel(
         faceValidator.close()
         super.onCleared()
     }
+}
+
+/**
+ * A well-behaved [HairstyleRepository] always fails with a [HairstyleFailureException]; this
+ * only falls back to [HairstyleFailure.Unknown] for a repository that misbehaves and
+ * throws/returns some other [Throwable] instead, so an implementation bug can never leak a raw
+ * message to the UI.
+ */
+private fun Throwable.toHairstyleFailure(): HairstyleFailure =
+    (this as? HairstyleFailureException)?.failure ?: HairstyleFailure.Unknown
+
+private fun HairstyleFailure.toUserMessage(): String = when (this) {
+    HairstyleFailure.InvalidImage -> "Cannot read this photo. Please choose it again or take a new photo."
+    HairstyleFailure.DeviceOutOfMemory -> "There is not enough memory to analyze this photo. Close other apps and try again."
+    HairstyleFailure.ModelUnavailable -> "Face-shape analysis could not start on this device. Please update or reinstall the app."
+    HairstyleFailure.NotSignedIn -> "Sign in to save your face shape and see hairstyle recommendations."
+    HairstyleFailure.ProfileUnavailable -> "We couldn't load your profile. Please retry the scan."
+    HairstyleFailure.RecommendationsUnavailable -> "Hairstyle recommendations are temporarily unavailable. Please try again later."
+    HairstyleFailure.Unknown -> "Face-shape analysis failed. Please retry or choose another photo."
 }

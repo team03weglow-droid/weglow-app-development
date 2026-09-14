@@ -5,22 +5,29 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HairstyleRecommendationCatalogTest {
-    @Test fun detectedShapeIsIncludedAndRecommendationsAreRanked() {
+    @Test fun classificationIncludesDetectedShapeAndConfidence() {
         val result = recommendationResult("Square", 87, "Male")
 
         assertEquals("Square", result.faceShape)
         assertEquals(87, result.confidencePercent)
-        assertEquals(4, result.recommendations.size)
-        assertTrue(result.recommendations.zipWithNext().all { (left, right) ->
-            left.matchPercent > right.matchPercent
-        })
     }
 
-    @Test fun everyModelClassHasRecommendationCopy() {
+    @Test fun localClassificationDoesNotProduceACompetingHairstyleCatalog() {
+        // Supabase is the single source of truth for hairstyle recommendations; the local
+        // classifier must only describe the detected face shape, never fabricate styles.
+        listOf("Heart", "Oblong", "Oval", "Round", "Square").forEach { shape ->
+            listOf("Male", "Female", null).forEach { gender ->
+                val result = recommendationResult(shape, 50, gender)
+                assertTrue(result.recommendations.isEmpty())
+            }
+        }
+    }
+
+    @Test fun everyModelClassHasDescriptiveTraitsAndDescription() {
         listOf("Heart", "Oblong", "Oval", "Round", "Square").forEach { shape ->
             val result = recommendationResult(shape, 50, "Female")
             assertEquals(3, result.traits.size)
-            assertEquals(4, result.recommendations.map { it.title }.distinct().size)
+            assertTrue(result.description.isNotBlank())
         }
     }
 }

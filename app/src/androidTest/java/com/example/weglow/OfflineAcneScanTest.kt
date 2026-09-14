@@ -27,12 +27,19 @@ class OfflineAcneScanTest {
                 setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_ROTATE_90.toString())
                 saveAttributes()
             }
-            val result = LocalAcneScanRepository(context).analyze(Uri.fromFile(image).toString())
-            assertEquals(480, result.imageWidth)
-            assertEquals(640, result.imageHeight)
-            assertEquals(12, result.modelVersion.length)
-            assertEquals(0.15f, result.confidenceThreshold, 0f)
-            assertTrue(result.detections.all { it.confidence > 0.15f && it.left in 0f..1f && it.bottom in 0f..1f })
+            // A single repository instance is reused for repeated scans in the real app
+            // (see AppContainer); analyzing twice on the same instance proves the lazily
+            // built OrtEnvironment/OrtSession survive and keep working across repeated
+            // calls, instead of only ever being exercised once.
+            val repository = LocalAcneScanRepository(context)
+            repeat(2) {
+                val result = repository.analyze(Uri.fromFile(image).toString()).getOrThrow()
+                assertEquals(480, result.imageWidth)
+                assertEquals(640, result.imageHeight)
+                assertEquals(12, result.modelVersion.length)
+                assertEquals(0.15f, result.confidenceThreshold, 0f)
+                assertTrue(result.detections.all { it.confidence > 0.15f && it.left in 0f..1f && it.bottom in 0f..1f })
+            }
         } finally {
             bitmap.recycle()
             image.delete()

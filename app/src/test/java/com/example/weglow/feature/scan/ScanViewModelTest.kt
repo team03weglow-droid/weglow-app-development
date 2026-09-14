@@ -1,6 +1,8 @@
 package com.example.weglow.feature.scan
 
 import com.example.weglow.domain.model.AcneScanResult
+import com.example.weglow.domain.model.ScanFailure
+import com.example.weglow.domain.model.ScanFailureException
 import com.example.weglow.domain.repository.AcneScanRepository
 import com.example.weglow.domain.repository.ScanProfileRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -40,20 +42,61 @@ class ScanViewModelTest {
 
     @Test fun failedScanCanBeRetriedWithoutStaleResults() = runTest(dispatcher) {
         var fail = true
-        val viewModel = viewModel {
-            if (fail) throw IOException("cannot read photo")
-            emptyResult
+        val viewModel = viewModelResult {
+            if (fail) Result.failure(ScanFailureException(ScanFailure.InvalidImage)) else Result.success(emptyResult)
         }
         viewModel.analyzeReference("photo")
         dispatcher.scheduler.advanceUntilIdle()
-        assertNotNull(viewModel.uiState.value.error)
-        assertTrue(viewModel.uiState.value.error!!.contains("photo"))
+        assertEquals(
+            "Cannot read this photo. Please choose it again or take a new photo.",
+            viewModel.uiState.value.error,
+        )
         assertNull(viewModel.uiState.value.result)
         fail = false
         viewModel.analyzeReference("photo")
         assertNull(viewModel.uiState.value.error)
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(emptyResult, viewModel.uiState.value.result)
+    }
+
+    @Test fun eachTypedFailureMapsToItsOwnDeterministicMessage() = runTest(dispatcher) {
+        val expected = mapOf(
+            ScanFailure.InvalidImage to "Cannot read this photo. Please choose it again or take a new photo.",
+            ScanFailure.DeviceOutOfMemory to "There is not enough memory to analyze this photo. Close other apps and try again.",
+            ScanFailure.ModelUnavailable to "Skin analysis could not start on this device. Please update or reinstall the app.",
+            ScanFailure.Unknown to "Analysis failed. Please retry or choose another photo.",
+        )
+        expected.forEach { (failure, message) ->
+            val viewModel = viewModelResult { Result.failure(ScanFailureException(failure)) }
+            viewModel.analyzeReference("photo")
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(message, viewModel.uiState.value.error)
+        }
+    }
+
+    @Test fun unexpectedRepositoryExceptionNeverExposesRawMessage() = runTest(dispatcher) {
+        val secret = "internal debug detail token=abc123"
+        val viewModel = ScanViewModel(object : AcneScanRepository {
+            override suspend fun analyze(photoReference: String): Result<AcneScanResult> =
+                throw RuntimeException(secret)
+        }, scanProfileRepository())
+        viewModel.analyzeReference("photo")
+        dispatcher.scheduler.advanceUntilIdle()
+        val error = viewModel.uiState.value.error
+        assertNotNull(error)
+        assertFalse(error!!.contains(secret))
+        assertEquals("Analysis failed. Please retry or choose another photo.", error)
+    }
+
+    @Test fun repositoryFailureResultAlsoNeverExposesRawMessage() = runTest(dispatcher) {
+        val secret = "SQL error near line 42"
+        val viewModel = viewModelResult { Result.failure(RuntimeException(secret)) }
+        viewModel.analyzeReference("photo")
+        dispatcher.scheduler.advanceUntilIdle()
+        val error = viewModel.uiState.value.error
+        assertNotNull(error)
+        assertFalse(error!!.contains(secret))
+        assertEquals("Analysis failed. Please retry or choose another photo.", error)
     }
 
     @Test fun cancellationDoesNotPublishLateResults() = runTest(dispatcher) {
@@ -151,12 +194,21 @@ class ScanViewModelTest {
 
     private fun viewModel(block: suspend () -> AcneScanResult) = ScanViewModel(
         repository(block),
-        object : ScanProfileRepository {
-            override suspend fun saveScanResult(result: AcneScanResult, scannedAt: Instant) = Result.success(Unit)
-        },
+        scanProfileRepository(),
     )
 
+    private fun viewModelResult(block: suspend () -> Result<AcneScanResult>) =
+        ScanViewModel(repositoryResult(block), scanProfileRepository())
+
+    private fun scanProfileRepository() = object : ScanProfileRepository {
+        override suspend fun saveScanResult(result: AcneScanResult, scannedAt: Instant) = Result.success(Unit)
+    }
+
     private fun repository(block: suspend () -> AcneScanResult) = object : AcneScanRepository {
+        override suspend fun analyze(photoReference: String) = Result.success(block())
+    }
+
+    private fun repositoryResult(block: suspend () -> Result<AcneScanResult>) = object : AcneScanRepository {
         override suspend fun analyze(photoReference: String) = block()
     }
 
