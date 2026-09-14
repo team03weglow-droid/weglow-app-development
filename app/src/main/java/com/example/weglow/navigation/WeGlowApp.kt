@@ -84,6 +84,7 @@ fun WeGlowApp() {
         factory = viewModelFactory {
             ScanViewModel(
                 container.acneScanRepository(context),
+                container.scanProfileRepository,
             )
         }
     )
