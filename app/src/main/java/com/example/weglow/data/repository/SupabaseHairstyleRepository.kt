@@ -1,5 +1,7 @@
 package com.example.weglow.data.repository
 
+import com.example.weglow.domain.model.HairstyleFailure
+import com.example.weglow.domain.model.HairstyleFailureException
 import com.example.weglow.domain.model.HairstyleResult
 import com.example.weglow.domain.model.HairstyleRecommendation
 import com.example.weglow.domain.repository.HairstyleRepository
@@ -26,19 +28,22 @@ class SupabaseHairstyleRepository(
     private val profileRepository: ProfileRepository,
 ) : HairstyleRepository {
 
-    override suspend fun analyze(photoReference: String, gender: String?): HairstyleResult {
-        val classified = classifier.analyze(photoReference, gender)
+    override suspend fun analyze(photoReference: String, gender: String?): Result<HairstyleResult> {
+        val classified = classifier.analyze(photoReference, gender).getOrElse { error ->
+            return Result.failure(error)
+        }
         val userId = authRepository.currentUserId()
-            ?: throw IllegalStateException("Sign in to save your face shape and see hairstyle recommendations.")
+            ?: return Result.failure(HairstyleFailureException(HairstyleFailure.NotSignedIn))
+
         profileRepository.updateFaceShape(userId, classified.faceShape).getOrElse { error ->
-            throw IllegalStateException("Could not save your face shape. Please retry the scan.", error)
+            return Result.failure(HairstyleFailureException(HairstyleFailure.ProfileUnavailable, error))
         }
         val profile = profileRepository.getProfile(userId).getOrElse { error ->
-            throw IllegalStateException("Could not load your profile. Please retry the scan.", error)
-        } ?: throw IllegalStateException("Your profile is unavailable. Please complete onboarding and retry.")
+            return Result.failure(HairstyleFailureException(HairstyleFailure.ProfileUnavailable, error))
+        } ?: return Result.failure(HairstyleFailureException(HairstyleFailure.ProfileUnavailable))
         val savedShape = profile.faceShape?.trim()
             ?.takeIf(String::isNotEmpty)
-            ?: throw IllegalStateException("Could not confirm your saved face shape. Please retry the scan.")
+            ?: return Result.failure(HairstyleFailureException(HairstyleFailure.ProfileUnavailable))
 
         val normalizedGender = profile.gender?.trim()?.lowercase()
 
@@ -63,7 +68,7 @@ class SupabaseHairstyleRepository(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            throw IllegalStateException("Hairstyle recommendations are temporarily unavailable.", error)
+            return Result.failure(HairstyleFailureException(HairstyleFailure.RecommendationsUnavailable, error))
         }
 
         // An empty result here is only a real problem if the whole table is unreadable or
@@ -71,16 +76,18 @@ class SupabaseHairstyleRepository(
         // (e.g. that combination has no catalogued styles yet) and must not be reported as
         // a backend failure, nor papered over with fabricated recommendations.
         if (rows.isEmpty()) {
-            ensureHairstylesTableIsReadable()
+            ensureHairstylesTableIsReadable().getOrElse { error ->
+                return Result.failure(error)
+            }
         }
 
         val recommendations = matchingHairstyles(rows, savedShape, profile.gender)
 
-        return classified.copy(recommendations = recommendations)
+        return Result.success(classified.copy(recommendations = recommendations))
     }
 
     /** Cheap existence check (no rows transferred) used only when a filtered fetch is empty. */
-    private suspend fun ensureHairstylesTableIsReadable() {
+    private suspend fun ensureHairstylesTableIsReadable(): Result<Unit> {
         val totalRows = try {
             client.postgrest["hairstyles"]
                 .select {
@@ -91,10 +98,12 @@ class SupabaseHairstyleRepository(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            throw IllegalStateException("Hairstyle recommendations are temporarily unavailable.", error)
+            return Result.failure(HairstyleFailureException(HairstyleFailure.RecommendationsUnavailable, error))
         }
-        check((totalRows ?: 0L) > 0L) {
-            "Hairstyles are unavailable. Please check database read access."
+        return if ((totalRows ?: 0L) > 0L) {
+            Result.success(Unit)
+        } else {
+            Result.failure(HairstyleFailureException(HairstyleFailure.RecommendationsUnavailable))
         }
     }
 }

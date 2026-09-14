@@ -7,12 +7,16 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.net.Uri
 import com.example.weglow.core.image.ScanPhotoDecoder
+import com.example.weglow.domain.model.HairstyleFailure
+import com.example.weglow.domain.model.HairstyleFailureException
 import com.example.weglow.domain.model.HairstyleResult
 import com.example.weglow.domain.repository.HairstyleRepository
 import java.io.FileInputStream
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
@@ -44,7 +48,7 @@ class LocalHairstyleRepository(context: Context) : HairstyleRepository {
         )
     }
 
-    override suspend fun analyze(photoReference: String, gender: String?): HairstyleResult =
+    override suspend fun analyze(photoReference: String, gender: String?): Result<HairstyleResult> =
         withContext(Dispatchers.Default) {
             mutex.withLock {
                 ensureActive()
@@ -77,20 +81,22 @@ class LocalHairstyleRepository(context: Context) : HairstyleRepository {
                         }
                         val bestIndex = probabilities.indices.maxBy { probabilities[it] }
                         val confidence = (probabilities[bestIndex] * 100f).roundToInt().coerceIn(0, 100)
-                        recommendationResult(FACE_SHAPES[bestIndex], confidence, gender)
+                        Result.success(recommendationResult(FACE_SHAPES[bestIndex], confidence, gender))
                     } finally {
                         photo.recycle()
                     }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: IOException) {
+                    Result.failure(HairstyleFailureException(HairstyleFailure.InvalidImage, error))
                 } catch (error: OutOfMemoryError) {
-                    throw IllegalStateException(
-                        "There is not enough memory to analyze this photo. Close other apps and try again.",
-                        error,
-                    )
+                    Result.failure(HairstyleFailureException(HairstyleFailure.DeviceOutOfMemory, error))
                 } catch (error: LinkageError) {
-                    throw IllegalStateException(
-                        "Face-shape analysis could not start on this device. Please update or reinstall the app.",
-                        error,
-                    )
+                    Result.failure(HairstyleFailureException(HairstyleFailure.ModelUnavailable, error))
+                } catch (error: IllegalStateException) {
+                    Result.failure(HairstyleFailureException(HairstyleFailure.ModelUnavailable, error))
+                } catch (error: Exception) {
+                    Result.failure(HairstyleFailureException(HairstyleFailure.Unknown, error))
                 }
             }
         }

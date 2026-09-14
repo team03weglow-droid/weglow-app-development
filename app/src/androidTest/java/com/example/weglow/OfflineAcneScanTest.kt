@@ -27,7 +27,7 @@ class OfflineAcneScanTest {
                 setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_ROTATE_90.toString())
                 saveAttributes()
             }
-            val result = LocalAcneScanRepository(context).analyze(Uri.fromFile(image).toString())
+            val result = LocalAcneScanRepository(context).analyze(Uri.fromFile(image).toString()).getOrThrow()
             assertEquals(480, result.imageWidth)
             assertEquals(640, result.imageHeight)
             assertEquals(12, result.modelVersion.length)

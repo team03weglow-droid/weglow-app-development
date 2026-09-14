@@ -15,7 +15,10 @@ import com.example.weglow.core.image.ScanPhotoDecoder
 import com.example.weglow.data.scan.Letterbox
 import com.example.weglow.data.scan.YoloPostProcessor
 import com.example.weglow.domain.model.AcneScanResult
+import com.example.weglow.domain.model.ScanFailure
+import com.example.weglow.domain.model.ScanFailureException
 import com.example.weglow.domain.repository.AcneScanRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
@@ -24,6 +27,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.FileInputStream
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -79,7 +83,7 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
         SessionHandle(createdSession, shape)
     }
 
-    override suspend fun analyze(photoReference: String): AcneScanResult = withContext(Dispatchers.Default) {
+    override suspend fun analyze(photoReference: String): Result<AcneScanResult> = withContext(Dispatchers.Default) {
         mutex.withLock {
             ensureActive()
             try {
@@ -103,16 +107,26 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
                                 rows, metadata.labels, geometry, metadata.confidence_threshold,
                                 metadata.iou_threshold, metadata.max_detections,
                             )
-                            AcneScanResult(detections, photo.width, photo.height, metadata.model_sha256.take(12), metadata.confidence_threshold)
+                            Result.success(
+                                AcneScanResult(detections, photo.width, photo.height, metadata.model_sha256.take(12), metadata.confidence_threshold),
+                            )
                         }
                     }
                 } finally {
                     photo.recycle()
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: IOException) {
+                Result.failure(ScanFailureException(ScanFailure.InvalidImage, error))
             } catch (error: OutOfMemoryError) {
-                throw IllegalStateException("There is not enough memory to analyze this photo. Close other apps and try again.", error)
+                Result.failure(ScanFailureException(ScanFailure.DeviceOutOfMemory, error))
             } catch (error: LinkageError) {
-                throw IllegalStateException("Skin analysis could not start on this device. Please update or reinstall the app.", error)
+                Result.failure(ScanFailureException(ScanFailure.ModelUnavailable, error))
+            } catch (error: IllegalStateException) {
+                Result.failure(ScanFailureException(ScanFailure.ModelUnavailable, error))
+            } catch (error: Exception) {
+                Result.failure(ScanFailureException(ScanFailure.Unknown, error))
             }
         }
     }

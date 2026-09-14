@@ -27,7 +27,7 @@ class OfflineHairstyleScanTest {
             val result = LocalHairstyleRepository(context).analyze(
                 Uri.fromFile(image).toString(),
                 "Female",
-            )
+            ).getOrThrow()
 
             assertTrue(result.faceShape in listOf("Heart", "Oblong", "Oval", "Round", "Square"))
             assertTrue(result.confidencePercent in 0..100)
