@@ -31,7 +31,9 @@ class OfflineHairstyleScanTest {
 
             assertTrue(result.faceShape in listOf("Heart", "Oblong", "Oval", "Round", "Square"))
             assertTrue(result.confidencePercent in 0..100)
-            assertEquals(4, result.recommendations.size)
+            // The local classifier only classifies; Supabase is the sole source of
+            // hairstyle recommendations, so no local recommendations are produced here.
+            assertEquals(0, result.recommendations.size)
         } finally {
             bitmap.recycle()
             image.delete()
