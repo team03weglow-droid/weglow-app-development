@@ -24,16 +24,23 @@ class OfflineHairstyleScanTest {
             bitmap.eraseColor(Color.WHITE)
             image.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) }
 
-            val result = LocalHairstyleRepository(context).analyze(
-                Uri.fromFile(image).toString(),
-                "Female",
-            ).getOrThrow()
+            // A single repository instance is reused for repeated scans in the real app
+            // (see AppContainer); analyzing twice on the same instance proves the lazily
+            // built Interpreter survives and keeps working across repeated calls, instead
+            // of only ever being exercised once.
+            val repository = LocalHairstyleRepository(context)
+            repeat(2) {
+                val result = repository.analyze(
+                    Uri.fromFile(image).toString(),
+                    "Female",
+                ).getOrThrow()
 
-            assertTrue(result.faceShape in listOf("Heart", "Oblong", "Oval", "Round", "Square"))
-            assertTrue(result.confidencePercent in 0..100)
-            // The local classifier only classifies; Supabase is the sole source of
-            // hairstyle recommendations, so no local recommendations are produced here.
-            assertEquals(0, result.recommendations.size)
+                assertTrue(result.faceShape in listOf("Heart", "Oblong", "Oval", "Round", "Square"))
+                assertTrue(result.confidencePercent in 0..100)
+                // The local classifier only classifies; Supabase is the sole source of
+                // hairstyle recommendations, so no local recommendations are produced here.
+                assertEquals(0, result.recommendations.size)
+            }
         } finally {
             bitmap.recycle()
             image.delete()

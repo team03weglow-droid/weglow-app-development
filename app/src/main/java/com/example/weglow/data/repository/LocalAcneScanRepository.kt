@@ -60,6 +60,11 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
      * immutable session is constructed. If construction fails (including the shape check), the
      * partially-created session is closed and `lazy` retries on the next call, matching the
      * previous per-call retry behaviour for a corrupted install.
+     *
+     * [com.example.weglow.app.AppContainer] guarantees only one [LocalAcneScanRepository]
+     * instance exists for the app's lifetime, so this session (and [environment]) are
+     * effectively process-scoped and are intentionally never closed on the success path -
+     * see [com.example.weglow.app.AppContainer.hairstyleRepository]'s doc comment for why.
      */
     private val sessionHandle: SessionHandle by lazy {
         // Mapping the uncompressed asset avoids copying the weights into the Java heap. The

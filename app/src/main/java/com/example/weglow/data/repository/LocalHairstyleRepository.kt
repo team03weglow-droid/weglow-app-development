@@ -30,6 +30,15 @@ class LocalHairstyleRepository(context: Context) : HairstyleRepository {
     private val application = context.applicationContext
     private val mutex = Mutex()
 
+    /**
+     * Model loading (memory-mapping the asset and building the LiteRT graph) is the
+     * expensive part, not a single inference call, so the interpreter is built once here
+     * and reused for every subsequent [analyze] call on this instance rather than rebuilt
+     * per call. [com.example.weglow.app.AppContainer] guarantees only one
+     * [LocalHairstyleRepository] instance exists for the app's lifetime, so this Interpreter
+     * is effectively process-scoped and is intentionally never closed - see
+     * [com.example.weglow.app.AppContainer.hairstyleRepository]'s doc comment for why.
+     */
     private val interpreter: Interpreter by lazy {
         val model = application.assets.openFd(MODEL_ASSET).use { asset ->
             FileInputStream(asset.fileDescriptor).use { stream ->
