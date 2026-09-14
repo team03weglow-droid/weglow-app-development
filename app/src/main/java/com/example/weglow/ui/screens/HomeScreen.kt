@@ -95,7 +95,7 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = { showNotifications = false },
             title = { Text("Notifications") },
-            text = { Text("Reminders and alerts are coming soon. No notifications are scheduled yet.") },
+            text = { Text("You'll receive a reminder to apply sunscreen when your local UV index is high.") },
             confirmButton = { TextButton(onClick = { showNotifications = false }) { Text("Got it") } },
         )
     }
@@ -216,7 +216,7 @@ fun HomeScreen(
                             "Adjust routine", openRoutine, R.drawable.home_hydration)
                     }
                     item {
-                        HomeInsight("UV & barrier alerts", "Personalized UV alerts and SPF reminders are not connected yet.",
+                        HomeInsight("UV & barrier alerts", "You'll receive a sunscreen reminder when the local UV index is high.",
                             "Set reminder", null, R.drawable.home_environment)
                     }
                     item {

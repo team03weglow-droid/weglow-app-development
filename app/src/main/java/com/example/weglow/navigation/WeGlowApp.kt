@@ -2,6 +2,7 @@ package com.example.weglow.navigation
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
@@ -28,10 +29,12 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.weglow.app.AppContainer
 import com.example.weglow.app.viewModelFactory
+import com.example.weglow.core.notification.UvAlertNotifier
 import com.example.weglow.feature.auth.AuthEvent
 import com.example.weglow.feature.auth.AuthViewModel
 import com.example.weglow.feature.auth.StartupDestination
 import com.example.weglow.feature.discover.DiscoverViewModel
+import com.example.weglow.feature.environment.EnvironmentUiState
 import com.example.weglow.feature.environment.EnvironmentViewModel
 import com.example.weglow.feature.hairstyle.HairstyleViewModel
 import com.example.weglow.feature.onboarding.OnboardingViewModel
@@ -138,6 +141,16 @@ fun WeGlowApp() {
             EnvironmentViewModel(container.locationProvider(context), container.environmentRepository())
         }
     )
+    val environmentState by environmentViewModel.uiState.collectAsState()
+    val uvAlertNotifier = remember { UvAlertNotifier(context) }
+    var notificationPermissionRequested by remember { mutableStateOf(false) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            (environmentState as? EnvironmentUiState.Success)?.environment?.let(uvAlertNotifier::notifyIfHigh)
+        }
+    }
     var hasLocationPermission by remember {
         mutableStateOf(context.hasEnvironmentLocationPermission())
     }
@@ -158,7 +171,20 @@ fun WeGlowApp() {
     val profileState by profileViewModel.uiState.collectAsState()
     val recommendationState by recommendationViewModel.uiState.collectAsState()
     val routineState by routineViewModel.uiState.collectAsState()
-    val environmentState by environmentViewModel.uiState.collectAsState()
+
+    LaunchedEffect(environmentState) {
+        val environment = (environmentState as? EnvironmentUiState.Success)?.environment ?: return@LaunchedEffect
+        if (environment.uvIndex < 6.0) return@LaunchedEffect
+        if (
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) {
+            uvAlertNotifier.notifyIfHigh(environment)
+        } else if (!notificationPermissionRequested) {
+            notificationPermissionRequested = true
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     // Global session-termination reaction, owned by the navigation root rather than by
     // whichever screen happens to trigger sign-out. This must stay mounted for the whole
