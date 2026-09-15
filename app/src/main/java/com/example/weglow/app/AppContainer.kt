@@ -12,6 +12,7 @@ import com.example.weglow.data.repository.SupabaseCatalogRepository
 import com.example.weglow.data.repository.SupabaseHairstyleRepository
 import com.example.weglow.data.repository.SupabaseProfileImageRepository
 import com.example.weglow.data.repository.SupabaseProfileRepository
+import com.example.weglow.data.repository.SupabaseScanProfileRepository
 import com.example.weglow.data.repository.WeatherApiEnvironmentRepository
 import com.example.weglow.domain.repository.AcneScanRepository
 import com.example.weglow.domain.repository.AuthRepository
@@ -19,6 +20,7 @@ import com.example.weglow.domain.repository.CatalogRepository
 import com.example.weglow.domain.repository.HairstyleRepository
 import com.example.weglow.domain.repository.ProfileImageRepository
 import com.example.weglow.domain.repository.ProfileRepository
+import com.example.weglow.domain.repository.ScanProfileRepository
 import com.example.weglow.domain.repository.EnvironmentRepository
 
 /**
@@ -67,6 +69,10 @@ class AppContainer {
 
     val catalogRepository: CatalogRepository by lazy {
         SupabaseCatalogRepository(supabaseClient)
+    }
+
+    val scanProfileRepository: ScanProfileRepository by lazy {
+        SupabaseScanProfileRepository(supabaseClient, authRepository, profileRepository)
     }
 
     /**
