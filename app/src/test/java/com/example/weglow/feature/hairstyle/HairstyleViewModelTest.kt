@@ -2,6 +2,8 @@ package com.example.weglow.feature.hairstyle
 
 import com.example.weglow.core.image.FaceValidationResult
 import com.example.weglow.core.image.FaceValidator
+import com.example.weglow.domain.model.HairstyleFailure
+import com.example.weglow.domain.model.HairstyleFailureException
 import com.example.weglow.domain.model.HairstyleResult
 import com.example.weglow.domain.repository.HairstyleRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -44,13 +46,20 @@ class HairstyleViewModelTest {
 
     @Test fun failureCanBeRetriedWithoutStaleResult() = runTest(dispatcher) {
         var shouldFail = true
-        val viewModel = HairstyleViewModel(repository { _, _ ->
-            if (shouldFail) error("model failed") else result
+        val viewModel = HairstyleViewModel(repositoryResult { _, _ ->
+            if (shouldFail) {
+                Result.failure(HairstyleFailureException(HairstyleFailure.RecommendationsUnavailable))
+            } else {
+                Result.success(result)
+            }
         }, validator())
 
         viewModel.analyze("photo", null)
         dispatcher.scheduler.advanceUntilIdle()
-        assertNotNull(viewModel.uiState.value.error)
+        assertEquals(
+            "Hairstyle recommendations are temporarily unavailable. Please try again later.",
+            viewModel.uiState.value.error,
+        )
         assertNull(viewModel.uiState.value.result)
 
         shouldFail = false
@@ -58,6 +67,58 @@ class HairstyleViewModelTest {
         assertNull(viewModel.uiState.value.error)
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(result, viewModel.uiState.value.result)
+    }
+
+    @Test fun eachTypedFailureMapsToItsOwnDeterministicMessage() = runTest(dispatcher) {
+        val expected = mapOf(
+            HairstyleFailure.InvalidImage to "Cannot read this photo. Please choose it again or take a new photo.",
+            HairstyleFailure.DeviceOutOfMemory to "There is not enough memory to analyze this photo. Close other apps and try again.",
+            HairstyleFailure.ModelUnavailable to "Face-shape analysis could not start on this device. Please update or reinstall the app.",
+            HairstyleFailure.NotSignedIn to "Sign in to save your face shape and see hairstyle recommendations.",
+            HairstyleFailure.ProfileUnavailable to "We couldn't load your profile. Please retry the scan.",
+            HairstyleFailure.RecommendationsUnavailable to "Hairstyle recommendations are temporarily unavailable. Please try again later.",
+            HairstyleFailure.Unknown to "Face-shape analysis failed. Please retry or choose another photo.",
+        )
+        expected.forEach { (failure, message) ->
+            val viewModel = HairstyleViewModel(
+                repositoryResult { _, _ -> Result.failure(HairstyleFailureException(failure)) },
+                validator(),
+            )
+            viewModel.analyze("photo", null)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(message, viewModel.uiState.value.error)
+        }
+    }
+
+    @Test fun unexpectedRepositoryExceptionNeverExposesRawMessage() = runTest(dispatcher) {
+        val secret = "internal debug detail token=abc123"
+        val viewModel = HairstyleViewModel(
+            object : HairstyleRepository {
+                override suspend fun analyze(photoReference: String, gender: String?): Result<HairstyleResult> =
+                    throw RuntimeException(secret)
+            },
+            validator(),
+        )
+        viewModel.analyze("photo", null)
+        dispatcher.scheduler.advanceUntilIdle()
+        val error = viewModel.uiState.value.error
+        assertNotNull(error)
+        assertFalse(error!!.contains(secret))
+        assertEquals("Face-shape analysis failed. Please retry or choose another photo.", error)
+    }
+
+    @Test fun repositoryFailureResultAlsoNeverExposesRawMessage() = runTest(dispatcher) {
+        val secret = "SQL error near line 42"
+        val viewModel = HairstyleViewModel(
+            repositoryResult { _, _ -> Result.failure(RuntimeException(secret)) },
+            validator(),
+        )
+        viewModel.analyze("photo", null)
+        dispatcher.scheduler.advanceUntilIdle()
+        val error = viewModel.uiState.value.error
+        assertNotNull(error)
+        assertFalse(error!!.contains(secret))
+        assertEquals("Face-shape analysis failed. Please retry or choose another photo.", error)
     }
 
     @Test fun invalidPhotoNeverReachesHairstyleRepository() = runTest(dispatcher) {
@@ -127,6 +188,13 @@ class HairstyleViewModelTest {
 
     private fun repository(
         block: suspend (String, String?) -> HairstyleResult,
+    ) = object : HairstyleRepository {
+        override suspend fun analyze(photoReference: String, gender: String?) =
+            Result.success(block(photoReference, gender))
+    }
+
+    private fun repositoryResult(
+        block: suspend (String, String?) -> Result<HairstyleResult>,
     ) = object : HairstyleRepository {
         override suspend fun analyze(photoReference: String, gender: String?) =
             block(photoReference, gender)

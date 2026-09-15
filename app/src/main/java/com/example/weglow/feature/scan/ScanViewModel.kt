@@ -4,13 +4,14 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.domain.model.AcneScanResult
+import com.example.weglow.domain.model.ScanFailure
+import com.example.weglow.domain.model.ScanFailureException
 import com.example.weglow.domain.repository.AcneScanRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,12 +68,23 @@ class ScanViewModel(
         )
         analysis = viewModelScope.launch {
             try {
-                val result = repository.analyze(reference)
+                val outcome = repository.analyze(reference)
                 ensureActive()
-                _uiState.value = _uiState.value.copy(
-                    isValidating = false,
-                    isAnalyzing = false,
-                    result = result,
+                outcome.fold(
+                    onSuccess = { result ->
+                        _uiState.value = _uiState.value.copy(
+                            isValidating = false,
+                            isAnalyzing = false,
+                            result = result,
+                        )
+                    },
+                    onFailure = { error ->
+                        _uiState.value = _uiState.value.copy(
+                            isValidating = false,
+                            isAnalyzing = false,
+                            error = error.toScanFailure().toUserMessage(),
+                        )
+                    },
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -81,11 +93,7 @@ class ScanViewModel(
                 _uiState.value = _uiState.value.copy(
                     isValidating = false,
                     isAnalyzing = false,
-                    error = when (error) {
-                        is IOException -> "Cannot read this photo. Please choose it again or take a new photo."
-                        is IllegalStateException -> error.message ?: "Analysis failed. Please retry."
-                        else -> "Analysis failed. Please retry or choose another photo."
-                    },
+                    error = ScanFailure.Unknown.toUserMessage(),
                 )
             }
         }
@@ -120,4 +128,18 @@ class ScanViewModel(
             runCatching { file.delete() }
         }
     }
+}
+
+/**
+ * A well-behaved [AcneScanRepository] always fails with a [ScanFailureException]; this only
+ * falls back to [ScanFailure.Unknown] for a repository that misbehaves and throws/returns some
+ * other [Throwable] instead, so an implementation bug can never leak a raw message to the UI.
+ */
+private fun Throwable.toScanFailure(): ScanFailure = (this as? ScanFailureException)?.failure ?: ScanFailure.Unknown
+
+private fun ScanFailure.toUserMessage(): String = when (this) {
+    ScanFailure.InvalidImage -> "Cannot read this photo. Please choose it again or take a new photo."
+    ScanFailure.DeviceOutOfMemory -> "There is not enough memory to analyze this photo. Close other apps and try again."
+    ScanFailure.ModelUnavailable -> "Skin analysis could not start on this device. Please update or reinstall the app."
+    ScanFailure.Unknown -> "Analysis failed. Please retry or choose another photo."
 }

@@ -4,7 +4,6 @@ import com.example.weglow.ui.theme.*
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.SystemClock
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
@@ -65,28 +64,34 @@ import java.io.File
 import com.example.weglow.ui.components.WeGlowPrimaryButton
 import com.example.weglow.core.image.FaceValidationResult
 import com.example.weglow.core.image.errorMessage
+import com.example.weglow.feature.scan.ScanFlowState
+import com.example.weglow.feature.scan.ScanFlowUiState
+import com.example.weglow.feature.scan.ScanMode
 import com.example.weglow.feature.scan.ScanUiState
 import com.example.weglow.feature.hairstyle.HairstyleUiState
 import androidx.activity.compose.BackHandler
-import androidx.compose.runtime.saveable.rememberSaveable
 
 
-enum class ScanMode { ACNE, HAIRSTYLE }
-private enum class ScanFlowState { MODE_SELECT, CAMERA, ANALYZING }
-
+/**
+ * Pure renderer for the Scan destination's workflow stage. [flowState] (selected mode, current
+ * stage, and any revealed validation error) is owned by
+ * [com.example.weglow.feature.scan.ScanFlowViewModel] - this composable never decides when
+ * analysis is "done" or when to navigate; it only forwards user actions and Android UI results
+ * (permission grants, captured/picked photo Uris) to the caller.
+ */
 @Composable
 fun ScanScreen(
     photoUri: Uri?,
     acneState: ScanUiState,
     hairstyleState: HairstyleUiState,
-    onAnalyzeAcne: () -> Unit,
-    onCancelAcne: () -> Unit,
-    onAnalyzeHairstyle: (Uri) -> Unit,
-    onCancelHairstyle: () -> Unit,
-    onPhotoCaptured: (Uri) -> Unit,
+    flowState: ScanFlowUiState,
+    onSelectMode: (ScanMode) -> Unit,
+    onPhotoReady: (Uri) -> Unit,
+    onCancel: () -> Unit,
+    onRetryAcne: () -> Unit,
+    onRetryHairstyle: () -> Unit,
+    onReturnToModeSelection: () -> Unit,
     onBack: () -> Unit,
-    onAcneScanComplete: () -> Unit,
-    onHairstyleScanComplete: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -99,78 +104,20 @@ fun ScanScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted -> hasCameraPermission = granted }
 
-    var flowState by rememberSaveable { mutableStateOf(ScanFlowState.MODE_SELECT) }
-    var scanMode by rememberSaveable { mutableStateOf(ScanMode.ACNE) }
-    var analysisStartedAt by remember { mutableLongStateOf(0L) }
-    var displayedValidationError by remember { mutableStateOf<FaceValidationResult?>(null) }
-    fun beginAcneAnalysis() {
-        analysisStartedAt = SystemClock.elapsedRealtime()
-        displayedValidationError = null
-        onAnalyzeAcne()
-    }
-    fun beginHairstyleAnalysis(uri: Uri) {
-        analysisStartedAt = SystemClock.elapsedRealtime()
-        displayedValidationError = null
-        onAnalyzeHairstyle(uri)
-    }
     val galleryWithoutCamera = androidx.activity.compose.rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            onPhotoCaptured(uri)
-            flowState = ScanFlowState.ANALYZING
-            if (scanMode == ScanMode.ACNE) beginAcneAnalysis() else beginHairstyleAnalysis(uri)
-        }
-    }
-    BackHandler(flowState == ScanFlowState.ANALYZING) {
-        if (scanMode == ScanMode.ACNE) onCancelAcne() else onCancelHairstyle()
-        flowState = ScanFlowState.CAMERA
-    }
-    LaunchedEffect(acneState.result, flowState) {
-        if (flowState == ScanFlowState.ANALYZING && scanMode == ScanMode.ACNE && acneState.result != null) {
-            val elapsed = SystemClock.elapsedRealtime() - analysisStartedAt
-            val remaining = (5_000L - elapsed).coerceAtLeast(0L)
-            if (remaining > 0L) delay(remaining)
-            // Allow the UI progress animation to visibly finish at 100%.
-            delay(750L)
-            onAcneScanComplete()
-        }
-    }
-    LaunchedEffect(hairstyleState.result, flowState, scanMode) {
-        if (
-            flowState == ScanFlowState.ANALYZING &&
-            scanMode == ScanMode.HAIRSTYLE &&
-            hairstyleState.result != null
-        ) {
-            // Preserve the main branch's four-stage analyzer timing (4 x 700 ms + 300 ms).
-            val elapsed = SystemClock.elapsedRealtime() - analysisStartedAt
-            val remaining = (3_100L - elapsed).coerceAtLeast(0L)
-            if (remaining > 0L) delay(remaining)
-            onHairstyleScanComplete()
-        }
-    }
-    val currentValidationError = when (scanMode) {
-        ScanMode.ACNE -> null
-        ScanMode.HAIRSTYLE -> hairstyleState.validationError
-    }
-    LaunchedEffect(currentValidationError, flowState, scanMode) {
-        if (flowState == ScanFlowState.ANALYZING && currentValidationError != null) {
-            val elapsed = SystemClock.elapsedRealtime() - analysisStartedAt
-            val remaining = (650L - elapsed).coerceAtLeast(0L)
-            if (remaining > 0L) delay(remaining)
-            displayedValidationError = currentValidationError
-        } else {
-            displayedValidationError = null
-        }
+    ) { uri -> if (uri != null) onPhotoReady(uri) }
+
+    BackHandler(flowState.stage == ScanFlowState.ANALYZING) {
+        onCancel()
     }
 
     when {
-        flowState == ScanFlowState.MODE_SELECT -> {
+        flowState.stage == ScanFlowState.MODE_SELECT -> {
             ScanModeSelectScreen(
                 onBack = onBack,
                 onModeSelected = { mode ->
-                    scanMode = mode
-                    flowState = ScanFlowState.CAMERA
+                    onSelectMode(mode)
                     if (!hasCameraPermission) {
                         permissionLauncher.launch(Manifest.permission.CAMERA)
                     }
@@ -178,26 +125,22 @@ fun ScanScreen(
             )
         }
 
-        flowState == ScanFlowState.ANALYZING && displayedValidationError != null -> {
+        flowState.stage == ScanFlowState.ANALYZING && flowState.displayedValidationError != null -> {
             PhotoValidationErrorScreen(
-                error = displayedValidationError!!,
-                onChooseAnotherPhoto = {
-                    if (scanMode == ScanMode.ACNE) onCancelAcne() else onCancelHairstyle()
-                    displayedValidationError = null
-                    flowState = ScanFlowState.CAMERA
-                },
+                error = flowState.displayedValidationError,
+                onChooseAnotherPhoto = onCancel,
             )
         }
 
-        flowState == ScanFlowState.ANALYZING && scanMode == ScanMode.ACNE -> {
+        flowState.stage == ScanFlowState.ANALYZING && flowState.scanMode == ScanMode.ACNE -> {
             FigmaAcneAnalyzingScreen(
                 state = acneState,
-                onRetry = ::beginAcneAnalysis,
-                onCancel = { onCancelAcne(); flowState = ScanFlowState.CAMERA },
+                onRetry = onRetryAcne,
+                onCancel = onCancel,
             )
         }
 
-        !hasCameraPermission && flowState != ScanFlowState.ANALYZING -> {
+        !hasCameraPermission && flowState.stage != ScanFlowState.ANALYZING -> {
             Column(
                 modifier = Modifier.fillMaxSize().padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -222,29 +165,20 @@ fun ScanScreen(
             }
         }
 
-        flowState == ScanFlowState.ANALYZING -> {
+        flowState.stage == ScanFlowState.ANALYZING -> {
             AnalyzingScreen(
                 photoUri = photoUri,
                 state = hairstyleState,
-                onRetry = {
-                    photoUri?.let(::beginHairstyleAnalysis)
-                },
-                onCancel = {
-                    onCancelHairstyle()
-                    flowState = ScanFlowState.CAMERA
-                },
+                onRetry = onRetryHairstyle,
+                onCancel = onCancel,
             )
         }
 
         else -> {
             CameraCaptureScreen(
-                mode = scanMode,
-                onBack = { flowState = ScanFlowState.MODE_SELECT },
-                onPhotoReady = { uri ->
-                    onPhotoCaptured(uri)
-                    flowState = ScanFlowState.ANALYZING
-                    if (scanMode == ScanMode.ACNE) beginAcneAnalysis() else beginHairstyleAnalysis(uri)
-                }
+                mode = flowState.scanMode,
+                onBack = onReturnToModeSelection,
+                onPhotoReady = onPhotoReady,
             )
         }
     }

@@ -5,7 +5,6 @@ data class HairstyleRecommendation(
     val category: String,
     val title: String,
     val description: String,
-    val imageRes: Int = 0,
     val imageUrl: String? = null,
 )
 

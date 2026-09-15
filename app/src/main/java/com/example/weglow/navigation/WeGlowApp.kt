@@ -42,6 +42,8 @@ import com.example.weglow.feature.profile.ProfileViewModel
 import com.example.weglow.feature.recommendation.RecommendationViewModel
 import com.example.weglow.feature.routine.RoutineViewModel
 import com.example.weglow.feature.routine.RoutineJournalViewModel
+import com.example.weglow.feature.scan.ScanFlowEffect
+import com.example.weglow.feature.scan.ScanFlowViewModel
 import com.example.weglow.feature.scan.ScanViewModel
 import com.example.weglow.ui.components.WeGlowBottomNavigation
 import com.example.weglow.ui.components.WeGlowNavItem
@@ -100,6 +102,12 @@ fun WeGlowApp() {
                 container.hairstyleRepository(context),
                 container.faceValidator(context),
             )
+        }
+    )
+
+    val scanFlowViewModel: ScanFlowViewModel = viewModel(
+        factory = viewModelFactory {
+            ScanFlowViewModel(scanViewModel, hairstyleViewModel)
         }
     )
 
@@ -167,6 +175,7 @@ fun WeGlowApp() {
     val onboardingState by onboardingViewModel.uiState.collectAsState()
     val scanState by scanViewModel.uiState.collectAsState()
     val hairstyleState by hairstyleViewModel.uiState.collectAsState()
+    val scanFlowState by scanFlowViewModel.uiState.collectAsState()
     val discoverState by discoverViewModel.uiState.collectAsState()
     val profileState by profileViewModel.uiState.collectAsState()
     val recommendationState by recommendationViewModel.uiState.collectAsState()
@@ -198,6 +207,7 @@ fun WeGlowApp() {
 
             scanViewModel.clear()
             hairstyleViewModel.clear()
+            scanFlowViewModel.resetFlow()
 
             navController.navigate(
                 Destination.Login.route
@@ -212,6 +222,35 @@ fun WeGlowApp() {
             }
 
             authViewModel.consumeEvent()
+        }
+    }
+
+    // One-shot workflow-completion effects from the Scan destination's flow coordinator.
+    // ScanFlowViewModel never touches the NavController itself; this is the single place that
+    // turns "acne/hairstyle analysis finished" into an actual navigation call. Mounted for the
+    // whole app lifetime (like the sign-out effect above) so it is always subscribed the moment
+    // an effect is emitted, rather than being scoped to the Scan composable's own lifecycle.
+    LaunchedEffect(Unit) {
+        scanFlowViewModel.effects.collect { effect ->
+            when (effect) {
+                ScanFlowEffect.NavigateToAcneResults -> {
+                    navController.navigate(Destination.ScanResults.route) {
+                        popUpTo(Destination.Scan.route) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                }
+
+                ScanFlowEffect.NavigateToHairstyleResults -> {
+                    navController.navigate(Destination.HairstyleResults.route) {
+                        popUpTo(Destination.Scan.route) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                }
+            }
         }
     }
 
@@ -644,48 +683,33 @@ fun WeGlowApp() {
 
             composable(Destination.Scan.route) {
 
+                // Every fresh entry into the Scan destination starts at mode-selection, exactly
+                // as it did when this flow state lived in the composable's own rememberSaveable
+                // state (that state was reset simply because the composable was recreated).
+                // ScanFlowViewModel is Activity-scoped and survives leaving/returning to Scan,
+                // so it must be told explicitly to reset on each fresh entry.
+                LaunchedEffect(Unit) {
+                    scanFlowViewModel.resetFlow()
+                }
+
                 ScanScreen(
                     photoUri = scanState.photoUri,
                     acneState = scanState,
                     hairstyleState = hairstyleState,
-                    onAnalyzeAcne = scanViewModel::analyze,
-                    onCancelAcne = scanViewModel::cancelAnalysis,
-                    onAnalyzeHairstyle = { uri ->
-                        hairstyleViewModel.analyze(uri.toString(), onboardingState.gender)
+                    flowState = scanFlowState,
+                    onSelectMode = scanFlowViewModel::selectMode,
+                    onPhotoReady = { uri ->
+                        scanFlowViewModel.onPhotoReady(uri, onboardingState.gender)
                     },
-                    onCancelHairstyle = hairstyleViewModel::cancelAnalysis,
-                    onPhotoCaptured = scanViewModel::setPhoto,
+                    onCancel = scanFlowViewModel::cancelAnalysis,
+                    onRetryAcne = scanFlowViewModel::retryAcne,
+                    onRetryHairstyle = {
+                        scanFlowViewModel.retryHairstyle(onboardingState.gender)
+                    },
+                    onReturnToModeSelection = scanFlowViewModel::returnToModeSelection,
 
                     onBack = {
                         navController.popBackStack()
-                    },
-
-                    onAcneScanComplete = {
-
-                        navController.navigate(
-                            Destination.ScanResults.route
-                        ) {
-
-                            popUpTo(Destination.Scan.route) {
-                                inclusive = true
-                            }
-
-                            launchSingleTop = true
-                        }
-                    },
-
-                    onHairstyleScanComplete = {
-
-                        navController.navigate(
-                            Destination.HairstyleResults.route
-                        ) {
-
-                            popUpTo(Destination.Scan.route) {
-                                inclusive = true
-                            }
-
-                            launchSingleTop = true
-                        }
                     },
                 )
             }
