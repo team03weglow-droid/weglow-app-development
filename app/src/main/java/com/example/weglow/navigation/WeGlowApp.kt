@@ -33,6 +33,7 @@ import com.example.weglow.core.notification.UvAlertNotifier
 import com.example.weglow.feature.auth.AuthEvent
 import com.example.weglow.feature.auth.AuthViewModel
 import com.example.weglow.feature.auth.StartupDestination
+import com.example.weglow.feature.cart.CartViewModel
 import com.example.weglow.feature.discover.DiscoverViewModel
 import com.example.weglow.feature.environment.EnvironmentUiState
 import com.example.weglow.feature.environment.EnvironmentViewModel
@@ -42,6 +43,7 @@ import com.example.weglow.feature.profile.ProfileViewModel
 import com.example.weglow.feature.recommendation.RecommendationViewModel
 import com.example.weglow.feature.routine.RoutineViewModel
 import com.example.weglow.feature.routine.RoutineJournalViewModel
+import com.example.weglow.feature.savedproducts.SavedProductsViewModel
 import com.example.weglow.feature.scan.ScanFlowEffect
 import com.example.weglow.feature.scan.ScanFlowViewModel
 import com.example.weglow.feature.scan.ScanViewModel
@@ -145,6 +147,24 @@ fun WeGlowApp() {
     val journalViewModel: RoutineJournalViewModel = viewModel(
         factory = viewModelFactory { RoutineJournalViewModel(context, container.authRepository) }
     )
+
+    val savedProductsViewModel: SavedProductsViewModel = viewModel(
+        factory = viewModelFactory {
+            SavedProductsViewModel(
+                container.authRepository,
+                container.savedProductRepository,
+            )
+        }
+    )
+
+    val cartViewModel: CartViewModel = viewModel(
+        factory = viewModelFactory {
+            CartViewModel(
+                container.authRepository,
+                container.cartRepository,
+            )
+        }
+    )
     val environmentViewModel: EnvironmentViewModel = viewModel(
         factory = viewModelFactory {
             EnvironmentViewModel(container.locationProvider(context), container.environmentRepository())
@@ -181,6 +201,8 @@ fun WeGlowApp() {
     val profileState by profileViewModel.uiState.collectAsState()
     val recommendationState by recommendationViewModel.uiState.collectAsState()
     val routineState by routineViewModel.uiState.collectAsState()
+    val savedProductsState by savedProductsViewModel.uiState.collectAsState()
+    val cartState by cartViewModel.uiState.collectAsState()
 
     LaunchedEffect(environmentState) {
         val environment = (environmentState as? EnvironmentUiState.Success)?.environment ?: return@LaunchedEffect
@@ -209,6 +231,8 @@ fun WeGlowApp() {
             scanViewModel.clear()
             hairstyleViewModel.clear()
             scanFlowViewModel.resetFlow()
+            savedProductsViewModel.clear()
+            cartViewModel.clear()
 
             navController.navigate(
                 Destination.Login.route
@@ -670,6 +694,7 @@ fun WeGlowApp() {
                         scanState.result?.detections?.map { detection -> detection.label },
                     )
                     profileViewModel.refresh()
+                    savedProductsViewModel.load()
                 }
 
                 DiscoverScreen(
@@ -689,6 +714,12 @@ fun WeGlowApp() {
                             scanState.result?.detections?.map { detection -> detection.label },
                         )
                     },
+                    savedProductNumbers = savedProductsState.savedProductNumbers,
+                    pendingSaveProductNumbers = savedProductsState.pendingProductNumbers,
+                    onToggleSaved = savedProductsViewModel::toggleSaved,
+                    pendingCartProductNumbers = cartState.pendingProductNumbers,
+                    onAddToCart = cartViewModel::addToCart,
+                    onCartClick = { navController.navigate(Destination.Cart.route) { launchSingleTop = true } },
                 )
             }
 
@@ -840,16 +871,68 @@ fun WeGlowApp() {
                     onProfileImagePicked = profileViewModel::onProfileImagePicked,
                     onProfileImageUnreadable = profileViewModel::onProfileImageUnreadable,
                     onConsumeImageError = profileViewModel::consumeImageError,
+                    onScanClick = { navController.navigate(Destination.Scan.route) { launchSingleTop = true } },
+                    onRoutinesClick = { navController.navigate(Destination.Routines.route) { launchSingleTop = true } },
+                    onDiscoverClick = { navController.navigate(Destination.Discover.route) { launchSingleTop = true } },
+                    onRecommendationsClick = { navController.navigate(Destination.Recommendations.routeFor(false)) { launchSingleTop = true } },
+                    onAccountSettingsClick = { navController.navigate(Destination.AccountSettings.route) { launchSingleTop = true } },
+                    onSavedProductsClick = { navController.navigate(Destination.SavedProducts.route) { launchSingleTop = true } },
+                    onLogout = authViewModel::signOut
+                )
+            }
+
+            composable(Destination.AccountSettings.route) {
+
+                LaunchedEffect(Unit) { profileViewModel.refresh() }
+
+                AccountSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    displayName = profileState.displayName,
+                    email = profileState.email,
                     gender = profileState.gender,
                     isUpdatingGender = profileState.isUpdatingGender,
                     genderError = profileState.genderError,
                     onGenderSelected = profileViewModel::onGenderSelected,
                     onConsumeGenderError = profileViewModel::consumeGenderError,
-                    onScanClick = { navController.navigate(Destination.Scan.route) { launchSingleTop = true } },
-                    onRoutinesClick = { navController.navigate(Destination.Routines.route) { launchSingleTop = true } },
-                    onDiscoverClick = { navController.navigate(Destination.Discover.route) { launchSingleTop = true } },
-                    onRecommendationsClick = { navController.navigate(Destination.Recommendations.routeFor(false)) { launchSingleTop = true } },
-                    onLogout = authViewModel::signOut
+                )
+            }
+
+            // ---------------------------------------------------------
+            // SAVED PRODUCTS / CART
+            // ---------------------------------------------------------
+
+            composable(Destination.SavedProducts.route) {
+
+                LaunchedEffect(Unit) { savedProductsViewModel.load() }
+
+                SavedProductsScreen(
+                    isLoading = savedProductsState.isLoading,
+                    products = savedProductsState.products,
+                    errorMessage = savedProductsState.errorMessage,
+                    pendingProductNumbers = savedProductsState.pendingProductNumbers,
+                    cartPendingProductNumbers = cartState.pendingProductNumbers,
+                    onBack = { navController.popBackStack() },
+                    onRemove = savedProductsViewModel::remove,
+                    onAddToCart = cartViewModel::addToCart,
+                    onRetry = savedProductsViewModel::load,
+                )
+            }
+
+            composable(Destination.Cart.route) {
+
+                LaunchedEffect(Unit) { cartViewModel.load() }
+
+                CartScreen(
+                    isLoading = cartState.isLoading,
+                    items = cartState.items,
+                    subtotalLkr = cartState.subtotalLkr,
+                    errorMessage = cartState.errorMessage,
+                    pendingProductNumbers = cartState.pendingProductNumbers,
+                    onBack = { navController.popBackStack() },
+                    onIncrement = cartViewModel::incrementQuantity,
+                    onDecrement = cartViewModel::decrementQuantity,
+                    onRemove = cartViewModel::removeFromCart,
+                    onRetry = cartViewModel::load,
                 )
             }
         }

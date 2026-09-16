@@ -213,6 +213,7 @@ private class FakeAuthRepository(private val userId: String?) : AuthRepository {
     override fun currentUserId(): String? = userId
     override fun hasActiveSession(): Boolean = userId != null
     override fun currentUserDisplayName(): String? = null
+    override fun currentUserEmail(): String? = null
 }
 
 private class FakeProfileRepository(

@@ -25,4 +25,7 @@ sealed class Destination(val route: String) {
     }
     data object Routines : Destination("routines")
     data object Profile : Destination("profile")
+    data object AccountSettings : Destination("account_settings")
+    data object SavedProducts : Destination("saved_products")
+    data object Cart : Destination("cart")
 }

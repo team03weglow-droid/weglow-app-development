@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 
 data class ProfileUiState(
     val displayName: String? = null,
+    /** The authenticated account's own email, for read-only display (e.g. Account Settings). */
+    val email: String? = null,
     val isLoading: Boolean = false,
     /** Stable Supabase Storage object path persisted in the profile, or null. */
     val profileImagePath: String? = null,
@@ -38,6 +40,7 @@ data class ProfileUiState(
         if (this === other) return true
         if (other !is ProfileUiState) return false
         return displayName == other.displayName &&
+            email == other.email &&
             isLoading == other.isLoading &&
             profileImagePath == other.profileImagePath &&
             isUploadingImage == other.isUploadingImage &&
@@ -50,6 +53,7 @@ data class ProfileUiState(
 
     override fun hashCode(): Int {
         var result = displayName?.hashCode() ?: 0
+        result = 31 * result + (email?.hashCode() ?: 0)
         result = 31 * result + isLoading.hashCode()
         result = 31 * result + (profileImagePath?.hashCode() ?: 0)
         result = 31 * result + (profileImage?.contentHashCode() ?: 0)
@@ -107,6 +111,7 @@ class ProfileViewModel(
 
             _uiState.value = _uiState.value.copy(
                 displayName = persistedName ?: identityName,
+                email = authRepository.currentUserEmail(),
                 profileImagePath = imagePath,
                 profileImage = imageBytes,
                 gender = profile?.gender?.trim()?.takeIf { it.isNotBlank() },

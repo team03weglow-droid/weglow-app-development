@@ -182,4 +182,42 @@ class SupabaseCatalogRepositoryTest {
         requireNotNull(product)
         assertEquals(1800.0, product.priceLkr)
     }
+
+    // Saved Products / Cart relational key: the confirmed live products."No" smallint PK.
+    @Test
+    fun productRow_readsConfirmedNoColumnAsCatalogNo() {
+        val product = buildJsonObject {
+            put("No", 1)
+            put("Product_ID", "SPA_0001")
+            put("Product_Name", "Hydrating Serum")
+        }.toProductOrNull()
+
+        requireNotNull(product)
+        // Product_ID must never be parsed into catalogNo - only the real "No" column may be.
+        assertEquals(1, product.catalogNo)
+        assertEquals("SPA_0001", product.id)
+    }
+
+    @Test
+    fun productRow_withoutNoColumn_leavesCatalogNoNull() {
+        val product = buildJsonObject {
+            put("Product_ID", "p-40")
+            put("Product_Name", "Unlisted Row")
+        }.toProductOrNull()
+
+        requireNotNull(product)
+        assertNull(product.catalogNo)
+    }
+
+    @Test
+    fun productRow_secondCatalogRow_readsItsOwnDistinctNo() {
+        val product = buildJsonObject {
+            put("No", 2)
+            put("Product_ID", "SPA_0002")
+            put("Product_Name", "Second Product")
+        }.toProductOrNull()
+
+        requireNotNull(product)
+        assertEquals(2, product.catalogNo)
+    }
 }

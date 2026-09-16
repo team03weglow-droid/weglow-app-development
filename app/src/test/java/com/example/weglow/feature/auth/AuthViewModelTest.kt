@@ -342,6 +342,7 @@ private class FakeAuthRepository(
         activeSession
 
     override fun currentUserDisplayName(): String? = null
+    override fun currentUserEmail(): String? = null
 }
 
 private class FakeProfileRepository(

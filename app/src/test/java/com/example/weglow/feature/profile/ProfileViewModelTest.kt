@@ -43,6 +43,22 @@ class ProfileViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
+    // 16. Account Settings reads the authenticated account's own email (never a value
+    // supplied by the UI or fabricated), sourced from AuthRepository like currentUserId.
+    @Test
+    fun refresh_loadsAuthenticatedUserEmail() = runTest(dispatcher) {
+        val vm = ProfileViewModel(
+            FakeAuthRepository(userId = "u1", email = "person@example.com"),
+            FakeProfileRepository(stored = UserProfile(id = "u1", fullName = "N")),
+            FakeProfileImageRepository(),
+        )
+
+        vm.refresh()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("person@example.com", vm.uiState.value.email)
+    }
+
     // 1. Loads the persisted profile (real name from the profiles row).
     @Test
     fun refresh_loadsPersistedDisplayName() = runTest(dispatcher) {
@@ -375,6 +391,7 @@ class ProfileViewModelTest {
 private class FakeAuthRepository(
     private val userId: String?,
     private val displayName: String? = null,
+    private val email: String? = null,
 ) : AuthRepository {
     override val authenticationState: Flow<AuthenticationState> =
         MutableStateFlow(
@@ -389,6 +406,7 @@ private class FakeAuthRepository(
     override fun currentUserId(): String? = userId
     override fun hasActiveSession(): Boolean = userId != null
     override fun currentUserDisplayName(): String? = displayName
+    override fun currentUserEmail(): String? = email
 }
 
 private class FakeProfileRepository(

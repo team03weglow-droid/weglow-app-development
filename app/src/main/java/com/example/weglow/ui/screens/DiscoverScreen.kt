@@ -15,8 +15,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -62,6 +65,15 @@ fun DiscoverScreen(
     recommendationsLoading: Boolean = false,
     recommendationsErrorMessage: String? = null,
     onRecommendationsRetry: () -> Unit = {},
+    /** [Product.catalogNo] values the current user has already saved. */
+    savedProductNumbers: Set<Int> = emptySet(),
+    /** [Product.catalogNo] values with a save/unsave currently in flight. */
+    pendingSaveProductNumbers: Set<Int> = emptySet(),
+    onToggleSaved: (Product) -> Unit = {},
+    /** [Product.catalogNo] values with an add-to-cart currently in flight. */
+    pendingCartProductNumbers: Set<Int> = emptySet(),
+    onAddToCart: (Product) -> Unit = {},
+    onCartClick: () -> Unit = {},
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(ALL_PRODUCTS_CATEGORY) }
@@ -138,7 +150,15 @@ fun DiscoverScreen(
                     contentDescription = null,
                     modifier = Modifier.size(24.dp)
                 )
-                ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 36.dp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onCartClick,
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(Icons.Default.ShoppingCart, contentDescription = "Open cart", tint = DarkGreen)
+                    }
+                    ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 36.dp)
+                }
             }
         }
 
@@ -294,7 +314,20 @@ fun DiscoverScreen(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(product.priceLabel, style = MaterialTheme.typography.titleMedium, color = TextBlack)
-                    WeGlowPlannedFeature("Add to Bag")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    val isAddingToCart = product.catalogNo != null && product.catalogNo in pendingCartProductNumbers
+                    Button(
+                        onClick = { onAddToCart(product) },
+                        enabled = product.catalogNo != null && !isAddingToCart,
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = Color.White),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        if (isAddingToCart) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else {
+                            Text("Add to Bag", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
                 }
             } }
 
@@ -350,7 +383,13 @@ fun DiscoverScreen(
             ) {
                 if (viewMode == ProductViewMode.Gallery) {
                     rowItems.forEach { product ->
-                        ProductGridCard(product = product, modifier = Modifier.weight(1f))
+                        ProductGridCard(
+                            product = product,
+                            isSaved = product.catalogNo != null && product.catalogNo in savedProductNumbers,
+                            isSavePending = product.catalogNo != null && product.catalogNo in pendingSaveProductNumbers,
+                            onToggleSaved = { onToggleSaved(product) },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                     if (rowItems.size < 2) Spacer(modifier = Modifier.weight(1f))
                 } else {
@@ -367,7 +406,13 @@ fun DiscoverScreen(
 }
 
 @Composable
-private fun ProductGridCard(product: Product, modifier: Modifier = Modifier) {
+private fun ProductGridCard(
+    product: Product,
+    isSaved: Boolean,
+    isSavePending: Boolean,
+    onToggleSaved: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier) {
         Box {
             WeGlowProductImage(
@@ -396,7 +441,39 @@ private fun ProductGridCard(product: Product, modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(2.dp))
         Text(product.priceLabel, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
         Spacer(Modifier.height(8.dp))
-        WeGlowPlannedFeature("Save")
+        SaveToggleRow(
+            isSaved = isSaved,
+            isPending = isSavePending,
+            enabled = product.catalogNo != null,
+            onClick = onToggleSaved,
+        )
+    }
+}
+
+@Composable
+private fun SaveToggleRow(isSaved: Boolean, isPending: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clickable(enabled = enabled && !isPending, onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (isPending) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = DarkGreen)
+        } else {
+            Icon(
+                if (isSaved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = if (isSaved) "Remove from saved products" else "Save product",
+                tint = if (isSaved) LogoutRed else SoftGray,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            if (isSaved) "Saved" else "Save",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isSaved) LogoutRed else SoftGray,
+        )
     }
 }
 

@@ -188,6 +188,7 @@ private class SignedInAuthRepository(
     override fun currentUserId(): String = "signed-in-user"
     override fun hasActiveSession(): Boolean = true
     override fun currentUserDisplayName(): String? = displayName
+    override fun currentUserEmail(): String? = null
 }
 
 private class SignedOutAuthRepository : AuthRepository {
@@ -201,6 +202,7 @@ private class SignedOutAuthRepository : AuthRepository {
     override fun currentUserId(): String? = null
     override fun hasActiveSession(): Boolean = false
     override fun currentUserDisplayName(): String? = null
+    override fun currentUserEmail(): String? = null
 }
 
 private class RecordingProfileRepository(
