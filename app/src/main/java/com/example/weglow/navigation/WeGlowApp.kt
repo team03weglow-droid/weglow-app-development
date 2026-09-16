@@ -65,6 +65,35 @@ fun WeGlowApp() {
     val navController = rememberNavController()
     val container = remember { AppContainer() }
 
+    // The single, consistent way to navigate to one of the bottom-nav tab destinations
+    // (Home/Discover/Scan/Routines/Profile), no matter which screen the call is made from.
+    //
+    // This is the exact popUpTo(Home){saveState=true}+launchSingleTop+restoreState bookkeeping
+    // WeGlowBottomNavigation's own onSelect below uses, and that Home's onProfileClick was
+    // previously special-cased to duplicate (see docs/HOME_AVATAR_PROFILE_NAVIGATION_BUG_FIX.md
+    // for the confirmed root cause: androidx.navigation's NavController.executePopOperations
+    // aliases popUpTo's anchor destination ID - Home here - to whatever it just popped and
+    // saved off the stack. A tab reached via a *plain* navigate(route){launchSingleTop=true},
+    // with no popUpTo at all, never touches that aliasing entry on the way in; the next time
+    // ANY tab is popped back to Home via this pattern, that pop is the first thing to write a
+    // real (non-null) value into it, and restoreState then restores THAT tab right back instead
+    // of leaving Home (or whichever tab was actually requested) visible. This is exactly what
+    // made Profile silently fail to reopen after Profile -> Recommendations -> Discover here:
+    // Recommendations and Discover were both reached via plain navigate(), so tapping the
+    // Profile tab afterward re-triggered the same aliasing bug via a different intermediate
+    // screen. The general, correct fix is for every tab-reaching call site - not just one - to
+    // consistently go through this same popUpTo/restoreState bookkeeping, which is what this
+    // shared helper enforces instead of leaving each call site to redecide its own NavOptions.
+    fun navigateToTab(route: String) {
+        navController.navigate(route) {
+            popUpTo(Destination.Home.route) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     val authViewModel: AuthViewModel = viewModel(
         factory = viewModelFactory {
             AuthViewModel(
@@ -293,20 +322,7 @@ fun WeGlowApp() {
                 WeGlowBottomNavigation(
                     items = tabs,
                     selectedRoute = currentRoute,
-                    onSelect = { tab ->
-
-                        navController.navigate(tab.route) {
-
-                            // Phase 3:
-                            // Home is the stable anchor for main-app navigation.
-                            popUpTo(Destination.Home.route) {
-                                saveState = true
-                            }
-
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
+                    onSelect = { tab -> navigateToTab(tab.route) },
                 )
             }
         }
@@ -635,43 +651,17 @@ fun WeGlowApp() {
                     eveningRoutine = routineState.plan?.evening.orEmpty(),
                     isRoutineLoading = routineState.isLoading,
                     routineError = journalState.errorMessage ?: routineState.errorMessage,
-                    onProfileClick = {
-                        navController.navigate(Destination.Profile.route) {
-                            // Match the bottom-nav tab convention (see onSelect below) so that
-                            // entering Profile from the Home avatar leaves the same back-stack
-                            // bookkeeping in place as entering it via the tab. Without this,
-                            // returning to Home restores Profile's saved state instead of Home's.
-                            popUpTo(Destination.Home.route) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
+                    onProfileClick = { navigateToTab(Destination.Profile.route) },
                     onRoutinesPeriodClick = { morning ->
                         homeRoutineMorning = morning
-                        navController.navigate(Destination.Routines.route) { launchSingleTop = true }
+                        navigateToTab(Destination.Routines.route)
                     },
                     completedRoutineKeys = journalState.completedKeys,
                     onToggleRoutineStep = journalViewModel::toggleCompletion,
 
-                    onScanClick = {
+                    onScanClick = { navigateToTab(Destination.Scan.route) },
 
-                        navController.navigate(
-                            Destination.Scan.route
-                        ) {
-                            launchSingleTop = true
-                        }
-                    },
-
-                    onDiscoverClick = {
-
-                        navController.navigate(
-                            Destination.Discover.route
-                        ) {
-                            launchSingleTop = true
-                        }
-                    },
+                    onDiscoverClick = { navigateToTab(Destination.Discover.route) },
 
                     onRecommendationsClick = {
 
@@ -681,9 +671,7 @@ fun WeGlowApp() {
                             launchSingleTop = true
                         }
                     },
-                    onRoutinesClick = {
-                        navController.navigate(Destination.Routines.route) { launchSingleTop = true }
-                    },
+                    onRoutinesClick = { navigateToTab(Destination.Routines.route) },
                 )
             }
 
@@ -803,8 +791,8 @@ fun WeGlowApp() {
                 }
 
                 RecommendationsScreen(
-                    onScanClick = { navController.navigate(Destination.Scan.route) { launchSingleTop = true } },
-                    onDiscoverClick = { navController.navigate(Destination.Discover.route) { launchSingleTop = true } },
+                    onScanClick = { navigateToTab(Destination.Scan.route) },
+                    onDiscoverClick = { navigateToTab(Destination.Discover.route) },
                     isLoading = recommendationState.isLoading,
                     result = recommendationState.result,
                     errorMessage = recommendationState.errorMessage,
@@ -870,9 +858,9 @@ fun WeGlowApp() {
                     onProfileImagePicked = profileViewModel::onProfileImagePicked,
                     onProfileImageUnreadable = profileViewModel::onProfileImageUnreadable,
                     onConsumeImageError = profileViewModel::consumeImageError,
-                    onScanClick = { navController.navigate(Destination.Scan.route) { launchSingleTop = true } },
-                    onRoutinesClick = { navController.navigate(Destination.Routines.route) { launchSingleTop = true } },
-                    onDiscoverClick = { navController.navigate(Destination.Discover.route) { launchSingleTop = true } },
+                    onScanClick = { navigateToTab(Destination.Scan.route) },
+                    onRoutinesClick = { navigateToTab(Destination.Routines.route) },
+                    onDiscoverClick = { navigateToTab(Destination.Discover.route) },
                     onRecommendationsClick = { navController.navigate(Destination.Recommendations.routeFor(false)) { launchSingleTop = true } },
                     onAccountSettingsClick = { navController.navigate(Destination.AccountSettings.route) { launchSingleTop = true } },
                     onSavedProductsClick = { navController.navigate(Destination.SavedProducts.route) { launchSingleTop = true } },

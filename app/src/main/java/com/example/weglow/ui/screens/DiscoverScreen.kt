@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Favorite
@@ -318,7 +319,14 @@ fun DiscoverScreen(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(product.priceLabel, style = MaterialTheme.typography.titleMedium, color = TextBlack)
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    SaveToggleRow(
+                        isSaved = product.catalogNo != null && product.catalogNo in savedProductNumbers,
+                        isPending = product.catalogNo != null && product.catalogNo in pendingSaveProductNumbers,
+                        enabled = product.catalogNo != null,
+                        onClick = { onToggleSaved(product) },
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
                     val isAddingToCart = product.catalogNo != null && product.catalogNo in pendingCartProductNumbers
                     Button(
                         onClick = { onAddToCart(product) },
@@ -372,6 +380,10 @@ fun DiscoverScreen(
             }
         }
 
+        // FOR_YOU renders recommendation-specific cards (match reasons via RecommendationCard,
+        // reused as-is from RecommendationsScreen.kt) over filteredRecommendations; every other
+        // category renders the normal catalog cards over filteredProducts, each with the real
+        // Save/Add to Bag actions (CartViewModel/SavedProductsViewModel, via Product.catalogNo).
         if (selectedCategory == FOR_YOU_CATEGORY) {
             items(filteredRecommendations, key = { recommendation -> recommendation.product.id }) { recommendation ->
                 Box(Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
@@ -398,12 +410,22 @@ fun DiscoverScreen(
                                 isSaved = product.catalogNo != null && product.catalogNo in savedProductNumbers,
                                 isSavePending = product.catalogNo != null && product.catalogNo in pendingSaveProductNumbers,
                                 onToggleSaved = { onToggleSaved(product) },
+                                isAddingToCart = product.catalogNo != null && product.catalogNo in pendingCartProductNumbers,
+                                onAddToCart = { onAddToCart(product) },
                                 modifier = Modifier.weight(1f),
                             )
                         }
                         if (rowItems.size < 2) Spacer(modifier = Modifier.weight(1f))
                     } else {
-                        ProductListCard(product = rowItems.first())
+                        val product = rowItems.first()
+                        ProductListCard(
+                            product = product,
+                            isSaved = product.catalogNo != null && product.catalogNo in savedProductNumbers,
+                            isSavePending = product.catalogNo != null && product.catalogNo in pendingSaveProductNumbers,
+                            onToggleSaved = { onToggleSaved(product) },
+                            isAddingToCart = product.catalogNo != null && product.catalogNo in pendingCartProductNumbers,
+                            onAddToCart = { onAddToCart(product) },
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
@@ -422,6 +444,8 @@ private fun ProductGridCard(
     isSaved: Boolean,
     isSavePending: Boolean,
     onToggleSaved: () -> Unit,
+    isAddingToCart: Boolean,
+    onAddToCart: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -461,12 +485,52 @@ private fun ProductGridCard(
         Spacer(modifier = Modifier.height(2.dp))
         Text(product.priceLabel, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
         Spacer(Modifier.height(8.dp))
-        SaveToggleRow(
-            isSaved = isSaved,
-            isPending = isSavePending,
-            enabled = product.catalogNo != null,
-            onClick = onToggleSaved,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SaveToggleRow(
+                isSaved = isSaved,
+                isPending = isSavePending,
+                enabled = product.catalogNo != null,
+                onClick = onToggleSaved,
+            )
+            AddToBagIconButton(
+                isPending = isAddingToCart,
+                enabled = product.catalogNo != null,
+                onClick = onAddToCart,
+            )
+        }
+    }
+}
+
+/**
+ * Compact cart action reused by every product-card presentation (grid, list) that doesn't have
+ * room for the featured card's full-width "Add to Bag" button. Always calls the same
+ * [com.example.weglow.feature.cart.CartViewModel.addToCart] the featured card and Saved
+ * Products use - no separate cart logic.
+ */
+@Composable
+private fun AddToBagIconButton(isPending: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(if (enabled) DarkGreen else SoftGray.copy(alpha = 0.3f))
+            .clickable(enabled = enabled && !isPending, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isPending) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+        } else {
+            Icon(
+                Icons.Default.AddShoppingCart,
+                contentDescription = "Add to bag",
+                tint = Color.White,
+                modifier = Modifier.size(16.dp),
+            )
+        }
     }
 }
 
@@ -498,7 +562,14 @@ private fun SaveToggleRow(isSaved: Boolean, isPending: Boolean, enabled: Boolean
 }
 
 @Composable
-private fun ProductListCard(product: Product) {
+private fun ProductListCard(
+    product: Product,
+    isSaved: Boolean,
+    isSavePending: Boolean,
+    onToggleSaved: () -> Unit,
+    isAddingToCart: Boolean,
+    onAddToCart: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -550,6 +621,24 @@ private fun ProductListCard(product: Product) {
                         Text(rating, style = MaterialTheme.typography.bodySmall, color = TextBlack)
                     }
                 }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SaveToggleRow(
+                    isSaved = isSaved,
+                    isPending = isSavePending,
+                    enabled = product.catalogNo != null,
+                    onClick = onToggleSaved,
+                )
+                AddToBagIconButton(
+                    isPending = isAddingToCart,
+                    enabled = product.catalogNo != null,
+                    onClick = onAddToCart,
+                )
             }
         }
     }
