@@ -1,5 +1,6 @@
 package com.example.weglow.feature.onboarding
 
+import com.example.weglow.domain.model.AgeRange
 import com.example.weglow.domain.model.UserProfile
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.AuthenticationState
@@ -38,7 +39,7 @@ class OnboardingViewModelTest {
         val viewModel = OnboardingViewModel(SignedInAuthRepository(), profiles)
 
         viewModel.start("Alex Doe")
-        viewModel.setAge("25-34")
+        viewModel.setAge("25–35")
         viewModel.setSkinType("Combination")
         viewModel.setGender("Non-binary")
         viewModel.setSensitivityAndSave(true)
@@ -48,7 +49,7 @@ class OnboardingViewModelTest {
             UserProfile(
                 id = "signed-in-user",
                 fullName = "Alex Doe",
-                ageRange = "25-34",
+                ageRange = "25–35",
                 skinType = "Combination",
                 gender = "Non-binary",
                 isSkinSensitive = true,
@@ -68,7 +69,7 @@ class OnboardingViewModelTest {
         val viewModel = OnboardingViewModel(SignedInAuthRepository(), profiles)
 
         viewModel.start("Alex Doe")
-        viewModel.setAge("25-34")
+        viewModel.setAge("25–35")
         viewModel.setSkinType(null) // "Skip for now" is a valid answer
         viewModel.setGender("Female")
         viewModel.setSensitivityAndSave(false)
@@ -89,7 +90,7 @@ class OnboardingViewModelTest {
         val viewModel = OnboardingViewModel(SignedInAuthRepository(), profiles)
 
         viewModel.start("Alex Doe")
-        viewModel.setAge("25-34")
+        viewModel.setAge("25–35")
         viewModel.setGender("Female")
         viewModel.setSensitivityAndSave(true)
         dispatcher.scheduler.advanceUntilIdle()
@@ -109,7 +110,7 @@ class OnboardingViewModelTest {
         val viewModel = OnboardingViewModel(SignedOutAuthRepository(), profiles)
 
         viewModel.start("Alex Doe")
-        viewModel.setAge("25-34")
+        viewModel.setAge("25–35")
         viewModel.setGender("Female")
         viewModel.setSensitivityAndSave(true)
         dispatcher.scheduler.advanceUntilIdle()
@@ -130,7 +131,7 @@ class OnboardingViewModelTest {
         )
 
         viewModel.start()
-        viewModel.setAge("25-34")
+        viewModel.setAge("25–35")
         viewModel.setGender("Female")
         viewModel.setSensitivityAndSave(false)
         dispatcher.scheduler.advanceUntilIdle()
@@ -144,7 +145,7 @@ class OnboardingViewModelTest {
         val viewModel = OnboardingViewModel(SignedInAuthRepository(displayName = null), profiles)
 
         viewModel.start()
-        viewModel.setAge("25-34")
+        viewModel.setAge("25–35")
         viewModel.setGender("Female")
         viewModel.setSensitivityAndSave(false)
         dispatcher.scheduler.advanceUntilIdle()
@@ -159,7 +160,7 @@ class OnboardingViewModelTest {
         val viewModel = OnboardingViewModel(SignedInAuthRepository(), RecordingProfileRepository())
 
         viewModel.start("First User")
-        viewModel.setAge("45 - 50")
+        viewModel.setAge("36–45")
         viewModel.setSkinType("Oily")
         viewModel.setGender("Male")
 
@@ -172,6 +173,72 @@ class OnboardingViewModelTest {
         assertNull(state.gender)
         assertNull(state.isSkinSensitive)
         assertFalse(state.saveCompleted)
+    }
+
+    // --- Minimum age of 14: setAge() is the single point every age value passes through on
+    // its way into the saved profile, so these confirm it never accepts "Under 14" (or any
+    // other value outside the real AgeRange.OPTIONS), regardless of what a caller passes it.
+
+    // 7. "Under 14" is never accepted into onboarding state.
+    @Test
+    fun setAge_underFourteen_isRejected() = runTest(dispatcher) {
+        val viewModel = OnboardingViewModel(SignedInAuthRepository(), RecordingProfileRepository())
+
+        viewModel.setAge("Under 14")
+
+        assertNull(viewModel.uiState.value.ageRange)
+    }
+
+    // 8. Any value outside the real, supported age ranges is rejected the same way -
+    // this is a defense-in-depth guard, not a hardcoded special case for "Under 14".
+    @Test
+    fun setAge_unrecognizedValue_isRejected() = runTest(dispatcher) {
+        val viewModel = OnboardingViewModel(SignedInAuthRepository(), RecordingProfileRepository())
+
+        viewModel.setAge("not a real age range")
+
+        assertNull(viewModel.uiState.value.ageRange)
+    }
+
+    // 9. Every currently supported age range is still accepted.
+    @Test
+    fun setAge_everySupportedAgeRange_isAccepted() = runTest(dispatcher) {
+        AgeRange.OPTIONS.forEach { option ->
+            val viewModel = OnboardingViewModel(SignedInAuthRepository(), RecordingProfileRepository())
+
+            viewModel.setAge(option)
+
+            assertEquals(option, viewModel.uiState.value.ageRange)
+        }
+    }
+
+    // 10. End-to-end: even if "Under 14" were somehow passed to setAge(), it can never reach
+    // the saved profile - onboarding completes with ageRange left null, not "Under 14".
+    @Test
+    fun finalAnswer_afterRejectedAge_neverPersistsIt() = runTest(dispatcher) {
+        val profiles = RecordingProfileRepository()
+        val viewModel = OnboardingViewModel(SignedInAuthRepository(), profiles)
+
+        viewModel.start("Alex Doe")
+        viewModel.setAge("Under 14")
+        viewModel.setSkinType("Combination")
+        viewModel.setGender("Female")
+        viewModel.setSensitivityAndSave(true)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(profiles.savedProfile?.ageRange)
+        assertTrue(profiles.savedProfile?.onboardingCompleted == true)
+    }
+
+    // 11. A rejected setAge() call does not disturb an already-valid answer.
+    @Test
+    fun setAge_rejectedValueAfterValidOne_leavesValidAnswerInPlace() = runTest(dispatcher) {
+        val viewModel = OnboardingViewModel(SignedInAuthRepository(), RecordingProfileRepository())
+
+        viewModel.setAge("25–35")
+        viewModel.setAge("Under 14")
+
+        assertEquals("25–35", viewModel.uiState.value.ageRange)
     }
 }
 

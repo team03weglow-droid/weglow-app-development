@@ -16,10 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.weglow.domain.model.AgeRange
 
 private val CardGreen = CheckboxGreen
-
-private val AGE_OPTIONS = listOf("Under 14", "14–24", "25–35", "36–45", "46–59", "60+")
 
 @Composable
 fun AgeSelectionScreen(onContinue: (String) -> Unit) {
@@ -68,11 +67,19 @@ fun AgeSelectionScreen(onContinue: (String) -> Unit) {
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "You must be at least 14 years old to use WeGlow.",
+            style = MaterialTheme.typography.bodySmall,
+            color = SoftGray,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Spacer(modifier = Modifier.height(36.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            AGE_OPTIONS.forEach { option ->
+            AgeRange.OPTIONS.forEach { option ->
                 val isSelected = option == selected
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

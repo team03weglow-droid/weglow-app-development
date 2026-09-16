@@ -2,6 +2,7 @@ package com.example.weglow.feature.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.weglow.domain.model.AgeRange
 import com.example.weglow.domain.model.UserProfile
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.ProfileRepository
@@ -39,7 +40,17 @@ class OnboardingViewModel(
             ?: authRepository.currentUserDisplayName()?.trim()?.takeIf { it.isNotBlank() }
         _uiState.value = OnboardingUiState(fullName = resolvedName.orEmpty())
     }
-    fun setAge(value: String) { _uiState.value = _uiState.value.copy(ageRange = value) }
+    /**
+     * Only accepts a value from [AgeRange.OPTIONS] - WeGlow's minimum age of 14 means "Under 14"
+     * (and anything else outside that list) is not a value this app will save, regardless of
+     * whether the UI still offers it. This is the single point every age answer passes through
+     * on its way into the saved profile, so guarding here is enough to keep an under-14 value
+     * from ever being submitted through the normal application flow.
+     */
+    fun setAge(value: String) {
+        if (value !in AgeRange.OPTIONS) return
+        _uiState.value = _uiState.value.copy(ageRange = value)
+    }
     fun setSkinType(value: String?) { _uiState.value = _uiState.value.copy(skinType = value) }
     fun setGender(value: String) { _uiState.value = _uiState.value.copy(gender = value) }
 
