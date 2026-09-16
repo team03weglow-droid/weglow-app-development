@@ -19,5 +19,6 @@ backend/models/*.pt
 backend/models/*.onnx
 backend/.env
 backend/.runtime/
+supabase/.temp/
 __pycache__/
 .pytest_cache/

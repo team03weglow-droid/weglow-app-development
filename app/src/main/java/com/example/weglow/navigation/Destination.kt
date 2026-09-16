@@ -25,4 +25,5 @@ sealed class Destination(val route: String) {
     }
     data object Routines : Destination("routines")
     data object Profile : Destination("profile")
+    data object Chatbot : Destination("chatbot")
 }

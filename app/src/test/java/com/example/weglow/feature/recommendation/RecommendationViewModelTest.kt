@@ -224,6 +224,9 @@ private class FakeProfileRepository(
     override suspend fun hasCompletedOnboarding(userId: String): Result<Boolean> = Result.success(true)
     override suspend fun updateProfileImagePath(userId: String, path: String?): Result<Unit> = Result.success(Unit)
     override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> = Result.success(Unit)
+    override suspend fun updateScanSummary(userId: String, concerns: String, scannedAt: java.time.Instant): Result<Unit> = Result.success(Unit)
+
+    override suspend fun updateEnvironment(userId: String, uvIndex: Double, uvCategory: String, humidity: Int, locationName: String): Result<Unit> = Result.success(Unit)
 }
 
 private class FakeCatalogRepository(private val result: Result<List<Product>>) : CatalogRepository {

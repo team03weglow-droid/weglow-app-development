@@ -6,7 +6,10 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
@@ -15,8 +18,10 @@ import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -33,6 +38,7 @@ import com.example.weglow.core.notification.UvAlertNotifier
 import com.example.weglow.feature.auth.AuthEvent
 import com.example.weglow.feature.auth.AuthViewModel
 import com.example.weglow.feature.auth.StartupDestination
+import com.example.weglow.feature.chat.ChatViewModel
 import com.example.weglow.feature.discover.DiscoverViewModel
 import com.example.weglow.feature.environment.EnvironmentUiState
 import com.example.weglow.feature.environment.EnvironmentViewModel
@@ -48,6 +54,7 @@ import com.example.weglow.feature.scan.ScanViewModel
 import com.example.weglow.ui.components.WeGlowBottomNavigation
 import com.example.weglow.ui.components.WeGlowNavItem
 import com.example.weglow.ui.screens.*
+import com.example.weglow.ui.theme.DarkGreen
 
 private val tabs = listOf(
     WeGlowNavItem(Destination.Home.route, "Home", Icons.Default.Home),
@@ -121,6 +128,12 @@ fun WeGlowApp() {
         }
     )
 
+    val chatViewModel: ChatViewModel = viewModel(
+        factory = viewModelFactory {
+            ChatViewModel(container.chatRepository)
+        }
+    )
+
     val recommendationViewModel: RecommendationViewModel = viewModel(
         factory = viewModelFactory {
             RecommendationViewModel(
@@ -146,7 +159,12 @@ fun WeGlowApp() {
     )
     val environmentViewModel: EnvironmentViewModel = viewModel(
         factory = viewModelFactory {
-            EnvironmentViewModel(container.locationProvider(context), container.environmentRepository())
+            EnvironmentViewModel(
+                container.locationProvider(context),
+                container.environmentRepository(),
+                container.profileRepository,
+                container.authRepository,
+            )
         }
     )
     val environmentState by environmentViewModel.uiState.collectAsState()
@@ -283,6 +301,25 @@ fun WeGlowApp() {
                         }
                     },
                 )
+            }
+        },
+        floatingActionButton = {
+            // Round chatbot entry point floating in the Home corner, above the tab bar.
+            // It only appears on the Home tab so it never overlaps other destinations.
+            val backStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = backStackEntry?.destination?.route
+            if (currentRoute == Destination.Home.route) {
+                FloatingActionButton(
+                    onClick = {
+                        navController.navigate(Destination.Chatbot.route) { launchSingleTop = true }
+                    },
+                    shape = CircleShape,
+                    containerColor = DarkGreen,
+                    contentColor = Color.White,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Open chatbot")
+                }
             }
         }
     ) { padding ->
@@ -820,6 +857,17 @@ fun WeGlowApp() {
                     onDiscoverClick = { navController.navigate(Destination.Discover.route) { launchSingleTop = true } },
                     onRecommendationsClick = { navController.navigate(Destination.Recommendations.routeFor(false)) { launchSingleTop = true } },
                     onLogout = authViewModel::signOut
+                )
+            }
+
+            // ---------------------------------------------------------
+            // CHATBOT
+            // ---------------------------------------------------------
+
+            composable(Destination.Chatbot.route) {
+                WeGlowChatScreen(
+                    chatViewModel = chatViewModel,
+                    onBack = { navController.popBackStack() },
                 )
             }
         }

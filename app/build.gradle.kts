@@ -21,7 +21,8 @@ fun phaseOneConfig(name: String): String =
         ?: System.getenv(name)
         ?: ""
 
-fun String.asBuildConfigString(): String = "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+fun String.asBuildConfigString(): String =
+    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     namespace = "com.example.weglow"
@@ -39,13 +40,29 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Phase 1 centralizes configuration only; backend features remain for later phases.
-        buildConfigField("String", "SUPABASE_URL", phaseOneConfig("WEGLOW_SUPABASE_URL").asBuildConfigString())
+        buildConfigField(
+            "String",
+            "SUPABASE_URL",
+            phaseOneConfig("WEGLOW_SUPABASE_URL").asBuildConfigString()
+        )
+
         buildConfigField(
             "String",
             "SUPABASE_PUBLISHABLE_KEY",
             phaseOneConfig("WEGLOW_SUPABASE_PUBLISHABLE_KEY").asBuildConfigString(),
         )
-        buildConfigField("String", "WEATHER_API_KEY", phaseOneConfig("WEATHER_API_KEY").asBuildConfigString())
+
+        buildConfigField(
+            "String",
+            "WEATHER_API_KEY",
+            phaseOneConfig("WEATHER_API_KEY").asBuildConfigString()
+        )
+
+        buildConfigField(
+            "String",
+            "CHAT_URL",
+            phaseOneConfig("WEGLOW_CHAT_URL").asBuildConfigString()
+        )
     }
 
     buildTypes {
@@ -66,10 +83,21 @@ android {
         compose = true
         buildConfig = true
     }
-    androidResources { noCompress += listOf("onnx", "tflite") }
+
+    androidResources {
+        noCompress += listOf("onnx", "tflite")
+    }
+
     testOptions.unitTests.all {
-        it.systemProperty("weglow.model.assets", file("src/main/assets/acne").absolutePath)
-        it.systemProperty("weglow.hairstyle.assets", file("src/main/assets/hairstyle").absolutePath)
+        it.systemProperty(
+            "weglow.model.assets",
+            file("src/main/assets/acne").absolutePath
+        )
+        it.systemProperty(
+            "weglow.hairstyle.assets",
+            file("src/main/assets/hairstyle").absolutePath
+        )
+        it.jvmArgs("--enable-native-access=ALL-UNNAMED")
     }
 }
 
@@ -85,24 +113,53 @@ abstract class ArchitectureCheckTask : DefaultTask() {
         fun scan(relativePath: String, forbidden: List<String>) {
             val root = rootDir.resolve(relativePath)
             if (!root.exists()) return
+
             root.walkTopDown()
                 .filter { it.isFile && it.extension == "kt" }
                 .forEach { sourceFile ->
                     val text = sourceFile.readText()
+
                     forbidden.forEach { token ->
                         if (text.contains(token)) {
-                            violations += "${sourceFile.relativeTo(rootDir)} imports/uses forbidden dependency: $token"
+                            violations +=
+                                "${sourceFile.relativeTo(rootDir)} imports/uses forbidden dependency: $token"
                         }
                     }
                 }
         }
 
-        scan("domain", listOf("import android.", "import androidx.", "io.github.jan.supabase", "com.example.weglow.data", "androidx.compose"))
-        scan("feature", listOf("io.github.jan.supabase", "com.example.weglow.data.remote"))
-        scan("ui", listOf("io.github.jan.supabase", "com.example.weglow.data.remote"))
+        scan(
+            "domain",
+            listOf(
+                "import android.",
+                "import androidx.",
+                "io.github.jan.supabase",
+                "com.example.weglow.data",
+                "androidx.compose"
+            )
+        )
+
+        scan(
+            "feature",
+            listOf(
+                "io.github.jan.supabase",
+                "com.example.weglow.data.remote"
+            )
+        )
+
+        scan(
+            "ui",
+            listOf(
+                "io.github.jan.supabase",
+                "com.example.weglow.data.remote"
+            )
+        )
 
         if (violations.isNotEmpty()) {
-            throw GradleException("Architecture boundary violations:\n" + violations.joinToString("\n"))
+            throw GradleException(
+                "Architecture boundary violations:\n" +
+                        violations.joinToString("\n")
+            )
         }
     }
 }
@@ -110,15 +167,21 @@ abstract class ArchitectureCheckTask : DefaultTask() {
 val architectureCheck by tasks.registering(ArchitectureCheckTask::class) {
     group = "verification"
     description = "Enforces WeGlow Phase 1 dependency boundaries."
-    sourceRoot.set(layout.projectDirectory.dir("src/main/java/com/example/weglow"))
+    sourceRoot.set(
+        layout.projectDirectory.dir("src/main/java/com/example/weglow")
+    )
 }
 
-tasks.named("preBuild").configure { dependsOn(architectureCheck) }
+tasks.named("preBuild").configure {
+    dependsOn(architectureCheck)
+}
 
 dependencies {
     implementation(libs.onnxruntime.android)
     implementation(libs.litert)
+
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
@@ -132,6 +195,12 @@ dependencies {
     implementation(libs.supabase.storage)
     implementation(libs.ktor.client.android)
     implementation(libs.kotlinx.serialization.json)
+
+    // Retrofit / OkHttp
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp.logging.interceptor)
+
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.mlkit.face.detection)
@@ -152,10 +221,12 @@ dependencies {
     testImplementation(libs.junit)
     testRuntimeOnly(libs.onnxruntime.desktop)
     testImplementation(libs.kotlinx.coroutines.test)
+
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

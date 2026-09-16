@@ -1,6 +1,7 @@
 package com.example.weglow.domain.repository
 
 import com.example.weglow.domain.model.UserProfile
+import java.time.Instant
 
 /** Contract for profile persistence. UI code must not depend on Supabase-specific models. */
 interface ProfileRepository {
@@ -25,4 +26,17 @@ interface ProfileRepository {
 
     /** Stores the last detected face shape for the authenticated profile only. */
     suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit>
+
+    /**
+     * Stores the latest on-device skin scan summary (e.g. "Blackheads (2), Pimples (1)")
+     * for the authenticated profile only, so the chat AI and recommendations can
+     * personalize on the most recent acne findings. Touches no other columns.
+     */
+    suspend fun updateScanSummary(userId: String, concerns: String, scannedAt: Instant): Result<Unit>
+
+    /**
+     * Stores the latest environment/UV reading for the authenticated profile only,
+     * so the chat AI can personalize sunscreen and UV advice. Touches no other columns.
+     */
+    suspend fun updateEnvironment(userId: String, uvIndex: Double, uvCategory: String, humidity: Int, locationName: String): Result<Unit>
 }

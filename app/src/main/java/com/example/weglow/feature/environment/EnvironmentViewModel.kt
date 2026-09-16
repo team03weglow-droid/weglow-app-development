@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.data.location.LocationProvider
 import com.example.weglow.domain.model.EnvironmentInfo
+import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.EnvironmentRepository
+import com.example.weglow.domain.repository.ProfileRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +23,8 @@ sealed interface EnvironmentUiState {
 class EnvironmentViewModel(
     private val locationProvider: LocationProvider,
     private val repository: EnvironmentRepository,
+    private val profileRepository: ProfileRepository,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
     private var refreshJob: Job? = null
     private val _uiState = MutableStateFlow<EnvironmentUiState>(EnvironmentUiState.Loading)
@@ -38,7 +42,22 @@ class EnvironmentViewModel(
             locationProvider.getCurrentLocation().fold(
                 onSuccess = { coordinates ->
                     repository.getEnvironmentForLocation(coordinates.latitude, coordinates.longitude).fold(
-                        onSuccess = { _uiState.value = EnvironmentUiState.Success(it) },
+                        onSuccess = { env ->
+                            _uiState.value = EnvironmentUiState.Success(env)
+                            authRepository.currentUserId()?.let { userId ->
+                                viewModelScope.launch {
+                                    runCatching {
+                                        profileRepository.updateEnvironment(
+                                            userId,
+                                            env.uvIndex,
+                                            env.uvCategory,
+                                            env.humidity,
+                                            env.locationName ?: "",
+                                        )
+                                    }
+                                }
+                            }
+                        },
                         onFailure = { _uiState.value = EnvironmentUiState.Error(it.userMessage()) },
                     )
                 },

@@ -29,12 +29,19 @@ class WeatherApiEnvironmentRepository(
 ) : EnvironmentRepository {
     private var cached: CachedEnvironment? = null
 
-    override suspend fun getEnvironmentForLocation(latitude: Double, longitude: Double): Result<EnvironmentInfo> = runCatching {
+    override suspend fun getEnvironmentForLocation(
+        latitude: Double,
+        longitude: Double,
+        forceRefresh: Boolean,
+    ): Result<EnvironmentInfo> = runCatching {
         require(apiKey.isNotBlank()) { "Weather service is not configured. Add WEATHER_API_KEY to local.properties." }
-        cached?.takeIf { it.isFreshFor(latitude, longitude) }?.environment ?: fetch(latitude, longitude).also {
+        val fresh = cached?.takeIf { !forceRefresh && it.isFreshFor(latitude, longitude) }
+        fresh?.environment ?: fetch(latitude, longitude).also {
             cached = CachedEnvironment(it, System.currentTimeMillis())
         }
     }
+
+    override suspend fun getLatestEnvironment(): EnvironmentInfo? = cached?.environment
 
     private suspend fun fetch(latitude: Double, longitude: Double): EnvironmentInfo {
         val response = client.get("current.json") {
@@ -106,14 +113,13 @@ class WeatherApiEnvironmentRepository(
             val distance = FloatArray(1)
             Location.distanceBetween(environment.latitude, environment.longitude, latitude, longitude, distance)
             return System.currentTimeMillis() - fetchedAtMs <= ENVIRONMENT_CACHE_FRESHNESS_MS &&
-                distance[0] < ENVIRONMENT_LOCATION_REFRESH_DISTANCE_METERS
+                    distance[0] < ENVIRONMENT_LOCATION_REFRESH_DISTANCE_METERS
         }
     }
 
     private companion object {
         const val WEATHER_API_BASE_URL = "https://api.weatherapi.com/v1/"
         const val NETWORK_TIMEOUT_MS = 15_000L
-        // Refresh after 20 minutes, or after travel of roughly 7 km; avoids needless API/GPS use.
         const val ENVIRONMENT_CACHE_FRESHNESS_MS = 20 * 60 * 1000L
         const val ENVIRONMENT_LOCATION_REFRESH_DISTANCE_METERS = 7_000f
         const val HISTORY_DAY_COUNT = 30L

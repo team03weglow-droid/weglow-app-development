@@ -4,8 +4,8 @@ coreKtx = "1.19.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
-lifecycleRuntimeKtx = "2.11.0"
-lifecycleViewModel = "2.11.0"
+lifecycleRuntimeKtx = "2.9.4"
+lifecycleViewModel = "2.9.4"
 activityCompose = "1.13.0"
 kotlin = "2.2.10"
 composeBom = "2026.02.01"
@@ -21,8 +21,12 @@ litert = "2.1.5"
 coil = "3.3.0"
 mlKitFaceDetection = "16.1.7"
 playServicesLocation = "21.3.0"
-
+retrofit = "2.11.0"
+okhttp = "4.12.0"
 [libraries]
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
+okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntime" }
 onnxruntime-desktop = { group = "com.microsoft.onnxruntime", name = "onnxruntime", version.ref = "onnxruntime" }
 litert = { group = "com.google.ai.edge.litert", name = "litert", version.ref = "litert" }

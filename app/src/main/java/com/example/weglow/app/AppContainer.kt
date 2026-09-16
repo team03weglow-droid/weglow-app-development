@@ -4,9 +4,12 @@ import android.content.Context
 import com.example.weglow.core.image.FaceImageValidator
 import com.example.weglow.core.image.FaceValidator
 import com.example.weglow.data.location.AndroidLocationProvider
+import com.example.weglow.data.remote.chat.ChatApiProvider
 import com.example.weglow.data.remote.supabase.SupabaseClientProvider
 import com.example.weglow.data.repository.LocalAcneScanRepository
 import com.example.weglow.data.repository.LocalHairstyleRepository
+import com.example.weglow.data.repository.RetrofitChatRepository
+import com.example.weglow.data.repository.SupabaseAcneScanRepository
 import com.example.weglow.data.repository.SupabaseAuthRepository
 import com.example.weglow.data.repository.SupabaseCatalogRepository
 import com.example.weglow.data.repository.SupabaseHairstyleRepository
@@ -16,6 +19,7 @@ import com.example.weglow.data.repository.WeatherApiEnvironmentRepository
 import com.example.weglow.domain.repository.AcneScanRepository
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.CatalogRepository
+import com.example.weglow.domain.repository.ChatRepository
 import com.example.weglow.domain.repository.HairstyleRepository
 import com.example.weglow.domain.repository.ProfileImageRepository
 import com.example.weglow.domain.repository.ProfileRepository
@@ -47,7 +51,11 @@ class AppContainer {
 
     @Synchronized
     fun acneScanRepository(context: Context): AcneScanRepository =
-        acneScanRepositoryInstance ?: LocalAcneScanRepository(context.applicationContext).also {
+        acneScanRepositoryInstance ?: SupabaseAcneScanRepository(
+            onDevice = LocalAcneScanRepository(context.applicationContext),
+            authRepository = authRepository,
+            profileRepository = profileRepository,
+        ).also {
             acneScanRepositoryInstance = it
         }
 
@@ -67,6 +75,10 @@ class AppContainer {
 
     val catalogRepository: CatalogRepository by lazy {
         SupabaseCatalogRepository(supabaseClient)
+    }
+
+    val chatRepository: ChatRepository by lazy {
+        RetrofitChatRepository({ ChatApiProvider.api }, supabaseClient)
     }
 
     /**
@@ -93,7 +105,9 @@ class AppContainer {
             client = supabaseClient,
             authRepository = authRepository,
             profileRepository = profileRepository,
-        ).also { hairstyleRepositoryInstance = it }
+        ).also {
+            hairstyleRepositoryInstance = it
+        }
 
     fun environmentRepository(): EnvironmentRepository = WeatherApiEnvironmentRepository()
 

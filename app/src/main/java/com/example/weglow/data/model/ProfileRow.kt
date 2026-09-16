@@ -14,6 +14,13 @@ data class ProfileRow(
     val is_skin_sensitive: Boolean? = null,
     val profile_image_url: String? = null,
     val onboarding_completed: Boolean = false,
+    val skin_concerns: String? = null,
+    val last_scan_at: String? = null,
+    val uv_index: Double? = null,
+    val uv_category: String? = null,
+    val humidity: Int? = null,
+    val location_name: String? = null,
+    val last_env_at: String? = null,
 )
 
 fun UserProfile.toProfileRow() = ProfileRow(
@@ -26,6 +33,13 @@ fun UserProfile.toProfileRow() = ProfileRow(
     is_skin_sensitive = isSkinSensitive,
     profile_image_url = profileImagePath,
     onboarding_completed = onboardingCompleted,
+    skin_concerns = null,
+    last_scan_at = null,
+    uv_index = null,
+    uv_category = null,
+    humidity = null,
+    location_name = null,
+    last_env_at = null,
 )
 
 fun ProfileRow.toUserProfile() = UserProfile(
