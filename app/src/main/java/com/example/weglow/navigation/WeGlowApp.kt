@@ -665,6 +665,9 @@ fun WeGlowApp() {
             composable(Destination.Discover.route) {
                 LaunchedEffect(Unit) {
                     discoverViewModel.loadProducts()
+                    recommendationViewModel.load(
+                        scanState.result?.detections?.map { detection -> detection.label },
+                    )
                     profileViewModel.refresh()
                 }
 
@@ -674,6 +677,17 @@ fun WeGlowApp() {
                     errorMessage = discoverState.errorMessage,
                     onRetry = discoverViewModel::loadProducts,
                     profileImage = profileState.profileImage,
+                    recommendedProducts = recommendationState.result
+                        ?.recommendations
+                        .orEmpty()
+                        .map { recommendation -> recommendation.product },
+                    recommendationsLoading = recommendationState.isLoading,
+                    recommendationsErrorMessage = recommendationState.errorMessage,
+                    onRecommendationsRetry = {
+                        recommendationViewModel.load(
+                            scanState.result?.detections?.map { detection -> detection.label },
+                        )
+                    },
                 )
             }
 
