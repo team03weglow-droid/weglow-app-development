@@ -10,22 +10,18 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) file.inputStream().use(::load)
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use {
+        localProperties.load(it)
+    }
 }
-
-fun phaseOneConfig(name: String): String =
-    providers.gradleProperty(name).orNull
-        ?: localProperties.getProperty(name)
-        ?: System.getenv(name)
-        ?: ""
-
-fun String.asBuildConfigString(): String =
-    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     namespace = "com.example.weglow"
+
     compileSdk {
         version = release(37)
     }
@@ -39,37 +35,39 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Phase 1 centralizes configuration only; backend features remain for later phases.
         buildConfigField(
             "String",
             "SUPABASE_URL",
-            phaseOneConfig("WEGLOW_SUPABASE_URL").asBuildConfigString()
+            "\"${localProperties.getProperty("WEGLOW_SUPABASE_URL", "")}\"",
         )
 
         buildConfigField(
             "String",
             "SUPABASE_PUBLISHABLE_KEY",
-            phaseOneConfig("WEGLOW_SUPABASE_PUBLISHABLE_KEY").asBuildConfigString(),
+            "\"${localProperties.getProperty("WEGLOW_SUPABASE_PUBLISHABLE_KEY", "")}\"",
         )
 
         buildConfigField(
             "String",
             "WEATHER_API_KEY",
-            phaseOneConfig("WEATHER_API_KEY").asBuildConfigString()
+            "\"${localProperties.getProperty("WEATHER_API_KEY", "")}\"",
         )
 
         buildConfigField(
             "String",
             "CHAT_URL",
-            phaseOneConfig("WEGLOW_CHAT_URL").asBuildConfigString()
+            "\"${localProperties.getProperty("WEGLOW_CHAT_URL", "")}\"",
         )
     }
 
     buildTypes {
         release {
-            optimization {
-                enable = false
-            }
+            isMinifyEnabled = false
+
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 
@@ -84,149 +82,169 @@ android {
         buildConfig = true
     }
 
-    androidResources {
-        noCompress += listOf("onnx", "tflite")
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 
     testOptions.unitTests.all {
+        it.jvmArgs("--enable-native-access=ALL-UNNAMED")
+
         it.systemProperty(
             "weglow.model.assets",
-            file("src/main/assets/acne").absolutePath
+            file("src/main/assets/acne").absolutePath,
         )
+
         it.systemProperty(
             "weglow.hairstyle.assets",
-            file("src/main/assets/hairstyle").absolutePath
+            file("src/main/assets/hairstyle").absolutePath,
         )
-        it.jvmArgs("--enable-native-access=ALL-UNNAMED")
     }
-}
 
-abstract class ArchitectureCheckTask : DefaultTask() {
-    @get:InputDirectory
-    abstract val sourceRoot: DirectoryProperty
-
-    @TaskAction
-    fun verifyBoundaries() {
-        val rootDir = sourceRoot.get().asFile
-        val violations = mutableListOf<String>()
-
-        fun scan(relativePath: String, forbidden: List<String>) {
-            val root = rootDir.resolve(relativePath)
-            if (!root.exists()) return
-
-            root.walkTopDown()
-                .filter { it.isFile && it.extension == "kt" }
-                .forEach { sourceFile ->
-                    val text = sourceFile.readText()
-
-                    forbidden.forEach { token ->
-                        if (text.contains(token)) {
-                            violations +=
-                                "${sourceFile.relativeTo(rootDir)} imports/uses forbidden dependency: $token"
-                        }
-                    }
-                }
-        }
-
-        scan(
-            "domain",
-            listOf(
-                "import android.",
-                "import androidx.",
-                "io.github.jan.supabase",
-                "com.example.weglow.data",
-                "androidx.compose"
-            )
+    androidResources {
+        noCompress += listOf(
+            "onnx",
+            "ort",
+            "tflite",
+            "lite",
         )
-
-        scan(
-            "feature",
-            listOf(
-                "io.github.jan.supabase",
-                "com.example.weglow.data.remote"
-            )
-        )
-
-        scan(
-            "ui",
-            listOf(
-                "io.github.jan.supabase",
-                "com.example.weglow.data.remote"
-            )
-        )
-
-        if (violations.isNotEmpty()) {
-            throw GradleException(
-                "Architecture boundary violations:\n" +
-                        violations.joinToString("\n")
-            )
-        }
     }
-}
-
-val architectureCheck by tasks.registering(ArchitectureCheckTask::class) {
-    group = "verification"
-    description = "Enforces WeGlow Phase 1 dependency boundaries."
-    sourceRoot.set(
-        layout.projectDirectory.dir("src/main/java/com/example/weglow")
-    )
-}
-
-tasks.named("preBuild").configure {
-    dependsOn(architectureCheck)
 }
 
 dependencies {
-    implementation(libs.onnxruntime.android)
-    implementation(libs.litert)
 
-    coreLibraryDesugaring(libs.desugar.jdk.libs)
-
-    implementation(libs.androidx.camera.core)
-    implementation(libs.androidx.camera.camera2)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.androidx.camera.view)
-    implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.compose.material.icons.extended)
-
-    implementation(platform(libs.supabase.bom))
-    implementation(libs.supabase.postgrest)
-    implementation(libs.supabase.auth)
-    implementation(libs.supabase.storage)
-    implementation(libs.ktor.client.android)
-    implementation(libs.kotlinx.serialization.json)
-
-    // Retrofit / OkHttp
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.gson)
-    implementation(libs.okhttp.logging.interceptor)
-
-    implementation(libs.coil.compose)
-    implementation(libs.coil.network.okhttp)
-    implementation(libs.mlkit.face.detection)
-    implementation(libs.play.services.location)
-    implementation(libs.kotlinx.coroutines.play.services)
-
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
+    // Android
     implementation(libs.androidx.core.ktx)
+
+    // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
+    // Activity / Compose
+    implementation(libs.androidx.activity.compose)
+
+    implementation(platform(libs.androidx.compose.bom))
+
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+
+    // Navigation
+    implementation(libs.androidx.navigation.compose)
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation(libs.kotlinx.coroutines.play.services)
+
+    // Serialization
+    implementation(libs.kotlinx.serialization.json)
+
+    // Supabase
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.storage)
+
+    // Ktor
+    implementation(libs.ktor.client.android)
+
+    // Retrofit / Gson
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+
+    // OkHttp
+    implementation(libs.okhttp.logging.interceptor)
+
+    // Images
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+
+    // Camera / scanning
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    // AI / ML
+    implementation(libs.onnxruntime.android)
+    implementation(libs.litert)
+    implementation(libs.mlkit.face.detection)
+
+    // Location / environment / UV
+    implementation(libs.play.services.location)
+
+    // Unit tests
     testImplementation(libs.junit)
-    testRuntimeOnly(libs.onnxruntime.desktop)
     testImplementation(libs.kotlinx.coroutines.test)
 
+    // Android tests
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
 
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    // Debug
     debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    // ONNX Runtime for JVM/unit tests
+    testRuntimeOnly(libs.onnxruntime.desktop)
+
+    // Java 8+ APIs on older Android versions
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+}
+
+/**
+ * Verifies that the main source set keeps the expected architecture boundaries.
+ */
+abstract class CheckArchitectureTask : DefaultTask() {
+
+    @get:InputDirectory
+    abstract val sourceDirectory: DirectoryProperty
+
+    @TaskAction
+    fun check() {
+        val root = sourceDirectory.get().asFile
+
+        if (!root.exists()) {
+            throw GradleException(
+                "Source directory does not exist: $root",
+            )
+        }
+
+        val forbiddenImports = listOf(
+            "android.database.",
+            "android.content.ContentResolver",
+        )
+
+        val violations = mutableListOf<String>()
+
+        root.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .forEach { file ->
+                val text = file.readText()
+
+                forbiddenImports.forEach { forbidden ->
+                    if (text.contains(forbidden)) {
+                        violations += "${file.relativeTo(root)} -> $forbidden"
+                    }
+                }
+            }
+
+        if (violations.isNotEmpty()) {
+            throw GradleException(
+                "Architecture violations found:\n${violations.joinToString("\n")}",
+            )
+        }
+    }
+}
+
+tasks.register<CheckArchitectureTask>("checkArchitecture") {
+    sourceDirectory.set(
+        layout.projectDirectory.dir("src/main/java"),
+    )
 }

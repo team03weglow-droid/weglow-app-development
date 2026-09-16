@@ -237,4 +237,9 @@ private class FakeCatalogRepository(private val result: Result<List<Product>>) :
         callCount++
         return result
     }
-}
+
+    override suspend fun updateGender(
+        userId: String,
+        gender: String,
+    ): Result<Unit> =
+        Result.success(Unit)}

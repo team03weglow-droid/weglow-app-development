@@ -188,6 +188,7 @@ private class SignedInAuthRepository(
     override fun currentUserId(): String = "signed-in-user"
     override fun hasActiveSession(): Boolean = true
     override fun currentUserDisplayName(): String? = displayName
+    override fun currentUserEmail(): String? = null
 }
 
 private class SignedOutAuthRepository : AuthRepository {
@@ -201,6 +202,7 @@ private class SignedOutAuthRepository : AuthRepository {
     override fun currentUserId(): String? = null
     override fun hasActiveSession(): Boolean = false
     override fun currentUserDisplayName(): String? = null
+    override fun currentUserEmail(): String? = null
 }
 
 private class RecordingProfileRepository(
@@ -232,9 +234,26 @@ private class RecordingProfileRepository(
     override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> =
         Result.success(Unit)
 
-    override suspend fun updateScanSummary(userId: String, concerns: String, scannedAt: java.time.Instant): Result<Unit> =
+    override suspend fun updateScanSummary(
+        userId: String,
+        concerns: String,
+        scannedAt: java.time.Instant,
+    ): Result<Unit> =
         Result.success(Unit)
 
-    override suspend fun updateEnvironment(userId: String, uvIndex: Double, uvCategory: String, humidity: Int, locationName: String): Result<Unit> =
+    override suspend fun updateEnvironment(
+        userId: String,
+        uvIndex: Double,
+        uvCategory: String,
+        humidity: Int,
+        locationName: String,
+    ): Result<Unit> =
+        Result.success(Unit)
+
+    override suspend fun updateGender(
+        userId: String,
+        gender: String,
+    ): Result<Unit> =
+        Result.success(Unit)
         Result.success(Unit)
 }

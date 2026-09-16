@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 
 data class ProfileUiState(
     val displayName: String? = null,
+    /** The authenticated account's own email, for read-only display (e.g. Account Settings). */
+    val email: String? = null,
     val isLoading: Boolean = false,
     /** Stable Supabase Storage object path persisted in the profile, or null. */
     val profileImagePath: String? = null,
@@ -22,26 +24,44 @@ data class ProfileUiState(
     val profileImage: ByteArray? = null,
     val isUploadingImage: Boolean = false,
     val imageError: String? = null,
+    /**
+     * The current persisted `profiles.gender` value (one of
+     * [com.example.weglow.domain.model.Gender.OPTIONS]), or null when never set. This is the
+     * same column onboarding writes to - it is the single value every other screen (hairstyle
+     * recommendations included) must read, so it is refreshed from the repository like every
+     * other profile field rather than cached anywhere else.
+     */
+    val gender: String? = null,
+    val isUpdatingGender: Boolean = false,
+    val genderError: String? = null,
 ) {
     // ByteArray needs structural equals/hashCode for predictable state comparisons.
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is ProfileUiState) return false
         return displayName == other.displayName &&
+            email == other.email &&
             isLoading == other.isLoading &&
             profileImagePath == other.profileImagePath &&
             isUploadingImage == other.isUploadingImage &&
             imageError == other.imageError &&
+            gender == other.gender &&
+            isUpdatingGender == other.isUpdatingGender &&
+            genderError == other.genderError &&
             profileImageContentEquals(other.profileImage)
     }
 
     override fun hashCode(): Int {
         var result = displayName?.hashCode() ?: 0
+        result = 31 * result + (email?.hashCode() ?: 0)
         result = 31 * result + isLoading.hashCode()
         result = 31 * result + (profileImagePath?.hashCode() ?: 0)
         result = 31 * result + (profileImage?.contentHashCode() ?: 0)
         result = 31 * result + isUploadingImage.hashCode()
         result = 31 * result + (imageError?.hashCode() ?: 0)
+        result = 31 * result + (gender?.hashCode() ?: 0)
+        result = 31 * result + isUpdatingGender.hashCode()
+        result = 31 * result + (genderError?.hashCode() ?: 0)
         return result
     }
 
@@ -91,11 +111,57 @@ class ProfileViewModel(
 
             _uiState.value = _uiState.value.copy(
                 displayName = persistedName ?: identityName,
+                email = authRepository.currentUserEmail(),
                 profileImagePath = imagePath,
                 profileImage = imageBytes,
+                gender = profile?.gender?.trim()?.takeIf { it.isNotBlank() },
                 isLoading = false,
             )
         }
+    }
+
+    /**
+     * Persists a Profile-initiated gender change to the same `profiles.gender` column
+     * onboarding writes to, then updates local state only once that write is confirmed - a
+     * failed update must never leave the UI showing a gender that was not actually saved.
+     * Reusing [refresh]'s single-column-update pattern ([ProfileRepository.updateGender])
+     * means no other screen needs to change: anything that re-reads the profile (in
+     * particular hairstyle recommendations) sees the new value on its very next read.
+     */
+    fun onGenderSelected(gender: String) {
+        if (_uiState.value.isUpdatingGender || gender == _uiState.value.gender) return
+
+        val userId = authRepository.currentUserId()
+        if (userId == null) {
+            _uiState.value = _uiState.value.copy(
+                genderError = "Your session is no longer active. Sign in again to update your gender.",
+            )
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isUpdatingGender = true, genderError = null)
+
+        viewModelScope.launch {
+            profileRepository.updateGender(userId, gender).fold(
+                onSuccess = {
+                    _uiState.value = _uiState.value.copy(
+                        isUpdatingGender = false,
+                        gender = gender,
+                        genderError = null,
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isUpdatingGender = false,
+                        genderError = error.message ?: "We couldn't save your gender. Please try again.",
+                    )
+                },
+            )
+        }
+    }
+
+    fun consumeGenderError() {
+        _uiState.value = _uiState.value.copy(genderError = null)
     }
 
     /**

@@ -11,19 +11,26 @@ import com.example.weglow.data.repository.LocalHairstyleRepository
 import com.example.weglow.data.repository.RetrofitChatRepository
 import com.example.weglow.data.repository.SupabaseAcneScanRepository
 import com.example.weglow.data.repository.SupabaseAuthRepository
+import com.example.weglow.data.repository.SupabaseCartRepository
 import com.example.weglow.data.repository.SupabaseCatalogRepository
 import com.example.weglow.data.repository.SupabaseHairstyleRepository
 import com.example.weglow.data.repository.SupabaseProfileImageRepository
 import com.example.weglow.data.repository.SupabaseProfileRepository
+import com.example.weglow.data.repository.SupabaseSavedProductRepository
+import com.example.weglow.data.repository.SupabaseScanProfileRepository
 import com.example.weglow.data.repository.WeatherApiEnvironmentRepository
 import com.example.weglow.domain.repository.AcneScanRepository
 import com.example.weglow.domain.repository.AuthRepository
+import com.example.weglow.domain.repository.CartRepository
 import com.example.weglow.domain.repository.CatalogRepository
 import com.example.weglow.domain.repository.ChatRepository
 import com.example.weglow.domain.repository.HairstyleRepository
 import com.example.weglow.domain.repository.ProfileImageRepository
 import com.example.weglow.domain.repository.ProfileRepository
+import com.example.weglow.domain.repository.SavedProductRepository
+import com.example.weglow.domain.repository.ScanProfileRepository
 import com.example.weglow.domain.repository.EnvironmentRepository
+import io.github.jan.supabase.auth.auth
 
 /**
  * Application-level dependency container.
@@ -78,7 +85,26 @@ class AppContainer {
     }
 
     val chatRepository: ChatRepository by lazy {
-        RetrofitChatRepository({ ChatApiProvider.api }, supabaseClient)
+        RetrofitChatRepository(
+            { ChatApiProvider.api },
+            supabaseClient
+        )
+    }
+
+    val scanProfileRepository: ScanProfileRepository by lazy {
+        SupabaseScanProfileRepository(
+            supabaseClient,
+            authRepository,
+            profileRepository
+        )
+    }
+
+    val savedProductRepository: SavedProductRepository by lazy {
+        SupabaseSavedProductRepository(supabaseClient)
+    }
+
+    val cartRepository: CartRepository by lazy {
+        SupabaseCartRepository(supabaseClient)
     }
 
     /**
@@ -109,7 +135,9 @@ class AppContainer {
             hairstyleRepositoryInstance = it
         }
 
-    fun environmentRepository(): EnvironmentRepository = WeatherApiEnvironmentRepository()
+    fun environmentRepository(): EnvironmentRepository = WeatherApiEnvironmentRepository(
+        accessTokenProvider = { supabaseClient.auth.currentAccessTokenOrNull() },
+    )
 
     fun locationProvider(context: Context) = AndroidLocationProvider(context)
 }

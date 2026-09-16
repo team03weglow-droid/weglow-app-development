@@ -1,5 +1,6 @@
 package com.example.weglow.ui.screens
 
+import com.example.weglow.domain.model.Gender
 import com.example.weglow.ui.theme.*
 import com.example.weglow.ui.components.WeGlowOnboardingLayout
 import androidx.compose.foundation.background
@@ -15,9 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-
-private val GENDER_OPTIONS = listOf("Female", "Male", "Other/Prefer not to say")
 
 @Composable
 fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
@@ -66,7 +64,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            GENDER_OPTIONS.forEach { option ->
+            Gender.OPTIONS.forEach { option ->
                 val isSelected = option == selected
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

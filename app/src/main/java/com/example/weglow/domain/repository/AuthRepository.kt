@@ -36,4 +36,12 @@ interface AuthRepository {
      * never a fabricated value and never a name supplied by the UI layer.
      */
     fun currentUserDisplayName(): String?
+
+    /**
+     * The authenticated identity's own account email, straight from the auth
+     * session (never a value supplied by the UI). Read-only display use only -
+     * this repository has no email-change operation, since the existing
+     * authentication architecture does not support changing it.
+     */
+    fun currentUserEmail(): String?
 }

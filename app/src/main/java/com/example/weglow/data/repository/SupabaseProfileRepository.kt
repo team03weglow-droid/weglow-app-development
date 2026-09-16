@@ -32,7 +32,10 @@ class SupabaseProfileRepository(
             .isOnboardingCompleted()
     }
 
-    override suspend fun updateProfileImagePath(userId: String, path: String?): Result<Unit> = runCatching {
+    override suspend fun updateProfileImagePath(
+        userId: String,
+        path: String?,
+    ): Result<Unit> = runCatching {
         client.postgrest["profiles"].update(
             update = { set("profile_image_url", path) },
         ) {
@@ -41,7 +44,10 @@ class SupabaseProfileRepository(
         Unit
     }
 
-    override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> = runCatching {
+    override suspend fun updateFaceShape(
+        userId: String,
+        faceShape: String,
+    ): Result<Unit> = runCatching {
         client.postgrest["profiles"].update(
             update = { set("face_shape", faceShape) },
         ) {
@@ -50,7 +56,11 @@ class SupabaseProfileRepository(
         Unit
     }
 
-    override suspend fun updateScanSummary(userId: String, concerns: String, scannedAt: Instant): Result<Unit> = runCatching {
+    override suspend fun updateScanSummary(
+        userId: String,
+        concerns: String,
+        scannedAt: Instant,
+    ): Result<Unit> = runCatching {
         client.postgrest["profiles"].update(
             update = {
                 set("skin_concerns", concerns)
@@ -62,7 +72,13 @@ class SupabaseProfileRepository(
         Unit
     }
 
-    override suspend fun updateEnvironment(userId: String, uvIndex: Double, uvCategory: String, humidity: Int, locationName: String): Result<Unit> = runCatching {
+    override suspend fun updateEnvironment(
+        userId: String,
+        uvIndex: Double,
+        uvCategory: String,
+        humidity: Int,
+        locationName: String,
+    ): Result<Unit> = runCatching {
         client.postgrest["profiles"].update(
             update = {
                 set("uv_index", uvIndex)
@@ -70,6 +86,23 @@ class SupabaseProfileRepository(
                 set("humidity", humidity)
                 set("location_name", locationName)
             },
+        ) {
+            filter { eq("id", userId) }
+        }
+        Unit
+    }
+
+    /**
+     * Targeted single-column update, mirroring [updateProfileImagePath]: a Profile-initiated
+     * gender change can never blank out the rest of the profile row, and the per-user UPDATE
+     * RLS policy still confines the write to `auth.uid() = id`.
+     */
+    override suspend fun updateGender(
+        userId: String,
+        gender: String,
+    ): Result<Unit> = runCatching {
+        client.postgrest["profiles"].update(
+            update = { set("gender", gender) },
         ) {
             filter { eq("id", userId) }
         }

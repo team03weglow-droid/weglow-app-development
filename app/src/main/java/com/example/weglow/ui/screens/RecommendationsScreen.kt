@@ -131,7 +131,7 @@ private fun contextSummary(result: RecommendationResult): String {
 }
 
 @Composable
-private fun RecommendationCard(recommendation: ProductRecommendation) {
+internal fun RecommendationCard(recommendation: ProductRecommendation) {
     val product = recommendation.product
     Row(
         modifier = Modifier

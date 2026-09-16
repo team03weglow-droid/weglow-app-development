@@ -15,8 +15,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,9 +39,12 @@ import com.example.weglow.ui.components.WeGlowProductImage
 import com.example.weglow.ui.components.rememberDecodedBitmap
 import com.example.weglow.ui.theme.*
 import com.example.weglow.domain.model.Product
+import com.example.weglow.domain.model.ProductRecommendation
 
 
-private val CATEGORIES = listOf("All Products", "Trending", "Serums", "Moisturizers", "Hair")
+private const val ALL_PRODUCTS_CATEGORY = "All Products"
+private const val FOR_YOU_CATEGORY = "For You"
+private val CATEGORIES = listOf(ALL_PRODUCTS_CATEGORY, FOR_YOU_CATEGORY, "Trending", "Serums", "Moisturizers", "Hair")
 private enum class ProductViewMode { Gallery, List }
 
 internal fun matchesPriceRange(priceLkr: Double?, minimumPrice: Double?, maximumPrice: Double?): Boolean {
@@ -56,34 +62,60 @@ fun DiscoverScreen(
     errorMessage: String?,
     onRetry: () -> Unit,
     profileImage: ByteArray? = null,
+    productRecommendations: List<ProductRecommendation> = emptyList(),
+    recommendationsLoading: Boolean = false,
+    recommendationsErrorMessage: String? = null,
+    onRecommendationsRetry: () -> Unit = {},
+    /** [Product.catalogNo] values the current user has already saved. */
+    savedProductNumbers: Set<Int> = emptySet(),
+    /** [Product.catalogNo] values with a save/unsave currently in flight. */
+    pendingSaveProductNumbers: Set<Int> = emptySet(),
+    onToggleSaved: (Product) -> Unit = {},
+    /** [Product.catalogNo] values with an add-to-cart currently in flight. */
+    pendingCartProductNumbers: Set<Int> = emptySet(),
+    onAddToCart: (Product) -> Unit = {},
+    onCartClick: () -> Unit = {},
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("All Products") }
+    var selectedCategory by remember { mutableStateOf(ALL_PRODUCTS_CATEGORY) }
     var viewMode by remember { mutableStateOf(ProductViewMode.Gallery) }
     var showPriceFilter by remember { mutableStateOf(false) }
     var minimumPrice by remember { mutableStateOf<Double?>(null) }
     var maximumPrice by remember { mutableStateOf<Double?>(null) }
+    val recommendedProducts = remember(productRecommendations) {
+        productRecommendations.map { recommendation -> recommendation.product }
+    }
     val filteredProducts = remember(
         products,
+        recommendedProducts,
         searchQuery,
         selectedCategory,
         minimumPrice,
         maximumPrice,
     ) {
-        products.filter { product ->
+        val visibleProducts = if (selectedCategory == FOR_YOU_CATEGORY) recommendedProducts else products
+        visibleProducts.filter { product ->
             val matchesSearch = searchQuery.isBlank() || listOfNotNull(
                 product.name,
                 product.brandName,
                 product.description,
                 product.category,
             ).any { it.contains(searchQuery.trim(), ignoreCase = true) }
-            val matchesCategory = selectedCategory == "All Products" ||
+            val matchesCategory = selectedCategory == ALL_PRODUCTS_CATEGORY ||
+                selectedCategory == FOR_YOU_CATEGORY ||
                 product.category?.contains(selectedCategory.removeSuffix("s"), ignoreCase = true) == true
             val matchesPrice = matchesPriceRange(product.priceLkr, minimumPrice, maximumPrice)
             matchesSearch && matchesCategory && matchesPrice
         }
     }
     val featuredProduct = filteredProducts.firstOrNull()
+    val filteredProductIds = remember(filteredProducts) { filteredProducts.mapTo(mutableSetOf()) { it.id } }
+    val filteredRecommendations = remember(productRecommendations, filteredProductIds) {
+        productRecommendations.filter { recommendation -> recommendation.product.id in filteredProductIds }
+    }
+    val visibleProductsAreLoading = if (selectedCategory == FOR_YOU_CATEGORY) recommendationsLoading else isLoading
+    val visibleProductsError = if (selectedCategory == FOR_YOU_CATEGORY) recommendationsErrorMessage else errorMessage
+    val retryVisibleProducts = if (selectedCategory == FOR_YOU_CATEGORY) onRecommendationsRetry else onRetry
 
     if (showPriceFilter) {
         PriceFilterDialog(
@@ -126,7 +158,15 @@ fun DiscoverScreen(
                     contentDescription = null,
                     modifier = Modifier.size(24.dp)
                 )
-                ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 36.dp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onCartClick,
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(Icons.Default.ShoppingCart, contentDescription = "Open cart", tint = DarkGreen)
+                    }
+                    ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 36.dp)
+                }
             }
         }
 
@@ -220,15 +260,13 @@ fun DiscoverScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            Row(
+            if (selectedCategory != FOR_YOU_CATEGORY) {
+                Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
                 Text(
-                    // This section is not personalized from the signed-in user's real skin
-                    // type (that lives in Recommendations, driven by RecommendationEngine) -
-                    // it must never claim a specific skin type it hasn't actually matched.
                     "Featured Products",
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextBlack,
@@ -263,8 +301,6 @@ fun DiscoverScreen(
                     ) {
                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = DarkGreen, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        // No real per-user match score is computed here; a specific percentage
-                        // would be fabricated, so this only claims "Featured" placement.
                         Text("Featured", style = MaterialTheme.typography.bodySmall, color = TextBlack)
                     }
                 }
@@ -282,37 +318,51 @@ fun DiscoverScreen(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(product.priceLabel, style = MaterialTheme.typography.titleMedium, color = TextBlack)
-                    WeGlowPlannedFeature("Add to Bag")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    val isAddingToCart = product.catalogNo != null && product.catalogNo in pendingCartProductNumbers
+                    Button(
+                        onClick = { onAddToCart(product) },
+                        enabled = product.catalogNo != null && !isAddingToCart,
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = Color.White),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        if (isAddingToCart) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else {
+                            Text("Add to Bag", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
                 }
             } }
 
-            Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(32.dp))
+            }
 
-            WeGlowPlannedFeature("Perfect Pairing")
-            Spacer(Modifier.height(16.dp))
             Text(
-                "All Products (${filteredProducts.size})",
+                "${if (selectedCategory == FOR_YOU_CATEGORY) FOR_YOU_CATEGORY else ALL_PRODUCTS_CATEGORY} (${filteredProducts.size})",
                 style = MaterialTheme.typography.headlineMedium,
                 color = TextBlack,
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (isLoading) {
+            if (visibleProductsAreLoading) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(color = DarkGreen)
                 }
-            } else if (errorMessage != null) {
+            } else if (visibleProductsError != null) {
                 ProductLoadMessage(
-                    message = "We couldn't load products. $errorMessage",
+                    message = "We couldn't load products. $visibleProductsError",
                     actionLabel = "Try again",
-                    onAction = onRetry,
+                    onAction = retryVisibleProducts,
                 )
             } else if (filteredProducts.isEmpty()) {
                 ProductLoadMessage(
-                    message = if (products.isEmpty()) {
+                    message = if (selectedCategory == FOR_YOU_CATEGORY) {
+                        "No recommended products are available yet."
+                    } else if (products.isEmpty()) {
                         "No products are available yet."
                     } else {
                         "No products match your search."
@@ -322,28 +372,42 @@ fun DiscoverScreen(
             }
         }
 
-        items(
-            items = if (viewMode == ProductViewMode.Gallery) {
-                filteredProducts.chunked(2)
-            } else {
-                filteredProducts.map(::listOf)
-            },
-            key = { rowItems -> rowItems.joinToString(separator = "|") { it.id } },
-        ) { rowItems ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            ) {
-                if (viewMode == ProductViewMode.Gallery) {
-                    rowItems.forEach { product ->
-                        ProductGridCard(product = product, modifier = Modifier.weight(1f))
-                    }
-                    if (rowItems.size < 2) Spacer(modifier = Modifier.weight(1f))
-                } else {
-                    ProductListCard(product = rowItems.first())
+        if (selectedCategory == FOR_YOU_CATEGORY) {
+            items(filteredRecommendations, key = { recommendation -> recommendation.product.id }) { recommendation ->
+                Box(Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+                    RecommendationCard(recommendation)
                 }
             }
-            Spacer(modifier = Modifier.height(20.dp))
+        } else {
+            items(
+                items = if (viewMode == ProductViewMode.Gallery) {
+                    filteredProducts.chunked(2)
+                } else {
+                    filteredProducts.map(::listOf)
+                },
+                key = { rowItems -> rowItems.joinToString(separator = "|") { it.id } },
+            ) { rowItems ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                ) {
+                    if (viewMode == ProductViewMode.Gallery) {
+                        rowItems.forEach { product ->
+                            ProductGridCard(
+                                product = product,
+                                isSaved = product.catalogNo != null && product.catalogNo in savedProductNumbers,
+                                isSavePending = product.catalogNo != null && product.catalogNo in pendingSaveProductNumbers,
+                                onToggleSaved = { onToggleSaved(product) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (rowItems.size < 2) Spacer(modifier = Modifier.weight(1f))
+                    } else {
+                        ProductListCard(product = rowItems.first())
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
         }
 
         item {
@@ -353,7 +417,13 @@ fun DiscoverScreen(
 }
 
 @Composable
-private fun ProductGridCard(product: Product, modifier: Modifier = Modifier) {
+private fun ProductGridCard(
+    product: Product,
+    isSaved: Boolean,
+    isSavePending: Boolean,
+    onToggleSaved: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier) {
         Box {
             WeGlowProductImage(
@@ -366,23 +436,64 @@ private fun ProductGridCard(product: Product, modifier: Modifier = Modifier) {
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
-        product.ratingLabel?.let { rating ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Star, contentDescription = null, tint = WarmGold, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(rating, style = MaterialTheme.typography.bodySmall, color = TextBlack)
+        Box(modifier = Modifier.height(18.dp)) {
+            product.ratingLabel?.let { rating ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = WarmGold, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(rating, style = MaterialTheme.typography.bodySmall, color = TextBlack)
+                }
             }
-            Spacer(modifier = Modifier.height(2.dp))
         }
-        product.brandName?.let { brand ->
-            Text(brand, style = MaterialTheme.typography.labelSmall, color = SoftGray)
-            Spacer(modifier = Modifier.height(2.dp))
+        Box(modifier = Modifier.height(16.dp)) {
+            product.brandName?.let { brand ->
+                Text(brand, style = MaterialTheme.typography.labelSmall, color = SoftGray)
+            }
         }
-        Text(product.name, style = MaterialTheme.typography.titleSmall, color = TextBlack)
+        Text(
+            product.name,
+            modifier = Modifier.height(40.dp),
+            style = MaterialTheme.typography.titleSmall,
+            color = TextBlack,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         Spacer(modifier = Modifier.height(2.dp))
         Text(product.priceLabel, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
         Spacer(Modifier.height(8.dp))
-        WeGlowPlannedFeature("Save")
+        SaveToggleRow(
+            isSaved = isSaved,
+            isPending = isSavePending,
+            enabled = product.catalogNo != null,
+            onClick = onToggleSaved,
+        )
+    }
+}
+
+@Composable
+private fun SaveToggleRow(isSaved: Boolean, isPending: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clickable(enabled = enabled && !isPending, onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (isPending) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = DarkGreen)
+        } else {
+            Icon(
+                if (isSaved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = if (isSaved) "Remove from saved products" else "Save product",
+                tint = if (isSaved) LogoutRed else SoftGray,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            if (isSaved) "Saved" else "Save",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isSaved) LogoutRed else SoftGray,
+        )
     }
 }
 

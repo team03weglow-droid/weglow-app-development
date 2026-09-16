@@ -79,6 +79,9 @@ class SupabaseAuthRepository(
             .firstOrNull { it.isNotBlank() }
     }
 
+    override fun currentUserEmail(): String? =
+        client.auth.currentUserOrNull()?.email?.trim()?.takeIf(String::isNotEmpty)
+
     private companion object {
         val DISPLAY_NAME_KEYS = listOf("full_name", "name", "user_name", "preferred_username")
     }

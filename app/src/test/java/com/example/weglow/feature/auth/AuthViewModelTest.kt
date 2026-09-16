@@ -378,4 +378,9 @@ private class FakeProfileRepository(
 
     override suspend fun updateEnvironment(userId: String, uvIndex: Double, uvCategory: String, humidity: Int, locationName: String): Result<Unit> =
         Result.success(Unit)
-}
+
+    override suspend fun updateGender(
+        userId: String,
+        gender: String,
+    ): Result<Unit> =
+        Result.success(Unit)}

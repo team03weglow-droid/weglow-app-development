@@ -12,6 +12,7 @@ import com.example.weglow.domain.model.ScanFailure
 import com.example.weglow.domain.model.ScanFailureException
 import com.example.weglow.domain.repository.AcneScanRepository
 import com.example.weglow.domain.repository.HairstyleRepository
+import com.example.weglow.domain.repository.ScanProfileRepository
 import com.example.weglow.feature.hairstyle.HairstyleViewModel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Instant
 
 /**
  * Covers the Scan destination's workflow/state machine now that it lives in
@@ -78,7 +80,7 @@ class ScanFlowViewModelTest {
 
     @Test fun photoReadyMovesToAnalyzingAndSetsThePhotoRegardlessOfMode() = runTest(dispatcher) {
         var acneCalls = 0
-        val scan = ScanViewModel(fakeAcneRepository { acneCalls++; Result.success(acneResult) })
+        val scan = ScanViewModel(fakeAcneRepository { acneCalls++; Result.success(acneResult) }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> Result.success(hairstyleResult) }, fakeValidator())
         val viewModel = ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
         viewModel.selectMode(ScanMode.HAIRSTYLE)
@@ -94,7 +96,7 @@ class ScanFlowViewModelTest {
 
     @Test fun acneProcessingProgressesThroughAnalyzingToSuccess() = runTest(dispatcher) {
         val prediction = CompletableDeferred<Result<AcneScanResult>>()
-        val scan = ScanViewModel(fakeAcneRepository { prediction.await() })
+        val scan = ScanViewModel(fakeAcneRepository { prediction.await() }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> Result.success(hairstyleResult) }, fakeValidator())
         val viewModel = ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
         viewModel.selectMode(ScanMode.ACNE)
@@ -111,7 +113,7 @@ class ScanFlowViewModelTest {
 
     @Test fun hairstyleProcessingProgressesThroughAnalyzingToSuccess() = runTest(dispatcher) {
         val prediction = CompletableDeferred<Result<HairstyleResult>>()
-        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) })
+        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> prediction.await() }, fakeValidator())
         val viewModel = ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
         viewModel.selectMode(ScanMode.HAIRSTYLE)
@@ -127,7 +129,7 @@ class ScanFlowViewModelTest {
     }
 
     @Test fun acneSuccessProducesExactlyOneNavigationEffect() = runTest(dispatcher) {
-        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) })
+        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> Result.success(hairstyleResult) }, fakeValidator())
         val viewModel = ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
         val (effects, collectorJob) = startEffectCollector(viewModel)
@@ -141,7 +143,7 @@ class ScanFlowViewModelTest {
     }
 
     @Test fun hairstyleSuccessProducesExactlyOneNavigationEffect() = runTest(dispatcher) {
-        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) })
+        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> Result.success(hairstyleResult) }, fakeValidator())
         val viewModel = ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
         val (effects, collectorJob) = startEffectCollector(viewModel)
@@ -155,7 +157,7 @@ class ScanFlowViewModelTest {
     }
 
     @Test fun failureDoesNotNavigate() = runTest(dispatcher) {
-        val scan = ScanViewModel(fakeAcneRepository { Result.failure(ScanFailureException(ScanFailure.InvalidImage)) })
+        val scan = ScanViewModel(fakeAcneRepository { Result.failure(ScanFailureException(ScanFailure.InvalidImage)) }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> Result.success(hairstyleResult) }, fakeValidator())
         val viewModel = ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
         val (effects, collectorJob) = startEffectCollector(viewModel)
@@ -173,7 +175,7 @@ class ScanFlowViewModelTest {
         var shouldFail = true
         val scan = ScanViewModel(fakeAcneRepository {
             if (shouldFail) Result.failure(ScanFailureException(ScanFailure.InvalidImage)) else Result.success(acneResult)
-        })
+        }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> Result.success(hairstyleResult) }, fakeValidator())
         val viewModel = ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
         val (effects, collectorJob) = startEffectCollector(viewModel)
@@ -193,7 +195,7 @@ class ScanFlowViewModelTest {
 
     @Test fun cancelDuringAnalysisReturnsToCameraAndSuppressesTheAlreadyScheduledCompletion() = runTest(dispatcher) {
         val prediction = CompletableDeferred<Result<AcneScanResult>>()
-        val scan = ScanViewModel(fakeAcneRepository { prediction.await() })
+        val scan = ScanViewModel(fakeAcneRepository { prediction.await() }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> Result.success(hairstyleResult) }, fakeValidator())
         val viewModel = ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
         val (effects, collectorJob) = startEffectCollector(viewModel)
@@ -214,7 +216,7 @@ class ScanFlowViewModelTest {
     }
 
     @Test fun resetFlowStartsASecondScanFromCleanState() = runTest(dispatcher) {
-        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) })
+        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> Result.success(hairstyleResult) }, fakeValidator())
         val viewModel = ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
         viewModel.selectMode(ScanMode.HAIRSTYLE)
@@ -228,7 +230,7 @@ class ScanFlowViewModelTest {
 
     @Test fun duplicateAnalyzeActionsDoNotCreateDuplicateFlowProgression() = runTest(dispatcher) {
         var calls = 0
-        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) })
+        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(
             fakeHairstyleRepository { _, _ -> calls++; Result.success(hairstyleResult) },
             fakeValidator(),
@@ -247,7 +249,7 @@ class ScanFlowViewModelTest {
     }
 
     @Test fun navigationEffectIsOneShotAndIsNeverReplayedToALateObserver() = runTest(dispatcher) {
-        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) })
+        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> Result.success(hairstyleResult) }, fakeValidator())
         val viewModel = ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
         viewModel.selectMode(ScanMode.ACNE)
@@ -260,7 +262,7 @@ class ScanFlowViewModelTest {
     }
 
     @Test fun typedHairstyleFailureStillReachesTheUnderlyingUiStateThroughTheCoordinator() = runTest(dispatcher) {
-        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) })
+        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(
             fakeHairstyleRepository { _, _ -> Result.failure(HairstyleFailureException(HairstyleFailure.NotSignedIn)) },
             fakeValidator(),
@@ -293,13 +295,21 @@ class ScanFlowViewModelTest {
     }
 
     private fun flowViewModel(): ScanFlowViewModel {
-        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) })
+        val scan = ScanViewModel(fakeAcneRepository { Result.success(acneResult) }, fakeScanProfileRepository())
         val hairstyle = HairstyleViewModel(fakeHairstyleRepository { _, _ -> Result.success(hairstyleResult) }, fakeValidator())
         return ScanFlowViewModel(scan, hairstyle, elapsedRealtimeMs = { 0L })
     }
 
     private fun fakeAcneRepository(block: suspend () -> Result<AcneScanResult>) = object : AcneScanRepository {
         override suspend fun analyze(photoReference: String) = block()
+    }
+
+    // ScanViewModel now persists a completed acne scan through ScanProfileRepository (see
+    // ScanViewModelTest for the same convention); this coordinator-level suite only needs a
+    // no-op success so persistence never interferes with the flow-state assertions below.
+    private fun fakeScanProfileRepository() = object : ScanProfileRepository {
+        override suspend fun saveScanResult(result: AcneScanResult, scannedAt: Instant): Result<Unit> =
+            Result.success(Unit)
     }
 
     private fun fakeHairstyleRepository(

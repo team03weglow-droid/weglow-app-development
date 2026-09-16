@@ -4,6 +4,7 @@ import com.example.weglow.domain.model.AcneScanResult
 import com.example.weglow.domain.model.ScanFailure
 import com.example.weglow.domain.model.ScanFailureException
 import com.example.weglow.domain.repository.AcneScanRepository
+import com.example.weglow.domain.repository.ScanProfileRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -15,6 +16,8 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
+import java.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScanViewModelTest {
@@ -26,7 +29,7 @@ class ScanViewModelTest {
 
     @Test fun waitsForPredictionAndAcceptsNoDetections() = runTest(dispatcher) {
         val prediction = CompletableDeferred<AcneScanResult>()
-        val viewModel = ScanViewModel(repository { prediction.await() })
+        val viewModel = viewModel { prediction.await() }
         viewModel.analyzeReference("photo")
         dispatcher.scheduler.runCurrent()
         assertTrue(viewModel.uiState.value.isAnalyzing)
@@ -39,9 +42,9 @@ class ScanViewModelTest {
 
     @Test fun failedScanCanBeRetriedWithoutStaleResults() = runTest(dispatcher) {
         var fail = true
-        val viewModel = ScanViewModel(repositoryResult {
+        val viewModel = viewModelResult {
             if (fail) Result.failure(ScanFailureException(ScanFailure.InvalidImage)) else Result.success(emptyResult)
-        })
+        }
         viewModel.analyzeReference("photo")
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(
@@ -64,7 +67,7 @@ class ScanViewModelTest {
             ScanFailure.Unknown to "Analysis failed. Please retry or choose another photo.",
         )
         expected.forEach { (failure, message) ->
-            val viewModel = ScanViewModel(repositoryResult { Result.failure(ScanFailureException(failure)) })
+            val viewModel = viewModelResult { Result.failure(ScanFailureException(failure)) }
             viewModel.analyzeReference("photo")
             dispatcher.scheduler.advanceUntilIdle()
             assertEquals(message, viewModel.uiState.value.error)
@@ -76,7 +79,7 @@ class ScanViewModelTest {
         val viewModel = ScanViewModel(object : AcneScanRepository {
             override suspend fun analyze(photoReference: String): Result<AcneScanResult> =
                 throw RuntimeException(secret)
-        })
+        }, scanProfileRepository())
         viewModel.analyzeReference("photo")
         dispatcher.scheduler.advanceUntilIdle()
         val error = viewModel.uiState.value.error
@@ -87,7 +90,7 @@ class ScanViewModelTest {
 
     @Test fun repositoryFailureResultAlsoNeverExposesRawMessage() = runTest(dispatcher) {
         val secret = "SQL error near line 42"
-        val viewModel = ScanViewModel(repositoryResult { Result.failure(RuntimeException(secret)) })
+        val viewModel = viewModelResult { Result.failure(RuntimeException(secret)) }
         viewModel.analyzeReference("photo")
         dispatcher.scheduler.advanceUntilIdle()
         val error = viewModel.uiState.value.error
@@ -98,7 +101,7 @@ class ScanViewModelTest {
 
     @Test fun cancellationDoesNotPublishLateResults() = runTest(dispatcher) {
         val prediction = CompletableDeferred<AcneScanResult>()
-        val viewModel = ScanViewModel(repository { prediction.await() })
+        val viewModel = viewModel { prediction.await() }
         viewModel.analyzeReference("photo")
         dispatcher.scheduler.runCurrent()
         viewModel.cancelAnalysis()
@@ -111,12 +114,10 @@ class ScanViewModelTest {
 
     @Test fun validPhotoContinuesToAcneRepository() = runTest(dispatcher) {
         var repositoryCalls = 0
-        val viewModel = ScanViewModel(
-            repository {
-                repositoryCalls++
-                emptyResult
-            },
-        )
+        val viewModel = viewModel {
+            repositoryCalls++
+            emptyResult
+        }
 
         viewModel.analyzeReference("photo")
         dispatcher.scheduler.advanceUntilIdle()
@@ -128,12 +129,10 @@ class ScanViewModelTest {
     @Test fun duplicateAnalyzeRequestIsIgnoredWhileAnalysisIsRunning() = runTest(dispatcher) {
         val prediction = CompletableDeferred<AcneScanResult>()
         var repositoryCalls = 0
-        val viewModel = ScanViewModel(
-            repository {
-                repositoryCalls++
-                prediction.await()
-            },
-        )
+        val viewModel = viewModel {
+            repositoryCalls++
+            prediction.await()
+        }
 
         viewModel.analyzeReference("photo")
         dispatcher.scheduler.runCurrent()
@@ -147,7 +146,7 @@ class ScanViewModelTest {
 
     @Test fun acneAnalysisDoesNotPerformFaceValidation() = runTest(dispatcher) {
         val prediction = CompletableDeferred<AcneScanResult>()
-        val viewModel = ScanViewModel(repository { prediction.await() })
+        val viewModel = viewModel { prediction.await() }
         viewModel.analyzeReference("photo")
         dispatcher.scheduler.runCurrent()
         assertTrue(viewModel.uiState.value.isAnalyzing)
@@ -155,6 +154,54 @@ class ScanViewModelTest {
         prediction.complete(emptyResult)
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(emptyResult, viewModel.uiState.value.result)
+    }
+
+    @Test fun completedAcneScan_isPersistedExactlyOnceBeforePublishingResult() = runTest(dispatcher) {
+        var saves = 0
+        val viewModel = ScanViewModel(
+            repository { emptyResult },
+            object : ScanProfileRepository {
+                override suspend fun saveScanResult(result: AcneScanResult, scannedAt: Instant): Result<Unit> {
+                    saves++
+                    return Result.success(Unit)
+                }
+            },
+        )
+
+        viewModel.analyzeReference("photo")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, saves)
+        assertEquals(emptyResult, viewModel.uiState.value.result)
+        assertEquals(ScanSaveState.Saved, viewModel.uiState.value.saveState)
+    }
+
+    @Test fun failedPersistence_keepsCompletedResultVisible() = runTest(dispatcher) {
+        val viewModel = ScanViewModel(
+            repository { emptyResult },
+            object : ScanProfileRepository {
+                override suspend fun saveScanResult(result: AcneScanResult, scannedAt: Instant) =
+                    Result.failure<Unit>(IOException("network unavailable"))
+            },
+        )
+
+        viewModel.analyzeReference("photo")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(emptyResult, viewModel.uiState.value.result)
+        assertTrue(viewModel.uiState.value.saveState is ScanSaveState.Failed)
+    }
+
+    private fun viewModel(block: suspend () -> AcneScanResult) = ScanViewModel(
+        repository(block),
+        scanProfileRepository(),
+    )
+
+    private fun viewModelResult(block: suspend () -> Result<AcneScanResult>) =
+        ScanViewModel(repositoryResult(block), scanProfileRepository())
+
+    private fun scanProfileRepository() = object : ScanProfileRepository {
+        override suspend fun saveScanResult(result: AcneScanResult, scannedAt: Instant) = Result.success(Unit)
     }
 
     private fun repository(block: suspend () -> AcneScanResult) = object : AcneScanRepository {

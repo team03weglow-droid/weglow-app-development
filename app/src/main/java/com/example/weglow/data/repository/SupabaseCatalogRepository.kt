@@ -88,6 +88,10 @@ internal fun JsonObject.toProductOrNull(): Product? {
         targetSkinType = text("target_skin_type", "skin_type_target", "suitable_skin_type"),
         targetConcerns = text("target_concerns", "concern", "concerns", "skin_concerns"),
         texture = text("texture", "product_texture"),
+        // The confirmed live column is the quoted identifier "No" (smallint primary key).
+        // "no"/"row_no" are only defensive fallbacks for a differently-cased export; unlike
+        // the `id` candidates above, this is never parsed out of Product_ID or any other text.
+        catalogNo = text("No", "no", "row_no")?.toIntOrNull(),
     )
 }
 

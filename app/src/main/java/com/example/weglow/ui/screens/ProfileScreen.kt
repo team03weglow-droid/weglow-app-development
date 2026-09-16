@@ -15,12 +15,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -74,6 +76,8 @@ fun ProfileScreen(
     onRoutinesClick: () -> Unit = {},
     onDiscoverClick: () -> Unit = {},
     onRecommendationsClick: () -> Unit = {},
+    onAccountSettingsClick: () -> Unit = {},
+    onSavedProductsClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -345,10 +349,16 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
+            // Saved Products and Order History require Supabase tables that do not exist yet
+            // (see the proposed schema in this feature's investigation report) - it stays an
+            // honest "coming soon" placeholder rather than navigating somewhere with no real
+            // data behind it. Saved Products and Account Settings both need no new schema
+            // beyond what is already backed (saved_products is live; Account Settings only
+            // reuses the existing profiles/auth data already loaded by ProfileViewModel), so
+            // both are real below.
             WeGlowPlannedFeature("Order History")
-            WeGlowPlannedFeature("Saved Products")
-            WeGlowPlannedFeature("Account Settings")
             Spacer(Modifier.height(20.dp))
+
             Text("Quick links", style = MaterialTheme.typography.headlineSmall, color = TextBlack, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(14.dp))
             Column(
@@ -357,6 +367,10 @@ fun ProfileScreen(
                     .clip(RoundedCornerShape(16.dp))
                     .background(CardWhite)
             ) {
+                SettingsRow(icon = Icons.Default.Settings, label = "Account Settings", onClick = onAccountSettingsClick)
+                HorizontalDivider(color = TrackGray)
+                SettingsRow(icon = Icons.Default.BookmarkBorder, label = "Saved Products", onClick = onSavedProductsClick)
+                HorizontalDivider(color = TrackGray)
                 SettingsRow(icon = Icons.Default.CameraAlt, label = "Analyze skin", onClick = onScanClick)
                 HorizontalDivider(color = TrackGray)
                 SettingsRow(icon = Icons.Default.FavoriteBorder, label = "Recommendations", onClick = onRecommendationsClick)
