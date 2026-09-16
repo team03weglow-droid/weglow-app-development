@@ -36,6 +36,7 @@ import com.example.weglow.ui.components.WeGlowProductImage
 import com.example.weglow.ui.components.rememberDecodedBitmap
 import com.example.weglow.ui.theme.*
 import com.example.weglow.domain.model.Product
+import com.example.weglow.domain.model.ProductRecommendation
 
 
 private const val ALL_PRODUCTS_CATEGORY = "All Products"
@@ -58,7 +59,7 @@ fun DiscoverScreen(
     errorMessage: String?,
     onRetry: () -> Unit,
     profileImage: ByteArray? = null,
-    recommendedProducts: List<Product> = emptyList(),
+    productRecommendations: List<ProductRecommendation> = emptyList(),
     recommendationsLoading: Boolean = false,
     recommendationsErrorMessage: String? = null,
     onRecommendationsRetry: () -> Unit = {},
@@ -69,6 +70,9 @@ fun DiscoverScreen(
     var showPriceFilter by remember { mutableStateOf(false) }
     var minimumPrice by remember { mutableStateOf<Double?>(null) }
     var maximumPrice by remember { mutableStateOf<Double?>(null) }
+    val recommendedProducts = remember(productRecommendations) {
+        productRecommendations.map { recommendation -> recommendation.product }
+    }
     val filteredProducts = remember(
         products,
         recommendedProducts,
@@ -93,6 +97,10 @@ fun DiscoverScreen(
         }
     }
     val featuredProduct = filteredProducts.firstOrNull()
+    val filteredProductIds = remember(filteredProducts) { filteredProducts.mapTo(mutableSetOf()) { it.id } }
+    val filteredRecommendations = remember(productRecommendations, filteredProductIds) {
+        productRecommendations.filter { recommendation -> recommendation.product.id in filteredProductIds }
+    }
     val visibleProductsAreLoading = if (selectedCategory == FOR_YOU_CATEGORY) recommendationsLoading else isLoading
     val visibleProductsError = if (selectedCategory == FOR_YOU_CATEGORY) recommendationsErrorMessage else errorMessage
     val retryVisibleProducts = if (selectedCategory == FOR_YOU_CATEGORY) onRecommendationsRetry else onRetry
@@ -232,15 +240,13 @@ fun DiscoverScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            Row(
+            if (selectedCategory != FOR_YOU_CATEGORY) {
+                Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
                 Text(
-                    // This section is not personalized from the signed-in user's real skin
-                    // type (that lives in Recommendations, driven by RecommendationEngine) -
-                    // it must never claim a specific skin type it hasn't actually matched.
                     "Featured Products",
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextBlack,
@@ -275,8 +281,6 @@ fun DiscoverScreen(
                     ) {
                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = DarkGreen, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        // No real per-user match score is computed here; a specific percentage
-                        // would be fabricated, so this only claims "Featured" placement.
                         Text("Featured", style = MaterialTheme.typography.bodySmall, color = TextBlack)
                     }
                 }
@@ -298,10 +302,9 @@ fun DiscoverScreen(
                 }
             } }
 
-            Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(32.dp))
+            }
 
-            WeGlowPlannedFeature("Perfect Pairing")
-            Spacer(Modifier.height(16.dp))
             Text(
                 "${if (selectedCategory == FOR_YOU_CATEGORY) FOR_YOU_CATEGORY else ALL_PRODUCTS_CATEGORY} (${filteredProducts.size})",
                 style = MaterialTheme.typography.headlineMedium,
@@ -336,28 +339,36 @@ fun DiscoverScreen(
             }
         }
 
-        items(
-            items = if (viewMode == ProductViewMode.Gallery) {
-                filteredProducts.chunked(2)
-            } else {
-                filteredProducts.map(::listOf)
-            },
-            key = { rowItems -> rowItems.joinToString(separator = "|") { it.id } },
-        ) { rowItems ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            ) {
-                if (viewMode == ProductViewMode.Gallery) {
-                    rowItems.forEach { product ->
-                        ProductGridCard(product = product, modifier = Modifier.weight(1f))
-                    }
-                    if (rowItems.size < 2) Spacer(modifier = Modifier.weight(1f))
-                } else {
-                    ProductListCard(product = rowItems.first())
+        if (selectedCategory == FOR_YOU_CATEGORY) {
+            items(filteredRecommendations, key = { recommendation -> recommendation.product.id }) { recommendation ->
+                Box(Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+                    RecommendationCard(recommendation)
                 }
             }
-            Spacer(modifier = Modifier.height(20.dp))
+        } else {
+            items(
+                items = if (viewMode == ProductViewMode.Gallery) {
+                    filteredProducts.chunked(2)
+                } else {
+                    filteredProducts.map(::listOf)
+                },
+                key = { rowItems -> rowItems.joinToString(separator = "|") { it.id } },
+            ) { rowItems ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                ) {
+                    if (viewMode == ProductViewMode.Gallery) {
+                        rowItems.forEach { product ->
+                            ProductGridCard(product = product, modifier = Modifier.weight(1f))
+                        }
+                        if (rowItems.size < 2) Spacer(modifier = Modifier.weight(1f))
+                    } else {
+                        ProductListCard(product = rowItems.first())
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
         }
 
         item {
