@@ -703,10 +703,9 @@ fun WeGlowApp() {
                     errorMessage = discoverState.errorMessage,
                     onRetry = discoverViewModel::loadProducts,
                     profileImage = profileState.profileImage,
-                    recommendedProducts = recommendationState.result
+                    productRecommendations = recommendationState.result
                         ?.recommendations
-                        .orEmpty()
-                        .map { recommendation -> recommendation.product },
+                        .orEmpty(),
                     recommendationsLoading = recommendationState.isLoading,
                     recommendationsErrorMessage = recommendationState.errorMessage,
                     onRecommendationsRetry = {
