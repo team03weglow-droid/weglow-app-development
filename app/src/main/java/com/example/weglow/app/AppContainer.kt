@@ -22,6 +22,7 @@ import com.example.weglow.domain.repository.ProfileImageRepository
 import com.example.weglow.domain.repository.ProfileRepository
 import com.example.weglow.domain.repository.ScanProfileRepository
 import com.example.weglow.domain.repository.EnvironmentRepository
+import io.github.jan.supabase.auth.auth
 
 /**
  * Application-level dependency container.
@@ -101,7 +102,9 @@ class AppContainer {
             profileRepository = profileRepository,
         ).also { hairstyleRepositoryInstance = it }
 
-    fun environmentRepository(): EnvironmentRepository = WeatherApiEnvironmentRepository()
+    fun environmentRepository(): EnvironmentRepository = WeatherApiEnvironmentRepository(
+        accessTokenProvider = { supabaseClient.auth.currentAccessTokenOrNull() },
+    )
 
     fun locationProvider(context: Context) = AndroidLocationProvider(context)
 }

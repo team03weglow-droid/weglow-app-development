@@ -10,10 +10,11 @@ import com.example.weglow.domain.repository.EnvironmentRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
 import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
@@ -21,26 +22,29 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.time.LocalDate
 
 class WeatherApiEnvironmentRepository(
-    private val apiKey: String = AppConfig.weatherApiKey,
+    private val accessTokenProvider: () -> String?,
+    private val supabaseUrl: String = AppConfig.supabaseUrl,
+    private val supabasePublishableKey: String = AppConfig.supabasePublishableKey,
     private val client: HttpClient = HttpClient(Android) {
         install(HttpTimeout) { requestTimeoutMillis = NETWORK_TIMEOUT_MS }
-        defaultRequest { url(WEATHER_API_BASE_URL) }
     },
 ) : EnvironmentRepository {
     private var cached: CachedEnvironment? = null
 
     override suspend fun getEnvironmentForLocation(latitude: Double, longitude: Double): Result<EnvironmentInfo> = runCatching {
-        require(apiKey.isNotBlank()) { "Weather service is not configured. Add WEATHER_API_KEY to local.properties." }
+        require(supabaseUrl.isNotBlank() && supabasePublishableKey.isNotBlank()) {
+            "Weather service is not configured. Add the Supabase configuration to local.properties."
+        }
         cached?.takeIf { it.isFreshFor(latitude, longitude) }?.environment ?: fetch(latitude, longitude).also {
             cached = CachedEnvironment(it, System.currentTimeMillis())
         }
     }
 
     private suspend fun fetch(latitude: Double, longitude: Double): EnvironmentInfo {
-        val response = client.get("current.json") {
-            parameter("key", apiKey)
-            parameter("q", "$latitude,$longitude")
-            parameter("aqi", "yes")
+        val response = client.get(weatherFunctionUrl()) {
+            addAuthenticationHeaders()
+            parameter("lat", latitude)
+            parameter("lon", longitude)
         }
         check(response.status.value in 200..299) { "Weather service is unavailable (${response.status.value})." }
         val root = Json.parseToJsonElement(response.bodyAsText()).jsonObject
@@ -75,21 +79,36 @@ class WeatherApiEnvironmentRepository(
         currentDate: String,
     ): Result<List<UvDailyReading>> = runCatching {
         val today = runCatching { LocalDate.parse(currentDate) }.getOrDefault(LocalDate.now())
-        val response = client.get("history.json") {
-            parameter("key", apiKey)
-            parameter("q", "$latitude,$longitude")
-            parameter("dt", today.minusDays(HISTORY_DAY_COUNT).toString())
-            parameter("end_dt", today.minusDays(1).toString())
+        val response = client.get(OPEN_METEO_FORECAST_URL) {
+            parameter("latitude", latitude)
+            parameter("longitude", longitude)
+            parameter("daily", "uv_index_max")
+            parameter("start_date", today.minusDays(HISTORY_DAY_COUNT).toString())
+            parameter("end_date", today.minusDays(1).toString())
+            parameter("timezone", "auto")
         }
         check(response.status.value in 200..299) { "UV history is unavailable." }
-        Json.parseToJsonElement(response.bodyAsText()).jsonObject.requiredObject("forecast")
-            .requiredArray("forecastday").map { item ->
-                val forecastDay = item.jsonObject
-                UvDailyReading(
-                    date = forecastDay["date"]?.jsonPrimitive?.content ?: error("Missing UV history date"),
-                    uvIndex = forecastDay.requiredObject("day").requiredDouble("uv"),
-                )
-            }
+        val daily = Json.parseToJsonElement(response.bodyAsText()).jsonObject.requiredObject("daily")
+        val dates = daily.requiredArray("time")
+        val uvValues = daily.requiredArray("uv_index_max")
+        check(dates.size == uvValues.size) { "Malformed UV history response." }
+        dates.indices.map { index ->
+            UvDailyReading(
+                date = dates[index].jsonPrimitive.content,
+                uvIndex = uvValues[index].jsonPrimitive.content.toDoubleOrNull()
+                    ?: error("Missing UV history value"),
+            )
+        }
+    }
+
+    private fun weatherFunctionUrl(): String =
+        "${supabaseUrl.trimEnd('/')}/functions/v1/smart-endpoint"
+
+    private fun io.ktor.client.request.HttpRequestBuilder.addAuthenticationHeaders() {
+        val accessToken = accessTokenProvider()
+        require(!accessToken.isNullOrBlank()) { "Sign in before requesting weather." }
+        header(HttpHeaders.Authorization, "Bearer $accessToken")
+        header("apikey", supabasePublishableKey)
     }
 
     private fun kotlinx.serialization.json.JsonObject.requiredObject(name: String) =
@@ -111,7 +130,7 @@ class WeatherApiEnvironmentRepository(
     }
 
     private companion object {
-        const val WEATHER_API_BASE_URL = "https://api.weatherapi.com/v1/"
+        const val OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
         const val NETWORK_TIMEOUT_MS = 15_000L
         // Refresh after 20 minutes, or after travel of roughly 7 km; avoids needless API/GPS use.
         const val ENVIRONMENT_CACHE_FRESHNESS_MS = 20 * 60 * 1000L

@@ -398,13 +398,26 @@ private fun UvHistoryGraph(readings: List<UvDailyReading>) {
                     contentDescription = "31-day daily UV index history"
                 },
             ) {
-                val maximum = maxOf(11.0, readings.maxOf { it.uvIndex })
+                val observedMinimum = readings.minOf { it.uvIndex }
+                val observedMaximum = readings.maxOf { it.uvIndex }
+                val variation = maxOf(1.0, observedMaximum - observedMinimum)
+                val verticalPadding = variation * 0.2
+                val graphMinimum = maxOf(0.0, observedMinimum - verticalPadding)
+                val graphMaximum = observedMaximum + verticalPadding
+                val graphRange = maxOf(1.0, graphMaximum - graphMinimum)
                 val xStep = if (readings.size == 1) 0f else size.width / (readings.size - 1)
                 fun point(index: Int, uv: Double) = androidx.compose.ui.geometry.Offset(
                     x = if (readings.size == 1) size.width / 2 else index * xStep,
-                    y = size.height - ((uv / maximum) * size.height).toFloat(),
+                    y = size.height - (((uv - graphMinimum) / graphRange) * size.height).toFloat(),
                 )
-                drawLine(SoftGray.copy(alpha = 0.25f), start = androidx.compose.ui.geometry.Offset(0f, size.height), end = androidx.compose.ui.geometry.Offset(size.width, size.height))
+                repeat(3) { index ->
+                    val y = size.height * index / 2f
+                    drawLine(
+                        SoftGray.copy(alpha = 0.16f),
+                        start = androidx.compose.ui.geometry.Offset(0f, y),
+                        end = androidx.compose.ui.geometry.Offset(size.width, y),
+                    )
+                }
                 val points = readings.mapIndexed { index, reading -> point(index, reading.uvIndex) }
                 if (points.size > 1) {
                     // Catmull-Rom-style cubic Béziers smooth the real day-to-day values
@@ -426,6 +439,13 @@ private fun UvHistoryGraph(readings: List<UvDailyReading>) {
                             )
                         }
                     }
+                    val fillPath = Path().apply {
+                        addPath(path)
+                        lineTo(points.last().x, size.height)
+                        lineTo(points.first().x, size.height)
+                        close()
+                    }
+                    drawPath(fillPath, color = DarkGreen.copy(alpha = 0.08f))
                     drawPath(path, color = DarkGreen, style = Stroke(width = 3.dp.toPx()))
                 }
                 readings.forEachIndexed { index, reading -> drawCircle(CoralAccent, radius = 4.dp.toPx(), center = point(index, reading.uvIndex)) }

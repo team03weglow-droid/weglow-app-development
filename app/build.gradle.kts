@@ -45,7 +45,6 @@ android {
             "SUPABASE_PUBLISHABLE_KEY",
             phaseOneConfig("WEGLOW_SUPABASE_PUBLISHABLE_KEY").asBuildConfigString(),
         )
-        buildConfigField("String", "WEATHER_API_KEY", phaseOneConfig("WEATHER_API_KEY").asBuildConfigString())
     }
 
     buildTypes {
