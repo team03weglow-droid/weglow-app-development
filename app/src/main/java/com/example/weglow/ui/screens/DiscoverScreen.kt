@@ -436,19 +436,28 @@ private fun ProductGridCard(
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
-        product.ratingLabel?.let { rating ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Star, contentDescription = null, tint = WarmGold, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(rating, style = MaterialTheme.typography.bodySmall, color = TextBlack)
+        Box(modifier = Modifier.height(18.dp)) {
+            product.ratingLabel?.let { rating ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = WarmGold, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(rating, style = MaterialTheme.typography.bodySmall, color = TextBlack)
+                }
             }
-            Spacer(modifier = Modifier.height(2.dp))
         }
-        product.brandName?.let { brand ->
-            Text(brand, style = MaterialTheme.typography.labelSmall, color = SoftGray)
-            Spacer(modifier = Modifier.height(2.dp))
+        Box(modifier = Modifier.height(16.dp)) {
+            product.brandName?.let { brand ->
+                Text(brand, style = MaterialTheme.typography.labelSmall, color = SoftGray)
+            }
         }
-        Text(product.name, style = MaterialTheme.typography.titleSmall, color = TextBlack)
+        Text(
+            product.name,
+            modifier = Modifier.height(40.dp),
+            style = MaterialTheme.typography.titleSmall,
+            color = TextBlack,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         Spacer(modifier = Modifier.height(2.dp))
         Text(product.priceLabel, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
         Spacer(Modifier.height(8.dp))
