@@ -23,8 +23,10 @@ sealed class Destination(val route: String) {
     data object Recommendations : Destination("recommendations?fromScan={fromScan}") {
         fun routeFor(fromScan: Boolean) = "recommendations?fromScan=$fromScan"
     }
+
     data object Routines : Destination("routines")
     data object Profile : Destination("profile")
+    data object Chatbot : Destination("chatbot")
     data object AccountSettings : Destination("account_settings")
     data object SavedProducts : Destination("saved_products")
     data object Cart : Destination("cart")

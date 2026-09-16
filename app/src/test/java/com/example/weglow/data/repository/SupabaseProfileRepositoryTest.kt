@@ -122,4 +122,25 @@ class SupabaseProfileRepositoryTest {
         assertFalse(ProfileRow(id = "user-1").onboarding_completed)
         assertFalse(ProfileRow(id = "user-1").toUserProfile().onboardingCompleted)
     }
+
+    @Test
+    fun envFields_defaultToNull() {
+        val row = ProfileRow(id = "user-1")
+        assertNull(row.uv_index)
+        assertNull(row.uv_category)
+        assertNull(row.humidity)
+        assertNull(row.location_name)
+        assertNull(row.last_env_at)
+    }
+
+    @Test
+    fun envFields_setViaToProfileRow() {
+        val profile = UserProfile(id = "user-1", fullName = "Test", onboardingCompleted = true)
+        val row = profile.toProfileRow()
+        assertNull(row.uv_index)
+        assertNull(row.uv_category)
+        assertNull(row.humidity)
+        assertNull(row.location_name)
+        assertNull(row.last_env_at)
+    }
 }

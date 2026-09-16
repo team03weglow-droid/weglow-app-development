@@ -7,6 +7,7 @@ import com.example.weglow.domain.model.UserProfile
 import com.example.weglow.domain.repository.ProfileRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
+import java.time.Instant
 
 class SupabaseProfileRepository(
     private val client: SupabaseClient,
@@ -31,13 +32,10 @@ class SupabaseProfileRepository(
             .isOnboardingCompleted()
     }
 
-    /**
-     * Targeted single-column update. It deliberately does not go through
-     * [saveProfile]'s upsert so a profile-picture change can never blank out
-     * `full_name`, onboarding answers, or the completion flag. The per-user
-     * UPDATE RLS policy still confines the write to `auth.uid() = id`.
-     */
-    override suspend fun updateProfileImagePath(userId: String, path: String?): Result<Unit> = runCatching {
+    override suspend fun updateProfileImagePath(
+        userId: String,
+        path: String?,
+    ): Result<Unit> = runCatching {
         client.postgrest["profiles"].update(
             update = { set("profile_image_url", path) },
         ) {
@@ -46,9 +44,48 @@ class SupabaseProfileRepository(
         Unit
     }
 
-    override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> = runCatching {
+    override suspend fun updateFaceShape(
+        userId: String,
+        faceShape: String,
+    ): Result<Unit> = runCatching {
         client.postgrest["profiles"].update(
             update = { set("face_shape", faceShape) },
+        ) {
+            filter { eq("id", userId) }
+        }
+        Unit
+    }
+
+    override suspend fun updateScanSummary(
+        userId: String,
+        concerns: String,
+        scannedAt: Instant,
+    ): Result<Unit> = runCatching {
+        client.postgrest["profiles"].update(
+            update = {
+                set("skin_concerns", concerns)
+                set("last_scan_at", scannedAt.toString())
+            },
+        ) {
+            filter { eq("id", userId) }
+        }
+        Unit
+    }
+
+    override suspend fun updateEnvironment(
+        userId: String,
+        uvIndex: Double,
+        uvCategory: String,
+        humidity: Int,
+        locationName: String,
+    ): Result<Unit> = runCatching {
+        client.postgrest["profiles"].update(
+            update = {
+                set("uv_index", uvIndex)
+                set("uv_category", uvCategory)
+                set("humidity", humidity)
+                set("location_name", locationName)
+            },
         ) {
             filter { eq("id", userId) }
         }
@@ -60,7 +97,10 @@ class SupabaseProfileRepository(
      * gender change can never blank out the rest of the profile row, and the per-user UPDATE
      * RLS policy still confines the write to `auth.uid() = id`.
      */
-    override suspend fun updateGender(userId: String, gender: String): Result<Unit> = runCatching {
+    override suspend fun updateGender(
+        userId: String,
+        gender: String,
+    ): Result<Unit> = runCatching {
         client.postgrest["profiles"].update(
             update = { set("gender", gender) },
         ) {
@@ -70,9 +110,5 @@ class SupabaseProfileRepository(
     }
 }
 
-/**
- * Decides completion from the actual [ProfileRow.onboarding_completed] flag, never from
- * row existence. Kept as a pure function so the rule is unit-testable without a Supabase client.
- */
 internal fun List<ProfileRow>.isOnboardingCompleted(): Boolean =
     firstOrNull()?.onboarding_completed == true
