@@ -3,6 +3,7 @@ package com.example.weglow.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -16,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -338,10 +340,6 @@ private fun HomeRoutine(
                 val key = routineStepKey(today, morning, index, product?.id)
                 val done = key in completed
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = done, enabled = product != null,
-                        onCheckedChange = { onToggle(key) },
-                        modifier = Modifier.semantics { contentDescription = "Complete ${product?.name ?: step.label}" },
-                        colors = CheckboxDefaults.colors(checkedColor = DarkGreen))
                     if (product != null && LocalDensity.current.fontScale <= 1.15f) {
                         WeGlowProductImage(product.imageUrl, null, Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)))
                         Spacer(Modifier.width(10.dp))
@@ -351,6 +349,25 @@ private fun HomeRoutine(
                         Text(step.label, style = MaterialTheme.typography.bodySmall, color = SoftGray)
                         Text(when { product == null -> "Product not matched yet"; done -> "Done"; index == nextIndex -> "Up next"; else -> "Queued" },
                             style = MaterialTheme.typography.labelMedium, color = if (index == nextIndex) AccentText else SoftGray)
+                    }
+                    IconToggleButton(
+                        checked = done,
+                        enabled = product != null,
+                        onCheckedChange = { onToggle(key) },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .semantics { contentDescription = "Complete ${product?.name ?: step.label}" },
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(if (done) DarkGreen else Color.Transparent)
+                                .then(if (done) Modifier else Modifier.border(2.dp, SoftGray, CircleShape)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (done) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
             }
