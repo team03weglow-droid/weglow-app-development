@@ -38,7 +38,9 @@ import com.example.weglow.ui.theme.*
 import com.example.weglow.domain.model.Product
 
 
-private val CATEGORIES = listOf("All Products", "Trending", "Serums", "Moisturizers", "Hair")
+private const val ALL_PRODUCTS_CATEGORY = "All Products"
+private const val FOR_YOU_CATEGORY = "For You"
+private val CATEGORIES = listOf(ALL_PRODUCTS_CATEGORY, FOR_YOU_CATEGORY, "Trending", "Serums", "Moisturizers", "Hair")
 private enum class ProductViewMode { Gallery, List }
 
 internal fun matchesPriceRange(priceLkr: Double?, minimumPrice: Double?, maximumPrice: Double?): Boolean {
@@ -56,34 +58,44 @@ fun DiscoverScreen(
     errorMessage: String?,
     onRetry: () -> Unit,
     profileImage: ByteArray? = null,
+    recommendedProducts: List<Product> = emptyList(),
+    recommendationsLoading: Boolean = false,
+    recommendationsErrorMessage: String? = null,
+    onRecommendationsRetry: () -> Unit = {},
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("All Products") }
+    var selectedCategory by remember { mutableStateOf(ALL_PRODUCTS_CATEGORY) }
     var viewMode by remember { mutableStateOf(ProductViewMode.Gallery) }
     var showPriceFilter by remember { mutableStateOf(false) }
     var minimumPrice by remember { mutableStateOf<Double?>(null) }
     var maximumPrice by remember { mutableStateOf<Double?>(null) }
     val filteredProducts = remember(
         products,
+        recommendedProducts,
         searchQuery,
         selectedCategory,
         minimumPrice,
         maximumPrice,
     ) {
-        products.filter { product ->
+        val visibleProducts = if (selectedCategory == FOR_YOU_CATEGORY) recommendedProducts else products
+        visibleProducts.filter { product ->
             val matchesSearch = searchQuery.isBlank() || listOfNotNull(
                 product.name,
                 product.brandName,
                 product.description,
                 product.category,
             ).any { it.contains(searchQuery.trim(), ignoreCase = true) }
-            val matchesCategory = selectedCategory == "All Products" ||
+            val matchesCategory = selectedCategory == ALL_PRODUCTS_CATEGORY ||
+                selectedCategory == FOR_YOU_CATEGORY ||
                 product.category?.contains(selectedCategory.removeSuffix("s"), ignoreCase = true) == true
             val matchesPrice = matchesPriceRange(product.priceLkr, minimumPrice, maximumPrice)
             matchesSearch && matchesCategory && matchesPrice
         }
     }
     val featuredProduct = filteredProducts.firstOrNull()
+    val visibleProductsAreLoading = if (selectedCategory == FOR_YOU_CATEGORY) recommendationsLoading else isLoading
+    val visibleProductsError = if (selectedCategory == FOR_YOU_CATEGORY) recommendationsErrorMessage else errorMessage
+    val retryVisibleProducts = if (selectedCategory == FOR_YOU_CATEGORY) onRecommendationsRetry else onRetry
 
     if (showPriceFilter) {
         PriceFilterDialog(
@@ -291,28 +303,30 @@ fun DiscoverScreen(
             WeGlowPlannedFeature("Perfect Pairing")
             Spacer(Modifier.height(16.dp))
             Text(
-                "All Products (${filteredProducts.size})",
+                "${if (selectedCategory == FOR_YOU_CATEGORY) FOR_YOU_CATEGORY else ALL_PRODUCTS_CATEGORY} (${filteredProducts.size})",
                 style = MaterialTheme.typography.headlineMedium,
                 color = TextBlack,
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (isLoading) {
+            if (visibleProductsAreLoading) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(color = DarkGreen)
                 }
-            } else if (errorMessage != null) {
+            } else if (visibleProductsError != null) {
                 ProductLoadMessage(
-                    message = "We couldn't load products. $errorMessage",
+                    message = "We couldn't load products. $visibleProductsError",
                     actionLabel = "Try again",
-                    onAction = onRetry,
+                    onAction = retryVisibleProducts,
                 )
             } else if (filteredProducts.isEmpty()) {
                 ProductLoadMessage(
-                    message = if (products.isEmpty()) {
+                    message = if (selectedCategory == FOR_YOU_CATEGORY) {
+                        "No recommended products are available yet."
+                    } else if (products.isEmpty()) {
                         "No products are available yet."
                     } else {
                         "No products match your search."
