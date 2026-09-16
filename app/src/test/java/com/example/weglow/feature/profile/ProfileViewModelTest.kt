@@ -273,6 +273,99 @@ class ProfileViewModelTest {
 
         assertEquals(1, images.uploadCount)
     }
+
+    // --- Gender (Task 4/5): edited from Profile, persisted to the same profiles.gender
+    // column onboarding writes to, and this is the value hairstyle recommendations reuse.
+
+    // 11. refresh() loads the current persisted gender alongside the rest of the profile.
+    @Test
+    fun refresh_loadsPersistedGender() = runTest(dispatcher) {
+        val vm = ProfileViewModel(
+            FakeAuthRepository(userId = "u1"),
+            FakeProfileRepository(stored = UserProfile(id = "u1", fullName = "N", gender = "Male")),
+            FakeProfileImageRepository(),
+        )
+
+        vm.refresh()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Male", vm.uiState.value.gender)
+    }
+
+    // 12. A successful gender change persists through the repository and updates local state.
+    @Test
+    fun onGenderSelected_success_persistsAndUpdatesState() = runTest(dispatcher) {
+        val profiles = FakeProfileRepository(stored = UserProfile(id = "u1", gender = "Male"))
+        val vm = ProfileViewModel(FakeAuthRepository(userId = "u1"), profiles, FakeProfileImageRepository())
+        vm.refresh()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onGenderSelected("Female")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Female", profiles.updatedGender)
+        assertEquals("u1", profiles.updatedGenderForUserId)
+        assertEquals("Female", vm.uiState.value.gender)
+        assertFalse(vm.uiState.value.isUpdatingGender)
+        assertNull(vm.uiState.value.genderError)
+    }
+
+    // 13. A failed gender update must not falsely show the newly picked value.
+    @Test
+    fun onGenderSelected_failure_doesNotChangeDisplayedGender() = runTest(dispatcher) {
+        val profiles = FakeProfileRepository(
+            stored = UserProfile(id = "u1", gender = "Male"),
+            updateGenderResult = Result.failure(RuntimeException("db write denied")),
+        )
+        val vm = ProfileViewModel(FakeAuthRepository(userId = "u1"), profiles, FakeProfileImageRepository())
+        vm.refresh()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onGenderSelected("Female")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Male", vm.uiState.value.gender)
+        assertEquals("db write denied", vm.uiState.value.genderError)
+        assertFalse(vm.uiState.value.isUpdatingGender)
+    }
+
+    // 14. Gender update requires an authenticated user, same as image upload.
+    @Test
+    fun onGenderSelected_withoutAuthenticatedUser_doesNotPersist() = runTest(dispatcher) {
+        val profiles = FakeProfileRepository()
+        val vm = ProfileViewModel(FakeAuthRepository(userId = null), profiles, FakeProfileImageRepository())
+
+        vm.onGenderSelected("Female")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, profiles.updateGenderCallCount)
+        assertNotNull(vm.uiState.value.genderError)
+    }
+
+    // 15. Re-selecting the already-saved value is a no-op (no redundant write).
+    @Test
+    fun onGenderSelected_sameValueAsCurrent_isNoOp() = runTest(dispatcher) {
+        val profiles = FakeProfileRepository(stored = UserProfile(id = "u1", gender = "Male"))
+        val vm = ProfileViewModel(FakeAuthRepository(userId = "u1"), profiles, FakeProfileImageRepository())
+        vm.refresh()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onGenderSelected("Male")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, profiles.updateGenderCallCount)
+    }
+
+    @Test
+    fun consumeGenderError_clearsError() = runTest(dispatcher) {
+        val vm = ProfileViewModel(FakeAuthRepository(userId = null), FakeProfileRepository(), FakeProfileImageRepository())
+
+        vm.onGenderSelected("Female")
+        assertNotNull(vm.uiState.value.genderError)
+
+        vm.consumeGenderError()
+        assertNull(vm.uiState.value.genderError)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -301,11 +394,18 @@ private class FakeAuthRepository(
 private class FakeProfileRepository(
     private val stored: UserProfile? = null,
     private val updateImageResult: Result<Unit> = Result.success(Unit),
+    private val updateGenderResult: Result<Unit> = Result.success(Unit),
 ) : ProfileRepository {
 
     var updatedImagePath: String? = null
         private set
     var updatedImageForUserId: String? = null
+        private set
+    var updatedGender: String? = null
+        private set
+    var updatedGenderForUserId: String? = null
+        private set
+    var updateGenderCallCount: Int = 0
         private set
 
     override suspend fun saveProfile(profile: UserProfile): Result<Unit> = Result.success(Unit)
@@ -325,6 +425,15 @@ private class FakeProfileRepository(
 
     override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> =
         Result.success(Unit)
+
+    override suspend fun updateGender(userId: String, gender: String): Result<Unit> {
+        updateGenderCallCount++
+        if (updateGenderResult.isSuccess) {
+            updatedGenderForUserId = userId
+            updatedGender = gender
+        }
+        return updateGenderResult
+    }
 }
 
 private class FakeProfileImageRepository(

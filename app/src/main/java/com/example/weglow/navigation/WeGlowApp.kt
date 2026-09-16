@@ -702,11 +702,21 @@ fun WeGlowApp() {
                 // as it did when this flow state lived in the composable's own rememberSaveable
                 // state (that state was reset simply because the composable was recreated).
                 // ScanFlowViewModel is Activity-scoped and survives leaving/returning to Scan,
-                // so it must be told explicitly to reset on each fresh entry.
+                // so it must be told explicitly to reset on each fresh entry. profileViewModel
+                // is refreshed here too so a gender change made in Profile is guaranteed to be
+                // current before the hairstyle flow reads profileState.gender below, even if
+                // the user navigates straight into Scan without passing back through Home.
                 LaunchedEffect(Unit) {
                     scanFlowViewModel.resetFlow()
+                    profileViewModel.refresh()
                 }
 
+                // The hairstyle flow must use the user's CURRENT saved profile gender, not the
+                // onboarding wizard's in-memory answer (onboardingState.gender is a one-shot
+                // snapshot that goes stale the moment Profile lets the user change gender
+                // afterwards, and is never refreshed). profileState.gender is loaded from the
+                // same `profiles.gender` column on every entry into this destination and after
+                // every Profile edit, so it always reflects the latest persisted value.
                 ScanScreen(
                     photoUri = scanState.photoUri,
                     acneState = scanState,
@@ -714,12 +724,12 @@ fun WeGlowApp() {
                     flowState = scanFlowState,
                     onSelectMode = scanFlowViewModel::selectMode,
                     onPhotoReady = { uri ->
-                        scanFlowViewModel.onPhotoReady(uri, onboardingState.gender)
+                        scanFlowViewModel.onPhotoReady(uri, profileState.gender)
                     },
                     onCancel = scanFlowViewModel::cancelAnalysis,
                     onRetryAcne = scanFlowViewModel::retryAcne,
                     onRetryHairstyle = {
-                        scanFlowViewModel.retryHairstyle(onboardingState.gender)
+                        scanFlowViewModel.retryHairstyle(profileState.gender)
                     },
                     onReturnToModeSelection = scanFlowViewModel::returnToModeSelection,
 
@@ -830,6 +840,11 @@ fun WeGlowApp() {
                     onProfileImagePicked = profileViewModel::onProfileImagePicked,
                     onProfileImageUnreadable = profileViewModel::onProfileImageUnreadable,
                     onConsumeImageError = profileViewModel::consumeImageError,
+                    gender = profileState.gender,
+                    isUpdatingGender = profileState.isUpdatingGender,
+                    genderError = profileState.genderError,
+                    onGenderSelected = profileViewModel::onGenderSelected,
+                    onConsumeGenderError = profileViewModel::consumeGenderError,
                     onScanClick = { navController.navigate(Destination.Scan.route) { launchSingleTop = true } },
                     onRoutinesClick = { navController.navigate(Destination.Routines.route) { launchSingleTop = true } },
                     onDiscoverClick = { navController.navigate(Destination.Discover.route) { launchSingleTop = true } },

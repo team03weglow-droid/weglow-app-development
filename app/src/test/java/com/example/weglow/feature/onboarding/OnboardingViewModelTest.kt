@@ -231,4 +231,7 @@ private class RecordingProfileRepository(
 
     override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> =
         Result.success(Unit)
+
+    override suspend fun updateGender(userId: String, gender: String): Result<Unit> =
+        Result.success(Unit)
 }

@@ -136,6 +136,7 @@ private class FakeProfileRepository(private val profile: UserProfile?) : Profile
     override suspend fun hasCompletedOnboarding(userId: String): Result<Boolean> = Result.success(true)
     override suspend fun updateProfileImagePath(userId: String, path: String?): Result<Unit> = Result.success(Unit)
     override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> = Result.success(Unit)
+    override suspend fun updateGender(userId: String, gender: String): Result<Unit> = Result.success(Unit)
 }
 
 private class FakeCatalogRepository(private val result: Result<List<Product>>) : CatalogRepository {

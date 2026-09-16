@@ -54,6 +54,20 @@ class SupabaseProfileRepository(
         }
         Unit
     }
+
+    /**
+     * Targeted single-column update, mirroring [updateProfileImagePath]: a Profile-initiated
+     * gender change can never blank out the rest of the profile row, and the per-user UPDATE
+     * RLS policy still confines the write to `auth.uid() = id`.
+     */
+    override suspend fun updateGender(userId: String, gender: String): Result<Unit> = runCatching {
+        client.postgrest["profiles"].update(
+            update = { set("gender", gender) },
+        ) {
+            filter { eq("id", userId) }
+        }
+        Unit
+    }
 }
 
 /**

@@ -25,4 +25,13 @@ interface ProfileRepository {
 
     /** Stores the last detected face shape for the authenticated profile only. */
     suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit>
+
+    /**
+     * Persists [gender] (one of [com.example.weglow.domain.model.Gender.OPTIONS]) into the
+     * authenticated user's profile row, touching no other column. This is the same
+     * `profiles.gender` value set during onboarding, so a Profile-initiated change here is
+     * the single source of truth every other screen (in particular hairstyle recommendations)
+     * reads from afterwards - no separate gender field or cache is ever created.
+     */
+    suspend fun updateGender(userId: String, gender: String): Result<Unit>
 }

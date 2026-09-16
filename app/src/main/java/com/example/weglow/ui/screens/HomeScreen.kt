@@ -27,10 +27,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.painterResource
 import com.example.weglow.R
@@ -160,7 +162,10 @@ fun HomeScreen(
                     }
                 }
                 Spacer(Modifier.height(16.dp))
-                Text(today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())),
+                // LocalConfiguration.current (not Locale.getDefault()) so this recomposes if the
+                // user changes their system locale while the app is open.
+                val currentLocale = LocalConfiguration.current.locales[0]
+                Text(today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", currentLocale)),
                     style = MaterialTheme.typography.labelMedium, color = SoftGray)
                 Spacer(Modifier.height(4.dp))
                 Text(displayName?.let { "Hello, ${homeGreetingName(it)}" } ?: "Hello there",
@@ -190,11 +195,19 @@ fun HomeScreen(
             }
             if (largeText) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HomeShortcut("Find hairstyles", "Face-shape analysis", onScanClick)
-                    HomeShortcut("Routines", "Daily steps", openRoutine)
-                    HomeShortcut("Progress", "Skin history", { scope.launch { listState.animateScrollToItem(7) } })
+                    HomeShortcut("Find hairstyles", "Face-shape analysis", onScanClick, Modifier.fillMaxWidth())
+                    HomeShortcut("Routines", "Daily steps", openRoutine, Modifier.fillMaxWidth())
+                    HomeShortcut("Progress", "Skin history", { scope.launch { listState.animateScrollToItem(7) } }, Modifier.fillMaxWidth())
                 }
-            } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp), content = shortcuts)
+            } else Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                // IntrinsicSize.Min sizes the row to its tallest child's natural height, and
+                // each HomeShortcut below fills that height, so all three always share one
+                // consistent geometry (width via weight(1f) above, height via this) no matter
+                // how their two-line labels happen to wrap on a given device/font scale.
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                content = shortcuts,
+            )
         }
         item(key = "recommendations") {
             Card(onClick = onRecommendationsClick, colors = CardDefaults.cardColors(containerColor = CardWhite)) {
@@ -492,10 +505,33 @@ private fun HomeMetric(title: String, value: String, modifier: Modifier) {
 
 @Composable
 private fun HomeShortcut(title: String, subtitle: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Card(onClick = onClick, modifier = modifier, colors = CardDefaults.cardColors(containerColor = CardWhite)) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.labelMedium, color = DarkGreen)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = SoftGray)
+    Card(
+        onClick = onClick,
+        // fillMaxHeight() lets this card stretch to match its siblings' shared
+        // IntrinsicSize.Min row height (see the "shortcuts" item above) instead of
+        // wrapping to its own content, which is what let differently-wrapped labels
+        // produce differently-sized cards before.
+        modifier = modifier.fillMaxHeight(),
+        colors = CardDefaults.cardColors(containerColor = CardWhite),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().fillMaxHeight().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.labelMedium,
+                color = DarkGreen,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = SoftGray,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -515,11 +551,28 @@ private fun HomeInsight(title: String, body: String, action: String, onClick: ((
 
 @Composable
 private fun HomeEditorial(title: String, category: String, image: Int) {
+    // Every guide card shares the same width, image height, padding, and a fixed
+    // two-line title area (minLines + maxLines) so a long title never grows one
+    // card taller than its neighbors in the horizontal list - it wraps within its
+    // own reserved space and is ellipsized instead of pushing the layout around.
     Column(Modifier.width(264.dp).clip(RoundedCornerShape(16.dp)).background(CardWhite)) {
         Image(painterResource(image), null, Modifier.fillMaxWidth().height(140.dp), contentScale = ContentScale.Crop)
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(category, style = MaterialTheme.typography.labelMedium, color = SoftGray)
-            Text(title, style = MaterialTheme.typography.titleMedium, color = DarkGreen)
+            Text(
+                category,
+                style = MaterialTheme.typography.labelMedium,
+                color = SoftGray,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = DarkGreen,
+                minLines = 2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
             WeGlowPlannedFeature("Read guide")
         }
     }

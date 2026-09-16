@@ -48,10 +48,13 @@ import com.example.weglow.R
 import com.example.weglow.ui.components.WeGlowPlannedFeature
 import com.example.weglow.core.image.ProfileCameraImageStore
 import com.example.weglow.core.image.ProfileImageReader
+import com.example.weglow.domain.model.Gender
 import com.example.weglow.domain.model.ProfileImageUpload
 import com.example.weglow.ui.components.ProfileAvatar
 import com.example.weglow.ui.components.rememberDecodedBitmap
 import com.example.weglow.ui.theme.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Wc
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -70,6 +73,11 @@ fun ProfileScreen(
     onProfileImagePicked: (ProfileImageUpload) -> Unit = {},
     onProfileImageUnreadable: () -> Unit = {},
     onConsumeImageError: () -> Unit = {},
+    gender: String? = null,
+    isUpdatingGender: Boolean = false,
+    genderError: String? = null,
+    onGenderSelected: (String) -> Unit = {},
+    onConsumeGenderError: () -> Unit = {},
     onScanClick: () -> Unit = {},
     onRoutinesClick: () -> Unit = {},
     onDiscoverClick: () -> Unit = {},
@@ -81,6 +89,7 @@ fun ProfileScreen(
     val fileProviderAuthority = "${context.packageName}.fileprovider"
 
     var showSourceChooser by rememberSaveable { mutableStateOf(false) }
+    var showGenderChooser by rememberSaveable { mutableStateOf(false) }
     // Absolute path of the throw-away file the system camera writes into. Held
     // in saveable state so an in-progress capture survives a configuration
     // change / process death while the camera app is in the foreground.
@@ -170,6 +179,13 @@ fun ProfileScreen(
         if (cameraNotice != null) {
             delay(4000)
             cameraNotice = null
+        }
+    }
+
+    LaunchedEffect(genderError) {
+        if (genderError != null) {
+            delay(4000)
+            onConsumeGenderError()
         }
     }
 
@@ -349,6 +365,32 @@ fun ProfileScreen(
             WeGlowPlannedFeature("Saved Products")
             WeGlowPlannedFeature("Account Settings")
             Spacer(Modifier.height(20.dp))
+
+            Text("Personal details", style = MaterialTheme.typography.headlineSmall, color = TextBlack, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(14.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(CardWhite)
+            ) {
+                GenderSettingsRow(
+                    gender = gender,
+                    isUpdating = isUpdatingGender,
+                    onClick = { showGenderChooser = true },
+                )
+            }
+            if (genderError != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    genderError,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LogoutRed,
+                    modifier = Modifier.clickable(onClick = onConsumeGenderError)
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
             Text("Quick links", style = MaterialTheme.typography.headlineSmall, color = TextBlack, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(14.dp))
             Column(
@@ -412,6 +454,36 @@ fun ProfileScreen(
                 }
             }
         }
+
+        if (showGenderChooser) {
+            ModalBottomSheet(
+                onDismissRequest = { showGenderChooser = false },
+                containerColor = CardWhite,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 32.dp)
+                ) {
+                    Text(
+                        "Gender",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextBlack
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Gender.OPTIONS.forEach { option ->
+                        GenderOptionRow(
+                            label = option,
+                            isSelected = option == gender,
+                        ) {
+                            showGenderChooser = false
+                            if (option != gender) onGenderSelected(option)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -439,6 +511,59 @@ private fun ImageSourceRow(
         Icon(icon, contentDescription = null, tint = DarkGreen)
         Spacer(modifier = Modifier.width(14.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge, color = TextBlack)
+    }
+}
+
+@Composable
+private fun GenderSettingsRow(gender: String?, isUpdating: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !isUpdating, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 18.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Wc, contentDescription = null, tint = DarkGreen)
+            Spacer(modifier = Modifier.width(14.dp))
+            Text("Gender", style = MaterialTheme.typography.bodyLarge, color = TextBlack)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                gender ?: "Not set",
+                style = MaterialTheme.typography.bodyMedium,
+                color = SoftGray,
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            if (isUpdating) {
+                CircularProgressIndicator(
+                    color = DarkGreen,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(16.dp),
+                )
+            } else {
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SoftGray)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GenderOptionRow(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = TextBlack)
+        if (isSelected) {
+            Icon(Icons.Default.Check, contentDescription = "Selected", tint = DarkGreen)
+        }
     }
 }
 
