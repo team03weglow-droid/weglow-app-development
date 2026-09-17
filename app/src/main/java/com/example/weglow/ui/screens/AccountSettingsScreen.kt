@@ -50,6 +50,8 @@ fun AccountSettingsScreen(
     genderError: String? = null,
     onGenderSelected: (String) -> Unit = {},
     onConsumeGenderError: () -> Unit = {},
+    onPrivacyPolicyClick: () -> Unit = {},
+    onTermsConditionsClick: () -> Unit = {},
 ) {
     var showGenderChooser by rememberSaveable { mutableStateOf(false) }
 
@@ -103,6 +105,21 @@ fun AccountSettingsScreen(
                     color = LogoutRed,
                     modifier = Modifier.clickable(onClick = onConsumeGenderError)
                 )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text("Legal", style = MaterialTheme.typography.headlineSmall, color = TextBlack, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(14.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(CardWhite)
+            ) {
+                LegalLinkRow(label = "Privacy Policy", onClick = onPrivacyPolicyClick)
+                HorizontalDivider(color = TrackGray)
+                LegalLinkRow(label = "Terms & Conditions", onClick = onTermsConditionsClick)
             }
 
             Spacer(modifier = Modifier.height(100.dp))
@@ -182,6 +199,21 @@ private fun GenderSettingsRow(gender: String?, isUpdating: Boolean, onClick: () 
                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SoftGray)
             }
         }
+    }
+}
+
+@Composable
+private fun LegalLinkRow(label: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 18.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = TextBlack)
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SoftGray)
     }
 }
 

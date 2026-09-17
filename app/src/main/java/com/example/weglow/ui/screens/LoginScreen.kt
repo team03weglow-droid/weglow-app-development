@@ -12,6 +12,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -35,9 +36,13 @@ fun LoginScreen(
     onCreateAccountClick: () -> Unit,
     isLoading: Boolean = false,
     errorMessage: String? = null,
+    onTermsConditionsClick: () -> Unit = {},
+    onPrivacyPolicyClick: () -> Unit = {},
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    // rememberSaveable so opening a legal document from the footer below and pressing Back
+    // does not silently clear whatever the user had already typed here.
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -207,6 +212,32 @@ fun LoginScreen(
                     enabled = !isLoading,
                     onClick = onCreateAccountClick,
                 ),
+            )
+        }
+
+        Spacer(Modifier.height(WeGlowSpacing.lg))
+
+        // Access only - unlike Sign Up, returning users are never asked to check an
+        // agreement box here; these links just open the same documents to read.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Terms & Conditions",
+                style = MaterialTheme.typography.bodySmall,
+                color = SoftGray,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable(onClick = onTermsConditionsClick),
+            )
+            Text(
+                text = "  •  ",
+                style = MaterialTheme.typography.bodySmall,
+                color = SoftGray,
+            )
+            Text(
+                text = "Privacy Policy",
+                style = MaterialTheme.typography.bodySmall,
+                color = SoftGray,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable(onClick = onPrivacyPolicyClick),
             )
         }
 
