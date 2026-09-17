@@ -19,6 +19,15 @@ if (localPropertiesFile.exists()) {
     }
 }
 
+val supabaseUrl = localProperties.getProperty("WEGLOW_SUPABASE_URL", "").trim()
+val chatUrl = localProperties.getProperty("WEGLOW_CHAT_URL", "").trim().ifBlank {
+    supabaseUrl
+        .takeIf { it.isNotBlank() }
+        ?.trimEnd('/')
+        ?.let { "$it/functions/v1/" }
+        .orEmpty()
+}
+
 android {
     namespace = "com.example.weglow"
 
@@ -38,7 +47,7 @@ android {
         buildConfigField(
             "String",
             "SUPABASE_URL",
-            "\"${localProperties.getProperty("WEGLOW_SUPABASE_URL", "")}\"",
+            "\"$supabaseUrl\"",
         )
 
         buildConfigField(
@@ -56,7 +65,7 @@ android {
         buildConfigField(
             "String",
             "CHAT_URL",
-            "\"${localProperties.getProperty("WEGLOW_CHAT_URL", "")}\"",
+            "\"$chatUrl\"",
         )
     }
 
