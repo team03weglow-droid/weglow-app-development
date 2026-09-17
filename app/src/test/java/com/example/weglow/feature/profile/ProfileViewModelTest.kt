@@ -444,6 +444,12 @@ private class FakeProfileRepository(
     override suspend fun updateFaceShape(userId: String, faceShape: String): Result<Unit> =
         Result.success(Unit)
 
+    override suspend fun updateScanSummary(userId: String, concerns: String, scannedAt: java.time.Instant): Result<Unit> =
+        Result.success(Unit)
+
+    override suspend fun updateEnvironment(userId: String, uvIndex: Double, uvCategory: String, humidity: Int, locationName: String): Result<Unit> =
+        Result.success(Unit)
+
     override suspend fun updateGender(userId: String, gender: String): Result<Unit> {
         updateGenderCallCount++
         if (updateGenderResult.isSuccess) {

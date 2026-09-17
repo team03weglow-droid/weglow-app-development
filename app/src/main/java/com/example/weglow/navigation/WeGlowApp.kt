@@ -6,7 +6,10 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
@@ -15,8 +18,10 @@ import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -34,6 +39,7 @@ import com.example.weglow.feature.auth.AuthEvent
 import com.example.weglow.feature.auth.AuthViewModel
 import com.example.weglow.feature.auth.StartupDestination
 import com.example.weglow.feature.cart.CartViewModel
+import com.example.weglow.feature.chat.ChatViewModel
 import com.example.weglow.feature.discover.DiscoverViewModel
 import com.example.weglow.feature.environment.EnvironmentUiState
 import com.example.weglow.feature.environment.EnvironmentViewModel
@@ -50,6 +56,7 @@ import com.example.weglow.feature.scan.ScanViewModel
 import com.example.weglow.ui.components.WeGlowBottomNavigation
 import com.example.weglow.ui.components.WeGlowNavItem
 import com.example.weglow.ui.screens.*
+import com.example.weglow.ui.theme.DarkGreen
 
 private val tabs = listOf(
     WeGlowNavItem(Destination.Home.route, "Home", Icons.Default.Home),
@@ -64,35 +71,6 @@ fun WeGlowApp() {
 
     val navController = rememberNavController()
     val container = remember { AppContainer() }
-
-    // The single, consistent way to navigate to one of the bottom-nav tab destinations
-    // (Home/Discover/Scan/Routines/Profile), no matter which screen the call is made from.
-    //
-    // This is the exact popUpTo(Home){saveState=true}+launchSingleTop+restoreState bookkeeping
-    // WeGlowBottomNavigation's own onSelect below uses, and that Home's onProfileClick was
-    // previously special-cased to duplicate (see docs/HOME_AVATAR_PROFILE_NAVIGATION_BUG_FIX.md
-    // for the confirmed root cause: androidx.navigation's NavController.executePopOperations
-    // aliases popUpTo's anchor destination ID - Home here - to whatever it just popped and
-    // saved off the stack. A tab reached via a *plain* navigate(route){launchSingleTop=true},
-    // with no popUpTo at all, never touches that aliasing entry on the way in; the next time
-    // ANY tab is popped back to Home via this pattern, that pop is the first thing to write a
-    // real (non-null) value into it, and restoreState then restores THAT tab right back instead
-    // of leaving Home (or whichever tab was actually requested) visible. This is exactly what
-    // made Profile silently fail to reopen after Profile -> Recommendations -> Discover here:
-    // Recommendations and Discover were both reached via plain navigate(), so tapping the
-    // Profile tab afterward re-triggered the same aliasing bug via a different intermediate
-    // screen. The general, correct fix is for every tab-reaching call site - not just one - to
-    // consistently go through this same popUpTo/restoreState bookkeeping, which is what this
-    // shared helper enforces instead of leaving each call site to redecide its own NavOptions.
-    fun navigateToTab(route: String) {
-        navController.navigate(route) {
-            popUpTo(Destination.Home.route) {
-                saveState = true
-            }
-            launchSingleTop = true
-            restoreState = true
-        }
-    }
 
     val authViewModel: AuthViewModel = viewModel(
         factory = viewModelFactory {
@@ -113,6 +91,7 @@ fun WeGlowApp() {
     )
 
     val context = LocalContext.current.applicationContext
+
     val scanViewModel: ScanViewModel = viewModel(
         factory = viewModelFactory {
             ScanViewModel(
@@ -153,6 +132,12 @@ fun WeGlowApp() {
         }
     )
 
+    val chatViewModel: ChatViewModel = viewModel(
+        factory = viewModelFactory {
+            ChatViewModel(container.chatRepository)
+        }
+    )
+
     val recommendationViewModel: RecommendationViewModel = viewModel(
         factory = viewModelFactory {
             RecommendationViewModel(
@@ -174,7 +159,9 @@ fun WeGlowApp() {
     )
 
     val journalViewModel: RoutineJournalViewModel = viewModel(
-        factory = viewModelFactory { RoutineJournalViewModel(context, container.authRepository) }
+        factory = viewModelFactory {
+            RoutineJournalViewModel(context, container.authRepository)
+        }
     )
 
     val savedProductsViewModel: SavedProductsViewModel = viewModel(
@@ -194,32 +181,53 @@ fun WeGlowApp() {
             )
         }
     )
+
     val environmentViewModel: EnvironmentViewModel = viewModel(
         factory = viewModelFactory {
-            EnvironmentViewModel(container.locationProvider(context), container.environmentRepository())
+            EnvironmentViewModel(
+                container.locationProvider(context),
+                container.environmentRepository(),
+                container.profileRepository,
+                container.authRepository,
+            )
         }
     )
+
     val environmentState by environmentViewModel.uiState.collectAsState()
+
     val uvAlertNotifier = remember { UvAlertNotifier(context) }
-    var notificationPermissionRequested by remember { mutableStateOf(false) }
+
+    var notificationPermissionRequested by remember {
+        mutableStateOf(false)
+    }
+
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) {
-            (environmentState as? EnvironmentUiState.Success)?.environment?.let(uvAlertNotifier::notifyIfHigh)
+            (environmentState as? EnvironmentUiState.Success)
+                ?.environment
+                ?.let(uvAlertNotifier::notifyIfHigh)
         }
     }
+
     var hasLocationPermission by remember {
         mutableStateOf(context.hasEnvironmentLocationPermission())
     }
+
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
         hasLocationPermission = context.hasEnvironmentLocationPermission()
         environmentViewModel.refresh(hasLocationPermission)
     }
+
     val journalState by journalViewModel.uiState.collectAsState()
-    var homeRoutineMorning by remember { mutableStateOf<Boolean?>(null) }
+
+    var homeRoutineMorning by remember {
+        mutableStateOf<Boolean?>(null)
+    }
+
     val authState by authViewModel.uiState.collectAsState()
     val startupDestination by authViewModel.startupDestination.collectAsState()
     val onboardingState by onboardingViewModel.uiState.collectAsState()
@@ -234,25 +242,29 @@ fun WeGlowApp() {
     val cartState by cartViewModel.uiState.collectAsState()
 
     LaunchedEffect(environmentState) {
-        val environment = (environmentState as? EnvironmentUiState.Success)?.environment ?: return@LaunchedEffect
+        val environment =
+            (environmentState as? EnvironmentUiState.Success)?.environment
+                ?: return@LaunchedEffect
+
         if (environment.uvIndex < 6.0) return@LaunchedEffect
+
         if (
             Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
         ) {
             uvAlertNotifier.notifyIfHigh(environment)
         } else if (!notificationPermissionRequested) {
             notificationPermissionRequested = true
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            notificationPermissionLauncher.launch(
+                Manifest.permission.POST_NOTIFICATIONS
+            )
         }
     }
 
-    // Global session-termination reaction, owned by the navigation root rather than by
-    // whichever screen happens to trigger sign-out. This must stay mounted for the whole
-    // app lifetime (not scoped to a single destination's composition) so a SignedOut event
-    // is always handled regardless of which screen is on screen when it fires. Screens that
-    // can initiate sign-out (currently only Profile) call authViewModel.signOut() and do not
-    // react to the result themselves.
+    // Global session-termination reaction.
     LaunchedEffect(authState.event) {
 
         if (authState.event is AuthEvent.SignedOut) {
@@ -266,8 +278,6 @@ fun WeGlowApp() {
             navController.navigate(
                 Destination.Login.route
             ) {
-
-                // Completely clear authenticated navigation.
                 popUpTo(navController.graph.id) {
                     inclusive = true
                 }
@@ -279,19 +289,17 @@ fun WeGlowApp() {
         }
     }
 
-    // One-shot workflow-completion effects from the Scan destination's flow coordinator.
-    // ScanFlowViewModel never touches the NavController itself; this is the single place that
-    // turns "acne/hairstyle analysis finished" into an actual navigation call. Mounted for the
-    // whole app lifetime (like the sign-out effect above) so it is always subscribed the moment
-    // an effect is emitted, rather than being scoped to the Scan composable's own lifecycle.
+    // One-shot workflow-completion effects from the Scan flow.
     LaunchedEffect(Unit) {
         scanFlowViewModel.effects.collect { effect ->
             when (effect) {
+
                 ScanFlowEffect.NavigateToAcneResults -> {
                     navController.navigate(Destination.ScanResults.route) {
                         popUpTo(Destination.Scan.route) {
                             inclusive = true
                         }
+
                         launchSingleTop = true
                     }
                 }
@@ -301,6 +309,7 @@ fun WeGlowApp() {
                         popUpTo(Destination.Scan.route) {
                             inclusive = true
                         }
+
                         launchSingleTop = true
                     }
                 }
@@ -310,20 +319,60 @@ fun WeGlowApp() {
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+
         bottomBar = {
 
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = backStackEntry?.destination?.route
 
-            // Scan owns its own camera/analyzing navigation. Keep it completely edge-to-edge;
-            // in particular, the Figma analyzing page must never show the tab bar.
-            if (currentRoute in tabs.map { it.route } && currentRoute != Destination.Scan.route) {
-
+            if (
+                currentRoute in tabs.map { it.route } &&
+                currentRoute != Destination.Scan.route
+            ) {
                 WeGlowBottomNavigation(
                     items = tabs,
                     selectedRoute = currentRoute,
-                    onSelect = { tab -> navigateToTab(tab.route) },
+                    onSelect = { tab ->
+
+                        navController.navigate(tab.route) {
+
+                            popUpTo(Destination.Home.route) {
+                                saveState = true
+                            }
+
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                 )
+            }
+        },
+
+        floatingActionButton = {
+
+            val backStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = backStackEntry?.destination?.route
+
+            if (currentRoute == Destination.Home.route) {
+
+                FloatingActionButton(
+                    onClick = {
+                        navController.navigate(
+                            Destination.Chatbot.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+                    shape = CircleShape,
+                    containerColor = DarkGreen,
+                    contentColor = Color.White,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Chat,
+                        contentDescription = "Open chatbot"
+                    )
+                }
             }
         }
     ) { padding ->
@@ -368,8 +417,6 @@ fun WeGlowApp() {
                             Destination.Login.route
 
                         StartupDestination.ONBOARDING -> {
-                            // Restored session with unfinished onboarding: reset the
-                            // wizard and resolve identity before the first question.
                             onboardingViewModel.start()
                             Destination.AgeSelection.route
                         }
@@ -429,9 +476,6 @@ fun WeGlowApp() {
                                 ) {
                                     Destination.Home
                                 } else {
-                                    // Sign-in / Google for a user who has not
-                                    // finished onboarding: reset the wizard and
-                                    // resolve identity before the first question.
                                     onboardingViewModel.start()
                                     Destination.AgeSelection
                                 }
@@ -477,7 +521,6 @@ fun WeGlowApp() {
                             Destination.AgeSelection.route
                         ) {
 
-                            // Remove authentication screens after signup.
                             popUpTo(Destination.Login.route) {
                                 inclusive = true
                             }
@@ -592,17 +635,6 @@ fun WeGlowApp() {
                             Destination.Home.route
                         ) {
 
-                            /*
-                             * Phase 3 blocker fix:
-                             * Clear the ENTIRE onboarding wizard.
-                             *
-                             * Removes:
-                             * AgeSelection
-                             * SkinType
-                             * GenderSelection
-                             * SkinSensitivity
-                             * WelcomeIntro
-                             */
                             popUpTo(Destination.AgeSelection.route) {
                                 inclusive = true
                             }
@@ -620,72 +652,171 @@ fun WeGlowApp() {
             composable(Destination.Home.route) {
 
                 val lifecycleOwner = LocalLifecycleOwner.current
+
                 DisposableEffect(lifecycleOwner) {
-                    val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_RESUME) {
-                            hasLocationPermission = context.hasEnvironmentLocationPermission()
-                            if (hasLocationPermission) environmentViewModel.refresh(true)
+
+                    val observer =
+                        LifecycleEventObserver { _, event ->
+
+                            if (event == Lifecycle.Event.ON_RESUME) {
+
+                                hasLocationPermission =
+                                    context.hasEnvironmentLocationPermission()
+
+                                if (hasLocationPermission) {
+                                    environmentViewModel.refresh(true)
+                                }
+                            }
                         }
-                    }
+
                     lifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                    }
                 }
 
                 LaunchedEffect(Unit) {
+
                     profileViewModel.refresh()
                     routineViewModel.load()
-                    if (hasLocationPermission) environmentViewModel.refresh(true)
-                    else locationPermissionLauncher.launch(
-                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                    )
+
+                    if (hasLocationPermission) {
+                        environmentViewModel.refresh(true)
+                    } else {
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            )
+                        )
+                    }
                 }
 
                 HomeScreen(
 
                     displayName = profileState.displayName,
                     environmentState = environmentState,
+
                     onEnvironmentRetry = {
-                        if (hasLocationPermission) environmentViewModel.refresh(true)
-                        else locationPermissionLauncher.launch(
-                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                        )
+
+                        if (hasLocationPermission) {
+                            environmentViewModel.refresh(true)
+                        } else {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                                )
+                            )
+                        }
                     },
+
                     profileImage = profileState.profileImage,
-                    morningRoutine = routineState.plan?.morning.orEmpty(),
-                    eveningRoutine = routineState.plan?.evening.orEmpty(),
-                    isRoutineLoading = routineState.isLoading,
-                    routineError = journalState.errorMessage ?: routineState.errorMessage,
-                    onProfileClick = { navigateToTab(Destination.Profile.route) },
-                    onRoutinesPeriodClick = { morning ->
-                        homeRoutineMorning = morning
-                        navigateToTab(Destination.Routines.route)
-                    },
-                    completedRoutineKeys = journalState.completedKeys,
-                    onToggleRoutineStep = journalViewModel::toggleCompletion,
 
-                    onScanClick = { navigateToTab(Destination.Scan.route) },
+                    morningRoutine =
+                        routineState.plan?.morning.orEmpty(),
 
-                    onDiscoverClick = { navigateToTab(Destination.Discover.route) },
+                    eveningRoutine =
+                        routineState.plan?.evening.orEmpty(),
 
-                    onRecommendationsClick = {
+                    isRoutineLoading =
+                        routineState.isLoading,
+
+                    routineError =
+                        journalState.errorMessage
+                            ?: routineState.errorMessage,
+
+                    onProfileClick = {
 
                         navController.navigate(
-                            Destination.Recommendations.routeFor(fromScan = false)
+                            Destination.Profile.route
+                        ) {
+
+                            popUpTo(Destination.Home.route) {
+                                saveState = true
+                            }
+
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+
+                    onRoutinesPeriodClick = { morning ->
+
+                        homeRoutineMorning = morning
+
+                        navController.navigate(
+                            Destination.Routines.route
                         ) {
                             launchSingleTop = true
                         }
                     },
-                    onRoutinesClick = { navigateToTab(Destination.Routines.route) },
+
+                    completedRoutineKeys =
+                        journalState.completedKeys,
+
+                    onToggleRoutineStep =
+                        journalViewModel::toggleCompletion,
+
+                    onScanClick = {
+
+                        navController.navigate(
+                            Destination.Scan.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onDiscoverClick = {
+
+                        navController.navigate(
+                            Destination.Discover.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onRecommendationsClick = {
+
+                        navController.navigate(
+                            Destination.Recommendations.routeFor(
+                                fromScan = false
+                            )
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onRoutinesClick = {
+
+                        navController.navigate(
+                            Destination.Routines.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
 
+            // ---------------------------------------------------------
+            // DISCOVER
+            // ---------------------------------------------------------
+
             composable(Destination.Discover.route) {
+
                 LaunchedEffect(Unit) {
+
                     discoverViewModel.loadProducts()
+
                     recommendationViewModel.load(
-                        scanState.result?.detections?.map { detection -> detection.label },
+                        scanState.result
+                            ?.detections
+                            ?.map { detection -> detection.label },
                     )
+
                     profileViewModel.refresh()
+
                     savedProductsViewModel.load()
                 }
 
@@ -695,22 +826,49 @@ fun WeGlowApp() {
                     errorMessage = discoverState.errorMessage,
                     onRetry = discoverViewModel::loadProducts,
                     profileImage = profileState.profileImage,
-                    productRecommendations = recommendationState.result
-                        ?.recommendations
-                        .orEmpty(),
-                    recommendationsLoading = recommendationState.isLoading,
-                    recommendationsErrorMessage = recommendationState.errorMessage,
+
+                    productRecommendations =
+                        recommendationState.result
+                            ?.recommendations
+                            .orEmpty(),
+
+                    recommendationsLoading =
+                        recommendationState.isLoading,
+
+                    recommendationsErrorMessage =
+                        recommendationState.errorMessage,
+
                     onRecommendationsRetry = {
+
                         recommendationViewModel.load(
-                            scanState.result?.detections?.map { detection -> detection.label },
+                            scanState.result
+                                ?.detections
+                                ?.map { detection -> detection.label },
                         )
                     },
-                    savedProductNumbers = savedProductsState.savedProductNumbers,
-                    pendingSaveProductNumbers = savedProductsState.pendingProductNumbers,
-                    onToggleSaved = savedProductsViewModel::toggleSaved,
-                    pendingCartProductNumbers = cartState.pendingProductNumbers,
-                    onAddToCart = cartViewModel::addToCart,
-                    onCartClick = { navController.navigate(Destination.Cart.route) { launchSingleTop = true } },
+
+                    savedProductNumbers =
+                        savedProductsState.savedProductNumbers,
+
+                    pendingSaveProductNumbers =
+                        savedProductsState.pendingProductNumbers,
+
+                    onToggleSaved =
+                        savedProductsViewModel::toggleSaved,
+
+                    pendingCartProductNumbers =
+                        cartState.pendingProductNumbers,
+
+                    onAddToCart =
+                        cartViewModel::addToCart,
+
+                    onCartClick = {
+                        navController.navigate(
+                            Destination.Cart.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
 
@@ -720,40 +878,48 @@ fun WeGlowApp() {
 
             composable(Destination.Scan.route) {
 
-                // Every fresh entry into the Scan destination starts at mode-selection, exactly
-                // as it did when this flow state lived in the composable's own rememberSaveable
-                // state (that state was reset simply because the composable was recreated).
-                // ScanFlowViewModel is Activity-scoped and survives leaving/returning to Scan,
-                // so it must be told explicitly to reset on each fresh entry. profileViewModel
-                // is refreshed here too so a gender change made in Profile is guaranteed to be
-                // current before the hairstyle flow reads profileState.gender below, even if
-                // the user navigates straight into Scan without passing back through Home.
                 LaunchedEffect(Unit) {
+
                     scanFlowViewModel.resetFlow()
+
+                    // Make sure hairstyle analysis uses the latest
+                    // persisted profile gender.
                     profileViewModel.refresh()
                 }
 
-                // The hairstyle flow must use the user's CURRENT saved profile gender, not the
-                // onboarding wizard's in-memory answer (onboardingState.gender is a one-shot
-                // snapshot that goes stale the moment Profile lets the user change gender
-                // afterwards, and is never refreshed). profileState.gender is loaded from the
-                // same `profiles.gender` column on every entry into this destination and after
-                // every Profile edit, so it always reflects the latest persisted value.
                 ScanScreen(
+
                     photoUri = scanState.photoUri,
                     acneState = scanState,
                     hairstyleState = hairstyleState,
                     flowState = scanFlowState,
-                    onSelectMode = scanFlowViewModel::selectMode,
+
+                    onSelectMode =
+                        scanFlowViewModel::selectMode,
+
                     onPhotoReady = { uri ->
-                        scanFlowViewModel.onPhotoReady(uri, profileState.gender)
+
+                        scanFlowViewModel.onPhotoReady(
+                            uri,
+                            profileState.gender
+                        )
                     },
-                    onCancel = scanFlowViewModel::cancelAnalysis,
-                    onRetryAcne = scanFlowViewModel::retryAcne,
+
+                    onCancel =
+                        scanFlowViewModel::cancelAnalysis,
+
+                    onRetryAcne =
+                        scanFlowViewModel::retryAcne,
+
                     onRetryHairstyle = {
-                        scanFlowViewModel.retryHairstyle(profileState.gender)
+
+                        scanFlowViewModel.retryHairstyle(
+                            profileState.gender
+                        )
                     },
-                    onReturnToModeSelection = scanFlowViewModel::returnToModeSelection,
+
+                    onReturnToModeSelection =
+                        scanFlowViewModel::returnToModeSelection,
 
                     onBack = {
                         navController.popBackStack()
@@ -761,9 +927,14 @@ fun WeGlowApp() {
                 )
             }
 
+            // ---------------------------------------------------------
+            // SCAN RESULTS
+            // ---------------------------------------------------------
+
             composable(Destination.ScanResults.route) {
 
                 ScanResultsScreen(
+
                     photoUri = scanState.photoUri,
                     result = scanState.result,
 
@@ -774,7 +945,9 @@ fun WeGlowApp() {
                     onViewRecommendations = {
 
                         navController.navigate(
-                            Destination.Recommendations.routeFor(fromScan = true)
+                            Destination.Recommendations.routeFor(
+                                fromScan = true
+                            )
                         ) {
                             launchSingleTop = true
                         }
@@ -782,42 +955,96 @@ fun WeGlowApp() {
                 )
             }
 
+            // ---------------------------------------------------------
+            // RECOMMENDATIONS
+            // ---------------------------------------------------------
+
             composable(
                 route = Destination.Recommendations.route,
-                arguments = listOf(navArgument("fromScan") { type = NavType.BoolType; defaultValue = false }),
+                arguments = listOf(
+                    navArgument("fromScan") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    }
+                ),
             ) { backStackEntry ->
 
-                val fromScan = backStackEntry.arguments?.getBoolean("fromScan") == true
-                val scanConcerns = if (fromScan) scanState.result?.detections?.map { it.label } else null
+                val fromScan =
+                    backStackEntry.arguments
+                        ?.getBoolean("fromScan") == true
+
+                val scanConcerns =
+                    if (fromScan) {
+                        scanState.result
+                            ?.detections
+                            ?.map { it.label }
+                    } else {
+                        null
+                    }
 
                 LaunchedEffect(Unit) {
                     recommendationViewModel.load(scanConcerns)
                 }
 
                 RecommendationsScreen(
-                    onScanClick = { navigateToTab(Destination.Scan.route) },
-                    onDiscoverClick = { navigateToTab(Destination.Discover.route) },
-                    isLoading = recommendationState.isLoading,
-                    result = recommendationState.result,
-                    errorMessage = recommendationState.errorMessage,
+
+                    onScanClick = {
+                        navController.navigate(
+                            Destination.Scan.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onDiscoverClick = {
+                        navController.navigate(
+                            Destination.Discover.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    isLoading =
+                        recommendationState.isLoading,
+
+                    result =
+                        recommendationState.result,
+
+                    errorMessage =
+                        recommendationState.errorMessage,
+
                     onBack = {
                         navController.popBackStack()
                     },
+
                     onRetry = {
                         recommendationViewModel.load(scanConcerns)
                     },
                 )
             }
 
+            // ---------------------------------------------------------
+            // HAIRSTYLE RESULTS
+            // ---------------------------------------------------------
+
             composable(Destination.HairstyleResults.route) {
+
                 val result = hairstyleState.result
+
                 if (result != null) {
+
                     HairstyleResultsScreen(
                         result = result,
-                        onBack = { navController.popBackStack() },
+                        onBack = {
+                            navController.popBackStack()
+                        },
                     )
+
                 } else {
-                    LaunchedEffect(Unit) { navController.popBackStack() }
+
+                    LaunchedEffect(Unit) {
+                        navController.popBackStack()
+                    }
                 }
             }
 
@@ -828,21 +1055,42 @@ fun WeGlowApp() {
             composable(Destination.Routines.route) {
 
                 LaunchedEffect(Unit) {
+
                     routineViewModel.load()
                     profileViewModel.refresh()
                 }
 
                 RoutinesScreen(
-                    isLoading = routineState.isLoading,
-                    errorMessage = routineState.errorMessage,
-                    plan = routineState.plan,
-                    journal = journalState,
-                    initialMorning = homeRoutineMorning,
-                    onToggleRoutineStep = journalViewModel::toggleCompletion,
-                    onSaveNote = journalViewModel::saveNote,
-                    onRetry = routineViewModel::load,
-                    displayName = profileState.displayName,
-                    profileImage = profileState.profileImage,
+
+                    isLoading =
+                        routineState.isLoading,
+
+                    errorMessage =
+                        routineState.errorMessage,
+
+                    plan =
+                        routineState.plan,
+
+                    journal =
+                        journalState,
+
+                    initialMorning =
+                        homeRoutineMorning,
+
+                    onToggleRoutineStep =
+                        journalViewModel::toggleCompletion,
+
+                    onSaveNote =
+                        journalViewModel::saveNote,
+
+                    onRetry =
+                        routineViewModel::load,
+
+                    displayName =
+                        profileState.displayName,
+
+                    profileImage =
+                        profileState.profileImage,
                 )
             }
 
@@ -852,41 +1100,134 @@ fun WeGlowApp() {
 
             composable(Destination.Profile.route) {
 
-                LaunchedEffect(Unit) { profileViewModel.refresh() }
+                LaunchedEffect(Unit) {
+                    profileViewModel.refresh()
+                }
 
                 ProfileScreen(
-                    displayName = profileState.displayName,
-                    profileImage = profileState.profileImage,
-                    isUploadingImage = profileState.isUploadingImage,
-                    imageError = profileState.imageError,
-                    onProfileImagePicked = profileViewModel::onProfileImagePicked,
-                    onProfileImageUnreadable = profileViewModel::onProfileImageUnreadable,
-                    onConsumeImageError = profileViewModel::consumeImageError,
-                    onScanClick = { navigateToTab(Destination.Scan.route) },
-                    onRoutinesClick = { navigateToTab(Destination.Routines.route) },
-                    onDiscoverClick = { navigateToTab(Destination.Discover.route) },
-                    onRecommendationsClick = { navController.navigate(Destination.Recommendations.routeFor(false)) { launchSingleTop = true } },
-                    onAccountSettingsClick = { navController.navigate(Destination.AccountSettings.route) { launchSingleTop = true } },
-                    onSavedProductsClick = { navController.navigate(Destination.SavedProducts.route) { launchSingleTop = true } },
-                    onLogout = authViewModel::signOut
+
+                    displayName =
+                        profileState.displayName,
+
+                    profileImage =
+                        profileState.profileImage,
+
+                    isUploadingImage =
+                        profileState.isUploadingImage,
+
+                    imageError =
+                        profileState.imageError,
+
+                    onProfileImagePicked =
+                        profileViewModel::onProfileImagePicked,
+
+                    onProfileImageUnreadable =
+                        profileViewModel::onProfileImageUnreadable,
+
+                    onConsumeImageError =
+                        profileViewModel::consumeImageError,
+
+                    onScanClick = {
+                        navController.navigate(
+                            Destination.Scan.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onRoutinesClick = {
+                        navController.navigate(
+                            Destination.Routines.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onDiscoverClick = {
+                        navController.navigate(
+                            Destination.Discover.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onRecommendationsClick = {
+                        navController.navigate(
+                            Destination.Recommendations.routeFor(false)
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onAccountSettingsClick = {
+                        navController.navigate(
+                            Destination.AccountSettings.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onSavedProductsClick = {
+                        navController.navigate(
+                            Destination.SavedProducts.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onLogout =
+                        authViewModel::signOut
                 )
             }
 
+            // ---------------------------------------------------------
+            // ACCOUNT SETTINGS
+            // ---------------------------------------------------------
+
             composable(Destination.AccountSettings.route) {
 
-                LaunchedEffect(Unit) { profileViewModel.refresh() }
+                LaunchedEffect(Unit) {
+                    profileViewModel.refresh()
+                }
 
                 AccountSettingsScreen(
-                    onBack = { navController.popBackStack() },
-                    displayName = profileState.displayName,
-                    email = profileState.email,
-                    gender = profileState.gender,
-                    isUpdatingGender = profileState.isUpdatingGender,
-                    genderError = profileState.genderError,
-                    onGenderSelected = profileViewModel::onGenderSelected,
-                    onConsumeGenderError = profileViewModel::consumeGenderError,
-                    onPrivacyPolicyClick = { navController.navigate(Destination.PrivacyPolicy.route) { launchSingleTop = true } },
-                    onTermsConditionsClick = { navController.navigate(Destination.TermsConditions.route) { launchSingleTop = true } },
+
+                    onBack = {
+                        navController.popBackStack()
+                    },
+
+                    displayName =
+                        profileState.displayName,
+
+                    email =
+                        profileState.email,
+
+                    gender =
+                        profileState.gender,
+
+                    isUpdatingGender =
+                        profileState.isUpdatingGender,
+
+                    genderError =
+                        profileState.genderError,
+
+                    onGenderSelected =
+                        profileViewModel::onGenderSelected,
+
+                    onConsumeGenderError =
+                        profileViewModel::consumeGenderError,
+
+                    onPrivacyPolicyClick = {
+                        navController.navigate(Destination.PrivacyPolicy.route) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onTermsConditionsClick = {
+                        navController.navigate(Destination.TermsConditions.route) {
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
 
@@ -899,41 +1240,103 @@ fun WeGlowApp() {
             }
 
             // ---------------------------------------------------------
-            // SAVED PRODUCTS / CART
+            // SAVED PRODUCTS
             // ---------------------------------------------------------
 
             composable(Destination.SavedProducts.route) {
 
-                LaunchedEffect(Unit) { savedProductsViewModel.load() }
+                LaunchedEffect(Unit) {
+                    savedProductsViewModel.load()
+                }
 
                 SavedProductsScreen(
-                    isLoading = savedProductsState.isLoading,
-                    products = savedProductsState.products,
-                    errorMessage = savedProductsState.errorMessage,
-                    pendingProductNumbers = savedProductsState.pendingProductNumbers,
-                    cartPendingProductNumbers = cartState.pendingProductNumbers,
-                    onBack = { navController.popBackStack() },
-                    onRemove = savedProductsViewModel::remove,
-                    onAddToCart = cartViewModel::addToCart,
-                    onRetry = savedProductsViewModel::load,
+
+                    isLoading =
+                        savedProductsState.isLoading,
+
+                    products =
+                        savedProductsState.products,
+
+                    errorMessage =
+                        savedProductsState.errorMessage,
+
+                    pendingProductNumbers =
+                        savedProductsState.pendingProductNumbers,
+
+                    cartPendingProductNumbers =
+                        cartState.pendingProductNumbers,
+
+                    onBack = {
+                        navController.popBackStack()
+                    },
+
+                    onRemove =
+                        savedProductsViewModel::remove,
+
+                    onAddToCart =
+                        cartViewModel::addToCart,
+
+                    onRetry =
+                        savedProductsViewModel::load,
                 )
             }
 
+            // ---------------------------------------------------------
+            // CART
+            // ---------------------------------------------------------
+
             composable(Destination.Cart.route) {
 
-                LaunchedEffect(Unit) { cartViewModel.load() }
+                LaunchedEffect(Unit) {
+                    cartViewModel.load()
+                }
 
                 CartScreen(
-                    isLoading = cartState.isLoading,
-                    items = cartState.items,
-                    subtotalLkr = cartState.subtotalLkr,
-                    errorMessage = cartState.errorMessage,
-                    pendingProductNumbers = cartState.pendingProductNumbers,
-                    onBack = { navController.popBackStack() },
-                    onIncrement = cartViewModel::incrementQuantity,
-                    onDecrement = cartViewModel::decrementQuantity,
-                    onRemove = cartViewModel::removeFromCart,
-                    onRetry = cartViewModel::load,
+
+                    isLoading =
+                        cartState.isLoading,
+
+                    items =
+                        cartState.items,
+
+                    subtotalLkr =
+                        cartState.subtotalLkr,
+
+                    errorMessage =
+                        cartState.errorMessage,
+
+                    pendingProductNumbers =
+                        cartState.pendingProductNumbers,
+
+                    onBack = {
+                        navController.popBackStack()
+                    },
+
+                    onIncrement =
+                        cartViewModel::incrementQuantity,
+
+                    onDecrement =
+                        cartViewModel::decrementQuantity,
+
+                    onRemove =
+                        cartViewModel::removeFromCart,
+
+                    onRetry =
+                        cartViewModel::load,
+                )
+            }
+
+            // ---------------------------------------------------------
+            // CHATBOT
+            // ---------------------------------------------------------
+
+            composable(Destination.Chatbot.route) {
+
+                WeGlowChatScreen(
+                    chatViewModel = chatViewModel,
+                    onBack = {
+                        navController.popBackStack()
+                    },
                 )
             }
         }
@@ -941,5 +1344,11 @@ fun WeGlowApp() {
 }
 
 private fun android.content.Context.hasEnvironmentLocationPermission(): Boolean =
-    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED

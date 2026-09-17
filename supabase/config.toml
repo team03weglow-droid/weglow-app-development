@@ -1,0 +1,7 @@
+# Supabase CLI configuration for WEGlow.
+# The chat backend now runs as a hosted Edge Function instead of the local
+# FastAPI server (backend/chat.py).
+project_id = "edmlbdkvrtmpcwigrqtr"
+
+[functions.chat]
+verify_jwt = true
