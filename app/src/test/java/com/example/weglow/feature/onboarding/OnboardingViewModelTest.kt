@@ -322,5 +322,4 @@ private class RecordingProfileRepository(
         gender: String,
     ): Result<Unit> =
         Result.success(Unit)
-        Result.success(Unit)
 }

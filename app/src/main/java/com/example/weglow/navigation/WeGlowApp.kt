@@ -459,6 +459,8 @@ fun WeGlowApp() {
 
                     isLoading = authState.isLoading,
                     errorMessage = authState.errorMessage,
+                    onTermsConditionsClick = { navController.navigate(Destination.TermsConditions.route) { launchSingleTop = true } },
+                    onPrivacyPolicyClick = { navController.navigate(Destination.PrivacyPolicy.route) { launchSingleTop = true } },
                 )
 
                 LaunchedEffect(authState.event) {
@@ -501,6 +503,8 @@ fun WeGlowApp() {
                     onCreateAccount = authViewModel::signUp,
                     isLoading = authState.isLoading,
                     errorMessage = authState.errorMessage,
+                    onTermsConditionsClick = { navController.navigate(Destination.TermsConditions.route) { launchSingleTop = true } },
+                    onPrivacyPolicyClick = { navController.navigate(Destination.PrivacyPolicy.route) { launchSingleTop = true } },
                 )
 
                 LaunchedEffect(authState.event) {
@@ -1212,7 +1216,27 @@ fun WeGlowApp() {
 
                     onConsumeGenderError =
                         profileViewModel::consumeGenderError,
+
+                    onPrivacyPolicyClick = {
+                        navController.navigate(Destination.PrivacyPolicy.route) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onTermsConditionsClick = {
+                        navController.navigate(Destination.TermsConditions.route) {
+                            launchSingleTop = true
+                        }
+                    },
                 )
+            }
+
+            composable(Destination.PrivacyPolicy.route) {
+                PrivacyPolicyScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(Destination.TermsConditions.route) {
+                TermsConditionsScreen(onBack = { navController.popBackStack() })
             }
 
             // ---------------------------------------------------------
