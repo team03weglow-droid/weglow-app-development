@@ -23,19 +23,19 @@ class SupabaseAcneScanRepository(
 
     override suspend fun analyze(photoReference: String): Result<AcneScanResult> {
         return onDevice.analyze(photoReference).onSuccess { result ->
-            val summary = concernsSummary(result)
+            val summary = concernsSummary(result).ifBlank {
+                "No skin concerns detected in the latest scan"
+            }
 
-            if (summary.isNotEmpty()) {
-                authRepository.currentUserId()?.let { userId ->
-                    runCatching {
-                        profileRepository.updateScanSummary(
-                            userId,
-                            summary,
-                            Instant.now(),
-                        )
-                    }
-                    // Best-effort: failures are ignored so the local scan still surfaces to the user.
+            authRepository.currentUserId()?.let { userId ->
+                runCatching {
+                    profileRepository.updateScanSummary(
+                        userId,
+                        summary,
+                        Instant.now(),
+                    ).getOrThrow()
                 }
+                // Best-effort: failures are ignored so the local scan still surfaces to the user.
             }
         }
     }

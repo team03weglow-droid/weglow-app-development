@@ -4,8 +4,11 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,18 +19,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,25 +49,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.example.weglow.R
 import com.example.weglow.chatbot.VoiceAgentManager
 import com.example.weglow.feature.chat.ChatMessage
 import com.example.weglow.feature.chat.ChatViewModel
+import com.example.weglow.ui.theme.CardWhite
+import com.example.weglow.ui.theme.DarkGreen
+import com.example.weglow.ui.theme.PageBackground
+import com.example.weglow.ui.theme.SoftGray
 import com.example.weglow.ui.theme.WeGlowRadius
-import com.example.weglow.ui.theme.WeGlowSize
 import com.example.weglow.ui.theme.WeGlowSpacing
 import kotlinx.coroutines.delay
 
 @Composable
 fun WeGlowChatScreen(
     chatViewModel: ChatViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
-
     val chatState by chatViewModel.uiState.collectAsState()
 
     var messageText by remember { mutableStateOf("") }
@@ -70,22 +84,14 @@ fun WeGlowChatScreen(
     val voiceAgentManager = remember {
         VoiceAgentManager(
             context = context,
-            onSpeechResult = { spokenText ->
-                messageText = spokenText
-            },
-            onListeningStateChanged = { listening ->
-                isListening = listening
-            },
-            onRecognitionError = { message ->
-                voiceError = message
-            }
+            onSpeechResult = { spokenText -> messageText = spokenText },
+            onListeningStateChanged = { listening -> isListening = listening },
+            onRecognitionError = { message -> voiceError = message },
         )
     }
 
     DisposableEffect(Unit) {
-        onDispose {
-            voiceAgentManager.destroy()
-        }
+        onDispose { voiceAgentManager.destroy() }
     }
 
     LaunchedEffect(voiceError) {
@@ -102,192 +108,77 @@ fun WeGlowChatScreen(
         }
     }
 
-    val scrollTarget =
-        if (chatState.isSending) {
-            chatState.messages.size
-        } else {
-            chatState.messages.lastIndex
-        }
-
+    val scrollTarget = if (chatState.isSending) chatState.messages.size else chatState.messages.lastIndex
     LaunchedEffect(scrollTarget, chatState.messages.size) {
-        if (scrollTarget >= 0) {
-            listState.animateScrollToItem(scrollTarget)
+        if (scrollTarget >= 0) listState.animateScrollToItem(scrollTarget)
+    }
+
+    val microphonePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            voiceAgentManager.startListening()
+        } else {
+            voiceError = "Microphone permission is required for voice input."
         }
     }
 
-    val microphonePermissionLauncher =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.RequestPermission()
-        ) { granted ->
-            if (granted) {
-                voiceAgentManager.startListening()
-            } else {
-                voiceError = "Microphone permission is required for voice input."
-            }
-        }
-
     fun startVoiceInput() {
-        val permissionGranted =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
 
-        if (permissionGranted) {
+        if (hasPermission) {
             voiceAgentManager.startListening()
         } else {
-            microphonePermissionLauncher.launch(
-                Manifest.permission.RECORD_AUDIO
-            )
+            microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
     fun sendMessage() {
         val text = messageText.trim()
-
         if (text.isEmpty()) return
-
         chatViewModel.sendMessage(text)
-
         messageText = ""
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .imePadding()
+            .background(PageBackground)
+            .imePadding(),
     ) {
+        ChatHeader(onBack = onBack)
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = WeGlowSpacing.sm,
-                    vertical = WeGlowSpacing.xs
-                ),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.size(WeGlowSize.iconLarge)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onBackground
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.size(WeGlowSpacing.xs)
-            )
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = "WeGlow AI",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-
-                Text(
-                    text = if (isListening) {
-                        "Listening..."
-                    } else {
-                        "Your beauty & skincare assistant"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isListening) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-            }
-        }
-
-        if (voiceError != null) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = WeGlowSpacing.md),
-                color = MaterialTheme.colorScheme.errorContainer,
-                shape = RoundedCornerShape(WeGlowRadius.medium)
-            ) {
-                Text(
-                    text = voiceError ?: "",
-                    modifier = Modifier.padding(
-                        horizontal = WeGlowSpacing.md,
-                        vertical = WeGlowSpacing.sm
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.height(WeGlowSpacing.xs)
-            )
-        }
-
-        chatState.errorMessage?.let { errorText ->
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = WeGlowSpacing.md),
-                color = MaterialTheme.colorScheme.errorContainer,
-                shape = RoundedCornerShape(WeGlowRadius.medium)
-            ) {
-                Text(
-                    text = errorText,
-                    modifier = Modifier.padding(
-                        horizontal = WeGlowSpacing.md,
-                        vertical = WeGlowSpacing.sm
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.height(WeGlowSpacing.xs)
-            )
-        }
+        voiceError?.let { error -> ChatErrorBanner(text = error) }
+        chatState.errorMessage?.let { error -> ChatErrorBanner(text = error) }
 
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = WeGlowSpacing.md),
+                .fillMaxWidth(),
             state = listState,
-            verticalArrangement = Arrangement.spacedBy(
-                WeGlowSpacing.sm
-            ),
+            verticalArrangement = Arrangement.spacedBy(WeGlowSpacing.sm),
             contentPadding = PaddingValues(
-                top = WeGlowSpacing.md,
-                bottom = WeGlowSpacing.md
-            )
+                start = WeGlowSpacing.lg,
+                top = WeGlowSpacing.lg,
+                end = WeGlowSpacing.lg,
+                bottom = WeGlowSpacing.md,
+            ),
         ) {
-
             items(chatState.messages) { message ->
                 ChatBubble(message = message)
             }
 
             if (chatState.isSending) {
-                item {
-                    TypingIndicator()
-                }
+                item { TypingIndicator() }
             }
 
-            item {
-                SuggestedQuestions(
-                    onQuestionClick = { question ->
-                        messageText = question
-                    }
-                )
+            if (chatState.messages.none { it.isUser }) {
+                item {
+                    SuggestedQuestions(onQuestionClick = { question -> messageText = question })
+                }
             }
         }
 
@@ -296,64 +187,107 @@ fun WeGlowChatScreen(
             onValueChange = { messageText = it },
             onSend = { sendMessage() },
             onMic = { startVoiceInput() },
-            isListening = isListening
+            isListening = isListening,
         )
     }
 }
 
 @Composable
-private fun ChatBubble(
-    message: ChatMessage
+private fun ChatHeader(
+    onBack: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (message.isUser) {
-            Arrangement.End
-        } else {
-            Arrangement.Start
-        }
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = WeGlowSpacing.sm,
+                top = WeGlowSpacing.xs,
+                end = WeGlowSpacing.lg,
+            ),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = DarkGreen,
+            )
+        }
+
+        Image(
+            painter = painterResource(R.drawable.weglow_logo),
+            contentDescription = "WeGlow",
+            modifier = Modifier.size(28.dp),
+        )
+    }
+}
+
+@Composable
+private fun ChatErrorBanner(text: String) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = WeGlowSpacing.lg, top = WeGlowSpacing.sm, end = WeGlowSpacing.lg),
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = RoundedCornerShape(WeGlowRadius.medium),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = WeGlowSpacing.md, vertical = WeGlowSpacing.sm),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+        )
+    }
+}
+
+@Composable
+private fun ChatBubble(message: ChatMessage) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        if (!message.isUser) {
+            AssistantBadge()
+            Spacer(Modifier.width(WeGlowSpacing.xs))
+        }
 
         Surface(
-            modifier = Modifier.fillMaxWidth(
-                fraction = if (message.isUser) 0.82f else 0.88f
-            ),
+            modifier = Modifier.fillMaxWidth(if (message.isUser) 0.80f else 0.84f),
             shape = RoundedCornerShape(
                 topStart = WeGlowRadius.medium,
                 topEnd = WeGlowRadius.medium,
-                bottomStart = if (message.isUser) {
-                    WeGlowRadius.medium
-                } else {
-                    WeGlowRadius.small
-                },
-                bottomEnd = if (message.isUser) {
-                    WeGlowRadius.small
-                } else {
-                    WeGlowRadius.medium
-                }
+                bottomStart = if (message.isUser) WeGlowRadius.medium else WeGlowSpacing.xxs,
+                bottomEnd = if (message.isUser) WeGlowSpacing.xxs else WeGlowRadius.medium,
             ),
-            color = if (message.isUser) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-            tonalElevation = WeGlowSpacing.xxs
+            color = if (message.isUser) DarkGreen else CardWhite,
         ) {
-
             Text(
                 text = message.text,
-                modifier = Modifier.padding(
-                    horizontal = WeGlowSpacing.md,
-                    vertical = WeGlowSpacing.sm
-                ),
+                modifier = Modifier.padding(horizontal = WeGlowSpacing.md, vertical = WeGlowSpacing.sm),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (message.isUser) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                color = if (message.isUser) Color.White else MaterialTheme.colorScheme.onSurface,
             )
         }
+    }
+}
+
+@Composable
+private fun AssistantBadge() {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(CardWhite),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.Chat,
+            contentDescription = null,
+            tint = DarkGreen,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }
 
@@ -370,119 +304,77 @@ private fun TypingIndicator() {
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start
+        verticalAlignment = Alignment.Bottom,
     ) {
-
+        AssistantBadge()
+        Spacer(Modifier.width(WeGlowSpacing.xs))
         Surface(
-            modifier = Modifier.fillMaxWidth(0.88f),
             shape = RoundedCornerShape(
                 topStart = WeGlowRadius.medium,
                 topEnd = WeGlowRadius.medium,
-                bottomStart = WeGlowRadius.small,
-                bottomEnd = WeGlowRadius.medium
+                bottomStart = WeGlowSpacing.xxs,
+                bottomEnd = WeGlowRadius.medium,
             ),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            tonalElevation = WeGlowSpacing.xxs
+            color = CardWhite,
         ) {
-
             Text(
-                text = ".".repeat(dotCount),
-                modifier = Modifier.padding(
-                    horizontal = WeGlowSpacing.md,
-                    vertical = WeGlowSpacing.sm
-                ),
+                text = "•".repeat(dotCount),
+                modifier = Modifier.padding(horizontal = WeGlowSpacing.md, vertical = WeGlowSpacing.sm),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = SoftGray,
             )
         }
     }
 }
 
 @Composable
-private fun SuggestedQuestions(
-    onQuestionClick: (String) -> Unit
-) {
-
+private fun SuggestedQuestions(onQuestionClick: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = WeGlowSpacing.sm),
-        horizontalAlignment = Alignment.Start
     ) {
-
         Text(
-            text = "You can ask me...",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "QUICK QUESTIONS",
+            style = MaterialTheme.typography.labelSmall,
+            color = SoftGray,
         )
+        Spacer(Modifier.height(WeGlowSpacing.xs))
 
-        Spacer(
-            modifier = Modifier.height(WeGlowSpacing.xs)
-        )
-
-        SuggestionChip(
-            text = "What did my latest skin analysis say?",
-            onClick = {
-                onQuestionClick(
-                    "What did my latest skin analysis say?"
-                )
-            }
-        )
-
-        Spacer(
-            modifier = Modifier.height(WeGlowSpacing.xs)
-        )
-
-        SuggestionChip(
-            text = "What is my skincare routine?",
-            onClick = {
-                onQuestionClick(
-                    "What is my skincare routine?"
-                )
-            }
-        )
-
-        Spacer(
-            modifier = Modifier.height(WeGlowSpacing.xs)
-        )
-
-        SuggestionChip(
-            text = "What products are suitable for me?",
-            onClick = {
-                onQuestionClick(
-                    "What products are suitable for me?"
-                )
-            }
-        )
+        listOf(
+            "What did my latest skin analysis say?",
+            "What is my skincare routine?",
+            "What products are suitable for me?",
+        ).forEachIndexed { index, question ->
+            SuggestionChip(text = question, onClick = { onQuestionClick(question) })
+            if (index < 2) Spacer(Modifier.height(WeGlowSpacing.xs))
+        }
     }
 }
 
 @Composable
 private fun SuggestionChip(
     text: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(
-                RoundedCornerShape(WeGlowRadius.pill)
-            ),
-        color = MaterialTheme.colorScheme.surfaceVariant
+            .clip(RoundedCornerShape(WeGlowRadius.medium))
+            .border(1.dp, DarkGreen.copy(alpha = 0.14f), RoundedCornerShape(WeGlowRadius.medium)),
+        color = CardWhite,
     ) {
-
         TextButton(
             onClick = onClick,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = WeGlowSpacing.md, vertical = WeGlowSpacing.sm),
         ) {
-
             Text(
                 text = text,
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Start
+                style = MaterialTheme.typography.bodyMedium,
+                color = DarkGreen,
+                textAlign = TextAlign.Start,
             )
         }
     }
@@ -494,25 +386,22 @@ private fun ChatInput(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     onMic: () -> Unit,
-    isListening: Boolean
+    isListening: Boolean,
 ) {
-
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = WeGlowSpacing.xxs
+        color = CardWhite,
+        shape = RoundedCornerShape(
+            topStart = WeGlowRadius.large,
+            topEnd = WeGlowRadius.large,
+        ),
     ) {
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(
-                    horizontal = WeGlowSpacing.sm,
-                    vertical = WeGlowSpacing.xs
-                ),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(WeGlowSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,
@@ -520,52 +409,52 @@ private fun ChatInput(
                 placeholder = {
                     Text(
                         text = "Ask WeGlow AI...",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SoftGray,
                     )
                 },
+                trailingIcon = {
+                    IconButton(onClick = onMic) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = if (isListening) {
+                                "Listening for voice input"
+                            } else {
+                                "Voice input"
+                            },
+                            tint = if (isListening) MaterialTheme.colorScheme.secondary else DarkGreen,
+                        )
+                    }
+                },
                 singleLine = true,
-                shape = RoundedCornerShape(
-                    WeGlowRadius.pill
+                shape = RoundedCornerShape(WeGlowRadius.pill),
+                textStyle = MaterialTheme.typography.bodyMedium,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { onSend() }),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = PageBackground,
+                    unfocusedContainerColor = PageBackground,
+                    focusedBorderColor = DarkGreen,
+                    unfocusedBorderColor = Color.Transparent,
+                    cursorColor = DarkGreen,
                 ),
-                textStyle = MaterialTheme.typography.bodyMedium
             )
 
-            IconButton(
-                onClick = onMic,
-                modifier = Modifier.size(
-                    WeGlowSize.iconLarge
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Mic,
-                    contentDescription = if (isListening) {
-                        "Listening for voice input"
-                    } else {
-                        "Voice input"
-                    },
-                    tint = if (isListening) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    }
-                )
-            }
+            Spacer(Modifier.width(WeGlowSpacing.xs))
 
             IconButton(
                 onClick = onSend,
-                modifier = Modifier.size(
-                    WeGlowSize.iconLarge
-                ),
-                enabled = value.isNotBlank()
+                enabled = value.isNotBlank(),
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(if (value.isNotBlank()) DarkGreen else PageBackground),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Send,
+                    imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send message",
-                    tint = if (value.isNotBlank()) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                    tint = if (value.isNotBlank()) Color.White else SoftGray,
+                    modifier = Modifier.size(21.dp),
                 )
             }
         }
