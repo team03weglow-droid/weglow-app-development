@@ -24,12 +24,15 @@ import kotlin.math.max
  */
 object ProfileImageReader {
 
+    private const val MAX_SOURCE_BYTES = 12 * 1024 * 1024
     private const val MAX_DIMENSION = 1024
     private const val JPEG_QUALITY = 85
 
     fun read(resolver: ContentResolver, uri: Uri): ProfileImageUpload? {
         val source = runCatching {
-            resolver.openInputStream(uri)?.use { it.readBytes() }
+            resolver.openInputStream(uri)?.use { input ->
+                readBounded(input, MAX_SOURCE_BYTES)
+            }
         }.getOrNull() ?: return null
         if (source.isEmpty()) return null
 

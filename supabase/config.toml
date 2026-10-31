@@ -5,3 +5,9 @@ project_id = "edmlbdkvrtmpcwigrqtr"
 
 [functions.chat]
 verify_jwt = true
+
+[functions.smart-endpoint]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true

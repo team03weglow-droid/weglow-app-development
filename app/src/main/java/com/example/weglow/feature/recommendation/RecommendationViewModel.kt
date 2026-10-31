@@ -1,5 +1,6 @@
 package com.example.weglow.feature.recommendation
 
+import com.example.weglow.core.auth.AccountWork
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.domain.model.RecommendationResult
@@ -31,6 +32,9 @@ class RecommendationViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RecommendationUiState())
     val uiState: StateFlow<RecommendationUiState> = _uiState.asStateFlow()
+    fun clear() = accountWork.clear()
+
+    private val accountWork = AccountWork(authRepository, viewModelScope) { _uiState.value = RecommendationUiState() }
 
     private var loadJob: Job? = null
 
@@ -39,8 +43,12 @@ class RecommendationViewModel(
      * empty list means a scan was used but detected no concerns.
      */
     fun load(scanConcerns: List<String>? = null) {
+        if (authRepository.currentUserId() == null) {
+            _uiState.value = RecommendationUiState(isLoading = false, errorMessage = "Sign in to see your personalized recommendations.")
+            return
+        }
         if (loadJob?.isActive == true) return
-        loadJob = viewModelScope.launch {
+        loadJob = accountWork.launch {
             _uiState.value = RecommendationUiState(isLoading = true)
 
             val userId = authRepository.currentUserId()
@@ -52,7 +60,7 @@ class RecommendationViewModel(
                 return@launch
             }
 
-            val profileResult = profileRepository.getProfile(userId)
+            val profileResult = await { profileRepository.getProfile(userId) }
             if (profileResult.isFailure) {
                 _uiState.value = RecommendationUiState(
                     isLoading = false,
@@ -62,7 +70,7 @@ class RecommendationViewModel(
                 return@launch
             }
 
-            catalogRepository.products().fold(
+            await { catalogRepository.products() }.fold(
                 onSuccess = { products ->
                     val result = RecommendationEngine.recommend(profileResult.getOrNull(), scanConcerns, products)
                     _uiState.value = RecommendationUiState(isLoading = false, result = result)

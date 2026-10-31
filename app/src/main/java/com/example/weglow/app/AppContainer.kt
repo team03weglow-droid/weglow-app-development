@@ -10,6 +10,8 @@ import com.example.weglow.data.repository.LocalAcneScanRepository
 import com.example.weglow.data.repository.LocalHairstyleRepository
 import com.example.weglow.data.repository.RetrofitChatRepository
 import com.example.weglow.data.repository.SupabaseAcneScanRepository
+import com.example.weglow.data.repository.SupabaseAccountSecurityRepository
+import com.example.weglow.domain.repository.AccountSecurityRepository
 import com.example.weglow.data.repository.SupabaseAuthRepository
 import com.example.weglow.data.repository.SupabaseCartRepository
 import com.example.weglow.data.repository.SupabaseCatalogRepository
@@ -70,6 +72,10 @@ class AppContainer {
 
     val authRepository: AuthRepository by lazy {
         SupabaseAuthRepository(supabaseClient)
+    }
+
+    val accountSecurityRepository: AccountSecurityRepository by lazy {
+        SupabaseAccountSecurityRepository(supabaseClient)
     }
 
     val profileRepository: ProfileRepository by lazy {

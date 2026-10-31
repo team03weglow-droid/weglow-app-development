@@ -2,9 +2,12 @@ package com.example.weglow.feature.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.weglow.domain.repository.AccountSecurityRepository
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.AuthenticationState
 import com.example.weglow.domain.repository.ProfileRepository
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +17,7 @@ data class AuthUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val event: AuthEvent? = null,
+    val notice: String? = null,
 )
 
 sealed interface AuthEvent {
@@ -26,6 +30,7 @@ sealed interface AuthEvent {
     ) : AuthEvent
 
     data object SignedOut : AuthEvent
+    data class AccountDeleted(val userId: String) : AuthEvent
 }
 
 enum class StartupDestination {
@@ -37,6 +42,7 @@ enum class StartupDestination {
 class AuthViewModel(
     private val authRepository: AuthRepository,
     private val profileRepository: ProfileRepository,
+    private val accountSecurityRepository: AccountSecurityRepository? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -66,6 +72,7 @@ class AuthViewModel(
         SIGN_IN,
         SIGN_UP,
         GOOGLE,
+        RECOVERY,
     }
 
     private var currentOperation = AuthOperation.NONE
@@ -76,7 +83,7 @@ class AuthViewModel(
 
     private fun observeAuthenticationState() {
         viewModelScope.launch {
-            authRepository.authenticationState.collect { state ->
+            authRepository.authenticationState.collectLatest { state ->
 
                 when (state) {
 
@@ -86,12 +93,17 @@ class AuthViewModel(
                     }
 
                     AuthenticationState.NOT_AUTHENTICATED -> {
+                        val sessionEnded = hadAuthenticatedSession
                         hadAuthenticatedSession = false
-
-                        if (_startupDestination.value == null) {
-                            _startupDestination.value =
-                                StartupDestination.LOGIN
+                        currentOperation = AuthOperation.NONE
+                        if (sessionEnded) {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                event = (_uiState.value.event as? AuthEvent.AccountDeleted) ?: AuthEvent.SignedOut,
+                            )
                         }
+
+                        _startupDestination.value = StartupDestination.LOGIN
                     }
 
                     AuthenticationState.AUTHENTICATED -> {
@@ -102,12 +114,17 @@ class AuthViewModel(
                          * Do NOT emit SignedIn here because signUp()
                          * needs to emit SignedUp(fullName).
                          */
-                        if (currentOperation == AuthOperation.SIGN_UP) {
+                        if (currentOperation == AuthOperation.SIGN_UP || currentOperation == AuthOperation.RECOVERY) {
                             hadAuthenticatedSession = true
-                            return@collect
+                            return@collectLatest
                         }
 
+                        val wasAuthenticated = hadAuthenticatedSession
+                        hadAuthenticatedSession = true
+                        val userId = authRepository.currentUserId()
                         val destination = determineDestination()
+                        ensureActive()
+                        if (userId != authRepository.currentUserId()) return@collectLatest
 
                         if (_startupDestination.value == null) {
 
@@ -117,7 +134,7 @@ class AuthViewModel(
                              */
                             _startupDestination.value = destination
 
-                        } else if (!hadAuthenticatedSession) {
+                        } else if (!wasAuthenticated) {
 
                             /*
                              * A new authenticated session was created.
@@ -341,6 +358,52 @@ class AuthViewModel(
                                 ?: "Unable to sign out."
                     )
                 }
+        }
+    }
+
+    fun requestPasswordRecovery(email: String) {
+        val repository = accountSecurityRepository ?: return
+        if (_uiState.value.isLoading) return
+        if (!email.contains("@") || email.length > 254) {
+            _uiState.value = AuthUiState(errorMessage = "Enter your email address.")
+            return
+        }
+        _uiState.value = AuthUiState(isLoading = true)
+        viewModelScope.launch {
+            repository.requestPasswordRecovery(email.trim()).fold(
+                onSuccess = { _uiState.value = AuthUiState(notice = "If an account exists, a recovery code has been sent. Check your email.") },
+                onFailure = { _uiState.value = AuthUiState(errorMessage = "Could not request recovery. Please try again later.") },
+            )
+        }
+    }
+
+    fun resetPassword(email: String, code: String, password: String) {
+        val repository = accountSecurityRepository ?: return
+        if (_uiState.value.isLoading) return
+        if (code.length !in 6..10 || code.any { !it.isDigit() } || password.length < 8 || password.none(Char::isDigit)) {
+            _uiState.value = AuthUiState(errorMessage = "Enter the emailed code and a password of at least 8 characters with a number.")
+            return
+        }
+        currentOperation = AuthOperation.RECOVERY
+        _uiState.value = AuthUiState(isLoading = true)
+        viewModelScope.launch {
+            repository.resetPassword(email.trim(), code.trim(), password).fold(
+                onSuccess = { _uiState.value = AuthUiState(notice = "Password updated. Sign in with your new password.", event = AuthEvent.SignedOut) },
+                onFailure = { _uiState.value = AuthUiState(errorMessage = "Could not reset your password. Check the code or request a new one.") },
+            )
+            currentOperation = AuthOperation.NONE
+        }
+    }
+
+    fun deleteAccount() {
+        val repository = accountSecurityRepository ?: return
+        if (_uiState.value.isLoading) return
+        _uiState.value = AuthUiState(isLoading = true)
+        viewModelScope.launch {
+            repository.deleteAccount().fold(
+                onSuccess = { userId -> _uiState.value = AuthUiState(event = AuthEvent.AccountDeleted(userId)) },
+                onFailure = { error -> _uiState.value = AuthUiState(errorMessage = error.message ?: "Could not delete your account. Please retry.") },
+            )
         }
     }
 

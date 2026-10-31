@@ -1,5 +1,6 @@
 package com.example.weglow.feature.profile
 
+import com.example.weglow.core.auth.AccountWork
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.domain.model.ProfileImageUpload
@@ -89,6 +90,9 @@ class ProfileViewModel(
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
+    fun clear() = accountWork.clear()
+
+    private val accountWork = AccountWork(authRepository, viewModelScope) { _uiState.value = ProfileUiState() }
 
     fun refresh() {
         val userId = authRepository.currentUserId()
@@ -96,17 +100,17 @@ class ProfileViewModel(
             _uiState.value = ProfileUiState()
             return
         }
-        viewModelScope.launch {
+        accountWork.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
 
-            val profile = profileRepository.getProfile(userId).getOrNull()
+            val profile = await { profileRepository.getProfile(userId) }.getOrNull()
 
             val persistedName = profile?.fullName?.trim()?.takeIf { it.isNotBlank() }
             val identityName = authRepository.currentUserDisplayName()?.trim()?.takeIf { it.isNotBlank() }
 
             val imagePath = profile?.profileImagePath?.trim()?.takeIf { it.isNotBlank() }
             val imageBytes = imagePath?.let { path ->
-                profileImageRepository.downloadProfileImage(path).getOrNull()
+                await { profileImageRepository.downloadProfileImage(path) }.getOrNull()
             }
 
             _uiState.value = _uiState.value.copy(
@@ -141,8 +145,8 @@ class ProfileViewModel(
 
         _uiState.value = _uiState.value.copy(isUpdatingGender = true, genderError = null)
 
-        viewModelScope.launch {
-            profileRepository.updateGender(userId, gender).fold(
+        accountWork.launch {
+            await { profileRepository.updateGender(userId, gender) }.fold(
                 onSuccess = {
                     _uiState.value = _uiState.value.copy(
                         isUpdatingGender = false,
@@ -189,8 +193,8 @@ class ProfileViewModel(
         val previousPath = _uiState.value.profileImagePath
         _uiState.value = _uiState.value.copy(isUploadingImage = true, imageError = null)
 
-        viewModelScope.launch {
-            val uploadedPath = profileImageRepository.uploadProfileImage(userId, upload).getOrElse { error ->
+        accountWork.launch {
+            val uploadedPath = await { profileImageRepository.uploadProfileImage(userId, upload) }.getOrElse { error ->
                 // Storage upload failed: nothing was persisted, report it honestly.
                 _uiState.value = _uiState.value.copy(
                     isUploadingImage = false,
@@ -199,12 +203,12 @@ class ProfileViewModel(
                 return@launch
             }
 
-            val persisted = profileRepository.updateProfileImagePath(userId, uploadedPath)
+            val persisted = await { profileRepository.updateProfileImagePath(userId, uploadedPath) }
             if (persisted.isFailure) {
                 // Storage succeeded but the profile row did not. Roll the new
                 // object back so it cannot linger unreferenced, and surface the
                 // real failure instead of a false success.
-                profileImageRepository.deleteProfileImage(uploadedPath)
+                await { profileImageRepository.deleteProfileImage(uploadedPath) }
                 _uiState.value = _uiState.value.copy(
                     isUploadingImage = false,
                     imageError = persisted.exceptionOrNull()?.message
@@ -216,7 +220,7 @@ class ProfileViewModel(
             // Persistence confirmed: safe to show the new image and to remove the
             // previous object so old pictures don't accumulate.
             if (previousPath != null && previousPath != uploadedPath) {
-                profileImageRepository.deleteProfileImage(previousPath)
+                await { profileImageRepository.deleteProfileImage(previousPath) }
             }
 
             _uiState.value = _uiState.value.copy(

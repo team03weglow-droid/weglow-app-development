@@ -1,3 +1,4 @@
+import { HttpError, requireUser, withQuota } from "../_shared/security.ts";
 const WEATHER_API_BASE_URL = "https://api.weatherapi.com/v1";
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -8,38 +9,6 @@ const jsonHeaders = {
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
-}
-
-async function requireSupabaseUser(request: Request): Promise<Response | null> {
-  const authorization = request.headers.get("authorization");
-  const publishableKey = request.headers.get("apikey");
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.replace(/\/$/, "");
-
-  if (!authorization?.startsWith("Bearer ") || !publishableKey) {
-    return jsonResponse({ error: "Sign in before requesting weather." }, 401);
-  }
-  if (!supabaseUrl) {
-    console.error("SUPABASE_URL is unavailable in the Edge Function runtime.");
-    return jsonResponse({ error: "Weather service is not configured." }, 503);
-  }
-
-  try {
-    const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: {
-        authorization,
-        apikey: publishableKey,
-      },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-      return jsonResponse({ error: "Your session is invalid or expired." }, 401);
-    }
-    return null;
-  } catch (error) {
-    console.error("Could not validate the Supabase session", error);
-    return jsonResponse({ error: "Authentication is temporarily unavailable." }, 503);
-  }
 }
 
 function parseCoordinate(
@@ -62,13 +31,11 @@ function isIsoDate(value: string | null): value is string {
     !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 }
 
-Deno.serve(async (request: Request): Promise<Response> => {
+async function weather(request: Request): Promise<Response> {
   if (request.method !== "GET") {
     return jsonResponse({ error: "Use GET for this endpoint." }, 405);
   }
 
-  const authenticationError = await requireSupabaseUser(request);
-  if (authenticationError) return authenticationError;
 
   const weatherApiKey = Deno.env.get("WEATHER_API_KEY")?.trim();
   if (!weatherApiKey) {
@@ -174,5 +141,17 @@ Deno.serve(async (request: Request): Promise<Response> => {
   } catch (error) {
     console.error("WeatherAPI request failed", error);
     return jsonResponse({ error: "Weather data is temporarily unavailable." }, 503);
+  }
+}
+
+Deno.serve(async (request: Request): Promise<Response> => {
+  if (request.method !== "GET") return jsonResponse({ error: "Use GET for this endpoint." }, 405);
+  try {
+    const user = await requireUser(request);
+    return await withQuota(user.id, "weather", () => weather(request));
+  } catch (error) {
+    if (error instanceof HttpError) return jsonResponse({ error: error.message }, error.status);
+    console.error("Weather request failed");
+    return jsonResponse({ error: "Weather is temporarily unavailable." }, 503);
   }
 });

@@ -1,5 +1,6 @@
 package com.example.weglow.feature.cart
 
+import com.example.weglow.core.auth.AccountWork
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.domain.model.CartItem
@@ -35,6 +36,7 @@ class CartViewModel(
 
     private val _uiState = MutableStateFlow(CartUiState())
     val uiState: StateFlow<CartUiState> = _uiState.asStateFlow()
+    private val accountWork = AccountWork(authRepository, viewModelScope) { _uiState.value = CartUiState() }
 
     fun load() {
         val userId = authRepository.currentUserId()
@@ -42,9 +44,9 @@ class CartViewModel(
             _uiState.value = CartUiState()
             return
         }
-        viewModelScope.launch {
+        accountWork.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-            cartRepository.getCartItems(userId).fold(
+            await { cartRepository.getCartItems(userId) }.fold(
                 onSuccess = { items ->
                     _uiState.value = _uiState.value.copy(isLoading = false, items = items)
                 },
@@ -97,9 +99,7 @@ class CartViewModel(
     }
 
     /** Resets to a clean slate on sign-out so the next signed-in user never sees a stale cart. */
-    fun clear() {
-        _uiState.value = CartUiState()
-    }
+    fun clear() = accountWork.clear()
 
     /**
      * Runs one cart-mutating [operation] for [productNo]: guards against a second tap while one
@@ -113,8 +113,8 @@ class CartViewModel(
             pendingProductNumbers = _uiState.value.pendingProductNumbers + productNo,
             errorMessage = null,
         )
-        viewModelScope.launch {
-            val result = operation()
+        accountWork.launch {
+            val result = await { operation() }
             _uiState.value = _uiState.value.copy(
                 pendingProductNumbers = _uiState.value.pendingProductNumbers - productNo,
             )

@@ -7,6 +7,7 @@ import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.JsonPrimitive
@@ -62,14 +63,21 @@ class SupabaseAuthRepository(
 
     override suspend fun signOut(): Result<Unit> =
         runCatching {
-            client.auth.signOut()
+            try {
+                client.auth.signOut()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Offline logout must still remove this device's stored session.
+            }
+            client.auth.clearSession()
         }
 
     override fun currentUserId(): String? =
-        client.auth.currentUserOrNull()?.id
+        client.auth.currentUserOrNull()?.id.takeIf { hasActiveSession() }
 
     override fun hasActiveSession(): Boolean =
-        client.auth.currentUserOrNull() != null
+        client.auth.sessionStatus.value is SessionStatus.Authenticated
 
     override fun currentUserDisplayName(): String? {
         val metadata = client.auth.currentUserOrNull()?.userMetadata ?: return null

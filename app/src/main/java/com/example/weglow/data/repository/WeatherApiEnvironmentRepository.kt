@@ -15,6 +15,8 @@ import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -45,11 +47,14 @@ class WeatherApiEnvironmentRepository(
         }
 
         fresh?.environment ?: fetch(latitude, longitude).also {
+            currentCoroutineContext().ensureActive()
             cached = CachedEnvironment(it, System.currentTimeMillis())
         }
     }
 
     override suspend fun getLatestEnvironment(): EnvironmentInfo? = cached?.environment
+
+    override fun clearCache() { cached = null }
 
     private suspend fun fetch(
         latitude: Double,

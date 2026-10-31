@@ -59,6 +59,20 @@ class RoutineJournalViewModel(context: Context, private val authRepository: Auth
         if (authRepository.currentUserId() == account) _uiState.value = state
     }
 
+    fun deleteAccountData(userId: String) {
+        viewModelScope.launch {
+            mutex.withLock {
+                withContext(Dispatchers.IO) {
+                    preferences.edit().remove("notes_$userId").remove("completed_$userId").commit()
+                }
+                if (owner == userId) {
+                    owner = null
+                    _uiState.value = RoutineJournalState()
+                }
+            }
+        }
+    }
+
     fun toggleCompletion(key: String) = update { current ->
         val completed = current.completedKeys.toMutableSet().apply { if (!add(key)) remove(key) }
         current.copy(completedKeys = completed, lastSavedNoteKey = null)

@@ -14,6 +14,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Loads Supabase-backed hairstyle recommendation cards for the face shape produced by
@@ -29,11 +31,13 @@ class SupabaseHairstyleRepository(
 ) : HairstyleRepository {
 
     override suspend fun analyze(photoReference: String, gender: String?): Result<HairstyleResult> {
+        val userId = authRepository.currentUserId()
+            ?: return Result.failure(HairstyleFailureException(HairstyleFailure.NotSignedIn))
         val classified = classifier.analyze(photoReference, gender).getOrElse { error ->
             return Result.failure(error)
         }
-        val userId = authRepository.currentUserId()
-            ?: return Result.failure(HairstyleFailureException(HairstyleFailure.NotSignedIn))
+        currentCoroutineContext().ensureActive()
+        if (authRepository.currentUserId() != userId) throw CancellationException("Account changed")
 
         profileRepository.updateFaceShape(userId, classified.faceShape).getOrElse { error ->
             return Result.failure(HairstyleFailureException(HairstyleFailure.ProfileUnavailable, error))

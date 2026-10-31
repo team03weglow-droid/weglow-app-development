@@ -43,6 +43,9 @@ import kotlinx.coroutines.delay
 @Composable
 fun AccountSettingsScreen(
     onBack: () -> Unit,
+    onDeleteAccount: () -> Unit = {},
+    isDeletingAccount: Boolean = false,
+    accountError: String? = null,
     displayName: String? = null,
     email: String? = null,
     gender: String? = null,
@@ -53,6 +56,23 @@ fun AccountSettingsScreen(
     onPrivacyPolicyClick: () -> Unit = {},
     onTermsConditionsClick: () -> Unit = {},
 ) {
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var deleteConfirmation by remember { mutableStateOf("") }
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { if (!isDeletingAccount) showDeleteConfirmation = false },
+            title = { Text("Delete your account?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("This permanently deletes your account, profile, scan results, saved products, cart, profile photos, and this device's journal. Sign in again first if your session is older than 15 minutes. Type DELETE to confirm.")
+                    OutlinedTextField(value = deleteConfirmation, onValueChange = { deleteConfirmation = it }, enabled = !isDeletingAccount, label = { Text("Confirmation") })
+                    accountError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = { TextButton(onClick = onDeleteAccount, enabled = deleteConfirmation == "DELETE" && !isDeletingAccount) { Text(if (isDeletingAccount) "Deleting…" else "Delete account", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { showDeleteConfirmation = false; deleteConfirmation = "" }, enabled = !isDeletingAccount) { Text("Cancel") } },
+        )
+    }
     var showGenderChooser by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(genderError) {
@@ -122,6 +142,10 @@ fun AccountSettingsScreen(
                 LegalLinkRow(label = "Terms & Conditions", onClick = onTermsConditionsClick)
             }
 
+            Spacer(modifier = Modifier.height(24.dp))
+            TextButton(onClick = { showDeleteConfirmation = true }, enabled = !isDeletingAccount) {
+                Text("Delete account", color = MaterialTheme.colorScheme.error)
+            }
             Spacer(modifier = Modifier.height(100.dp))
         }
     }

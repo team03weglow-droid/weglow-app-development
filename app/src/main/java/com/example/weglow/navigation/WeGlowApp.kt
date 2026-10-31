@@ -32,6 +32,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.weglow.domain.repository.AuthenticationState
 import com.example.weglow.app.AppContainer
 import com.example.weglow.app.viewModelFactory
 import com.example.weglow.core.notification.UvAlertNotifier
@@ -76,7 +77,8 @@ fun WeGlowApp() {
         factory = viewModelFactory {
             AuthViewModel(
                 container.authRepository,
-                container.profileRepository
+                container.profileRepository,
+                container.accountSecurityRepository,
             )
         }
     )
@@ -134,7 +136,7 @@ fun WeGlowApp() {
 
     val chatViewModel: ChatViewModel = viewModel(
         factory = viewModelFactory {
-            ChatViewModel(container.chatRepository)
+            ChatViewModel(container.chatRepository, container.authRepository)
         }
     )
 
@@ -264,16 +266,39 @@ fun WeGlowApp() {
         }
     }
 
+    LaunchedEffect(container) {
+        var previousUser = container.authRepository.currentUserId()
+        container.authRepository.authenticationState.collect { state ->
+            if (state != AuthenticationState.INITIALIZING) {
+                val user = if (state == AuthenticationState.AUTHENTICATED) container.authRepository.currentUserId() else null
+                if (user != previousUser) {
+                    scanViewModel.clear()
+                    hairstyleViewModel.clear()
+                    scanFlowViewModel.resetFlow()
+                    homeRoutineMorning = null
+                    previousUser = user
+                }
+            }
+        }
+    }
+
     // Global session-termination reaction.
     LaunchedEffect(authState.event) {
 
-        if (authState.event is AuthEvent.SignedOut) {
+        if (authState.event is AuthEvent.SignedOut || authState.event is AuthEvent.AccountDeleted) {
+            (authState.event as? AuthEvent.AccountDeleted)?.let { journalViewModel.deleteAccountData(it.userId) }
 
             scanViewModel.clear()
             hairstyleViewModel.clear()
             scanFlowViewModel.resetFlow()
             savedProductsViewModel.clear()
             cartViewModel.clear()
+            chatViewModel.clear()
+            profileViewModel.clear()
+            recommendationViewModel.clear()
+            routineViewModel.clear()
+            onboardingViewModel.clear()
+            environmentViewModel.clear()
 
             navController.navigate(
                 Destination.Login.route
@@ -459,6 +484,9 @@ fun WeGlowApp() {
 
                     isLoading = authState.isLoading,
                     errorMessage = authState.errorMessage,
+                    notice = authState.notice,
+                    onRequestRecovery = authViewModel::requestPasswordRecovery,
+                    onResetPassword = authViewModel::resetPassword,
                     onTermsConditionsClick = { navController.navigate(Destination.TermsConditions.route) { launchSingleTop = true } },
                     onPrivacyPolicyClick = { navController.navigate(Destination.PrivacyPolicy.route) { launchSingleTop = true } },
                 )
@@ -1191,6 +1219,9 @@ fun WeGlowApp() {
                 }
 
                 AccountSettingsScreen(
+                    onDeleteAccount = authViewModel::deleteAccount,
+                    isDeletingAccount = authState.isLoading,
+                    accountError = authState.errorMessage,
 
                     onBack = {
                         navController.popBackStack()

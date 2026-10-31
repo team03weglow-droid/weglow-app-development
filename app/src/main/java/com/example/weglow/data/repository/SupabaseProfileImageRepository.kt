@@ -1,5 +1,6 @@
 package com.example.weglow.data.repository
 
+import java.util.UUID
 import com.example.weglow.domain.model.ProfileImageUpload
 import com.example.weglow.domain.repository.ProfileImageRepository
 import io.github.jan.supabase.SupabaseClient
@@ -14,7 +15,7 @@ class SupabaseProfileImageRepository(
     override suspend fun uploadProfileImage(userId: String, upload: ProfileImageUpload): Result<String> = runCatching {
         val path = "$userId/${objectNameFor(upload.mimeType)}"
         client.storage[PROFILE_IMAGES_BUCKET].upload(path, upload.bytes) {
-            upsert = true
+            upsert = false
         }
         path
     }
@@ -29,8 +30,8 @@ class SupabaseProfileImageRepository(
     }
 
     private fun objectNameFor(mimeType: String): String = when (mimeType) {
-        "image/png" -> "profile.png"
-        "image/webp" -> "profile.webp"
-        else -> "profile.jpg"
+        "image/png" -> "${UUID.randomUUID()}.png"
+        "image/webp" -> "${UUID.randomUUID()}.webp"
+        else -> "${UUID.randomUUID()}.jpg"
     }
 }

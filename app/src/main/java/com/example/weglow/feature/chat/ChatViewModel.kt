@@ -1,5 +1,7 @@
 package com.example.weglow.feature.chat
 
+import com.example.weglow.core.auth.AccountWork
+import com.example.weglow.domain.repository.AuthRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.domain.model.ChatTurn
@@ -31,15 +33,23 @@ private val GREETING_MESSAGE = ChatMessage(
 
 class ChatViewModel(
     private val chatRepository: ChatRepository,
+    authRepository: AuthRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+    private val accountWork = AccountWork(authRepository, viewModelScope) { _uiState.value = ChatUiState() }
+
+    fun clear() = accountWork.clear()
 
     fun sendMessage(rawText: String) {
         val text = rawText.trim()
 
         if (text.isEmpty()) return
+        if (text.length > 4000) {
+            _uiState.value = _uiState.value.copy(errorMessage = "Keep your message under 4000 characters.")
+            return
+        }
         if (_uiState.value.isSending) return
 
         val previous = _uiState.value.messages
@@ -51,11 +61,11 @@ class ChatViewModel(
 
         val history = buildHistory(previous)
 
-        viewModelScope.launch {
-            chatRepository.sendMessage(
+        accountWork.launch {
+            await { chatRepository.sendMessage(
                 message = text,
                 history = history,
-            ).onSuccess { reply ->
+            ) }.onSuccess { reply ->
                 _uiState.value = ChatUiState(
                     messages = _uiState.value.messages + ChatMessage(
                         text = reply,
@@ -85,7 +95,11 @@ class ChatViewModel(
         val exchanged = messages.drop(1)
         val start = (exchanged.size - MAX_HISTORY_TURNS).coerceAtLeast(0)
 
-        return exchanged.drop(start).map { message ->
+        var remaining = 28000
+        return exchanged.drop(start).takeLastWhile { message ->
+            remaining -= message.text.length
+            message.text.length <= 8000 && remaining >= 0
+        }.map { message ->
             ChatTurn(
                 role = if (message.isUser) "user" else "model",
                 text = message.text,

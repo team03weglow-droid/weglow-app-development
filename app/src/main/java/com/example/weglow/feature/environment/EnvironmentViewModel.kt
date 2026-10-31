@@ -1,5 +1,6 @@
 package com.example.weglow.feature.environment
 
+import com.example.weglow.core.auth.AccountWork
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.data.location.LocationProvider
@@ -29,23 +30,31 @@ class EnvironmentViewModel(
     private var refreshJob: Job? = null
     private val _uiState = MutableStateFlow<EnvironmentUiState>(EnvironmentUiState.Loading)
     val uiState: StateFlow<EnvironmentUiState> = _uiState.asStateFlow()
+    private val accountWork = AccountWork(authRepository, viewModelScope) {
+        repository.clearCache()
+        _uiState.value = EnvironmentUiState.Loading
+    }
+
+    fun clear() = accountWork.clear()
 
     /** Safe on Home entry/resume: repository caching prevents repeat HTTP requests. */
     fun refresh(hasLocationPermission: Boolean) {
         if (!hasLocationPermission) {
+            refreshJob?.cancel()
             _uiState.value = EnvironmentUiState.PermissionRequired
             return
         }
         if (refreshJob?.isActive == true) return
-        refreshJob = viewModelScope.launch {
+        refreshJob = accountWork.launch {
+            val requestUserId = authRepository.currentUserId()
             _uiState.value = EnvironmentUiState.Loading
-            locationProvider.getCurrentLocation().fold(
+            await { locationProvider.getCurrentLocation() }.fold(
                 onSuccess = { coordinates ->
-                    repository.getEnvironmentForLocation(coordinates.latitude, coordinates.longitude).fold(
+                    await { repository.getEnvironmentForLocation(coordinates.latitude, coordinates.longitude) }.fold(
                         onSuccess = { env ->
                             _uiState.value = EnvironmentUiState.Success(env)
-                            authRepository.currentUserId()?.let { userId ->
-                                viewModelScope.launch {
+                            requestUserId?.let { userId ->
+                                accountWork.launch {
                                     runCatching {
                                         profileRepository.updateEnvironment(
                                             userId,

@@ -143,6 +143,12 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                     "Supabase — authentication, database services, and private profile-image " +
                     "storage.\n\n" +
                     "Google Sign-In — optional account authentication.\n\n" +
+                    "Google Gemini — processes messages you send to WeGlow AI, recent conversation " +
+                    "history, and relevant skin-profile, scan-summary and environmental readings to " +
+                    "generate replies. Full name, exact date of birth, profile photos, and location " +
+                    "name are excluded from the profile context sent by WeGlow. Information you type " +
+                    "into messages is still sent. Provider retention depends on the service terms " +
+                    "and account configuration; avoid sharing identifying or confidential information.\n\n" +
                     "WeatherAPI.com and Open-Meteo — environmental and weather-related information. " +
                     "Location coordinates may be transmitted when requesting relevant environmental " +
                     "information.\n\n" +
@@ -178,8 +184,11 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                     "feature is denied.\n\n" +
                     "You can remove individual Saved Products and Cart items and can replace your " +
                     "profile photograph through currently available application functionality.\n\n" +
-                    "At present, WeGlow does not provide self-service account deletion within the " +
-                    "application.\n\n" +
+                    "You can request permanent account deletion in Account Settings after a recent " +
+                    "sign-in. This removes your account and associated application records and " +
+                    "profile photos, plus the journal on this device. Local journals on other " +
+                    "devices must be removed on those devices, for example by clearing app data. " +
+                    "Provider backups and records retained under provider terms may expire separately.\n\n" +
                     "For questions or requests concerning your account or personal information, " +
                     "contact us at:\n\n" +
                     "team03weglow@gmail.com",

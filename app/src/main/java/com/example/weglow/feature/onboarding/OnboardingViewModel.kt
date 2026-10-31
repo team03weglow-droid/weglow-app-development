@@ -1,5 +1,6 @@
 package com.example.weglow.feature.onboarding
 
+import com.example.weglow.core.auth.AccountWork
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.domain.model.AgeRange
@@ -28,6 +29,9 @@ class OnboardingViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
+    fun clear() = accountWork.clear()
+
+    private val accountWork = AccountWork(authRepository, viewModelScope) { _uiState.value = OnboardingUiState() }
 
     /**
      * Begins (or restarts) onboarding with a clean state so answers from a previous
@@ -66,9 +70,9 @@ class OnboardingViewModel(
             return
         }
         val state = _uiState.value
-        viewModelScope.launch {
+        accountWork.launch {
             _uiState.value = state.copy(isSaving = true, errorMessage = null)
-            profileRepository.saveProfile(
+            await { profileRepository.saveProfile(
                 UserProfile(
                     id = userId,
                     fullName = state.fullName.ifBlank { null },
@@ -78,7 +82,7 @@ class OnboardingViewModel(
                     isSkinSensitive = state.isSkinSensitive,
                     onboardingCompleted = true,
                 )
-            ).onSuccess {
+            ) }.onSuccess {
                 _uiState.value = _uiState.value.copy(isSaving = false, saveCompleted = true)
             }.onFailure {
                 _uiState.value = _uiState.value.copy(isSaving = false, errorMessage = it.message ?: "Unable to save profile.")

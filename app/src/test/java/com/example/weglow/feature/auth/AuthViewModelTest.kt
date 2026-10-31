@@ -1,6 +1,7 @@
 package com.example.weglow.feature.auth
 
 import com.example.weglow.domain.model.UserProfile
+import com.example.weglow.domain.repository.AccountSecurityRepository
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.AuthenticationState
 import com.example.weglow.domain.repository.ProfileRepository
@@ -34,6 +35,61 @@ class AuthViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun externalSessionLossEmitsSignedOut() = runTest(dispatcher) {
+        val auth = FakeAuthRepository(active = true)
+        val vm = AuthViewModel(auth, FakeProfileRepository(completed = true))
+        advanceUntilIdle()
+        // Session invalidation outside the explicit ViewModel sign-out action.
+        auth.signOut()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.event is AuthEvent.SignedOut)
+        assertEquals(StartupDestination.LOGIN, vm.startupDestination.value)
+    }
+
+    @Test
+    fun recoveryUsesGenericNoticeAndDoesNotNavigateIntoAccount() = runTest(dispatcher) {
+        val auth = FakeAuthRepository(active = false)
+        val security = object : AccountSecurityRepository {
+            override suspend fun requestPasswordRecovery(email: String) = Result.success(Unit)
+            override suspend fun resetPassword(email: String, code: String, password: String): Result<Unit> {
+                auth.signIn(email, password)
+                kotlinx.coroutines.yield()
+                auth.signOut()
+                return Result.success(Unit)
+            }
+            override suspend fun deleteAccount(): Result<String> = Result.failure(IllegalStateException())
+        }
+        val vm = AuthViewModel(auth, FakeProfileRepository(), security)
+        advanceUntilIdle()
+        vm.requestPasswordRecovery("person@example.com")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.notice!!.startsWith("If an account exists"))
+        vm.resetPassword("person@example.com", "123456", "password123")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.event is AuthEvent.SignedOut)
+        assertFalse(auth.hasActiveSession())
+        assertEquals("Password updated. Sign in with your new password.", vm.uiState.value.notice)
+    }
+
+    @Test
+    fun deletionSuccessCarriesIdentityForLocalJournalCleanup() = runTest(dispatcher) {
+        val auth = FakeAuthRepository(active = true)
+        val security = object : AccountSecurityRepository {
+            override suspend fun requestPasswordRecovery(email: String) = Result.success(Unit)
+            override suspend fun resetPassword(email: String, code: String, password: String) = Result.success(Unit)
+            override suspend fun deleteAccount(): Result<String> {
+                auth.signOut()
+                return Result.success("user-1")
+            }
+        }
+        val vm = AuthViewModel(auth, FakeProfileRepository(), security)
+        advanceUntilIdle()
+        vm.deleteAccount()
+        advanceUntilIdle()
+        assertEquals(AuthEvent.AccountDeleted("user-1"), vm.uiState.value.event)
     }
 
     @Test

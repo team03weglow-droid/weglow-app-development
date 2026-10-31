@@ -1,5 +1,6 @@
 package com.example.weglow.feature.routine
 
+import com.example.weglow.core.auth.AccountWork
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.domain.model.RoutinePlan
@@ -32,6 +33,9 @@ class RoutineViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RoutineUiState())
     val uiState: StateFlow<RoutineUiState> = _uiState.asStateFlow()
+    fun clear() = accountWork.clear()
+
+    private val accountWork = AccountWork(authRepository, viewModelScope) { _uiState.value = RoutineUiState() }
 
     private var loadJob: Job? = null
     private var loadedUserId: String? = null
@@ -48,10 +52,14 @@ class RoutineViewModel(
             _uiState.value = RoutineUiState()
             loadedUserId = currentUserId
         }
+        if (authRepository.currentUserId() == null) {
+            _uiState.value = RoutineUiState(isLoading = false, errorMessage = "Sign in to see your routine.")
+            return
+        }
         if (loadJob?.isActive == true) return
         if (_uiState.value.plan != null && _uiState.value.errorMessage == null) return
 
-        loadJob = viewModelScope.launch {
+        loadJob = accountWork.launch {
             _uiState.value = RoutineUiState(isLoading = true)
 
             val userId = authRepository.currentUserId()
@@ -63,7 +71,7 @@ class RoutineViewModel(
                 return@launch
             }
 
-            val profileResult = profileRepository.getProfile(userId)
+            val profileResult = await { profileRepository.getProfile(userId) }
             if (profileResult.isFailure) {
                 _uiState.value = RoutineUiState(
                     isLoading = false,
@@ -73,7 +81,7 @@ class RoutineViewModel(
                 return@launch
             }
 
-            catalogRepository.products().fold(
+            await { catalogRepository.products() }.fold(
                 onSuccess = { products ->
                     val recommendations = RecommendationEngine.recommend(profileResult.getOrNull(), null, products)
                         .recommendations

@@ -62,6 +62,18 @@ fun WeGlowChatScreen(
     val listState = rememberLazyListState()
 
     val chatState by chatViewModel.uiState.collectAsState()
+    var acceptedProcessing by remember { mutableStateOf(false) }
+    if (!acceptedProcessing) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = onBack,
+            title = { androidx.compose.material3.Text("Before you chat") },
+            text = { androidx.compose.material3.Text("WeGlow AI sends your messages, recent chat history, and relevant skin-profile and environmental readings to Google Gemini to generate replies. Your profile name, exact date of birth, photo, and location name are excluded. Avoid including identifying details in messages. Provider processing and retention follow its service terms.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { acceptedProcessing = true }) { androidx.compose.material3.Text("Continue") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = onBack) { androidx.compose.material3.Text("Cancel") } },
+        )
+        return
+    }
+
 
     var messageText by remember { mutableStateOf("") }
     var isListening by remember { mutableStateOf(false) }

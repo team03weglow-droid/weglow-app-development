@@ -1,5 +1,6 @@
 package com.example.weglow.feature.savedproducts
 
+import com.example.weglow.core.auth.AccountWork
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.domain.model.Product
@@ -32,6 +33,7 @@ class SavedProductsViewModel(
 
     private val _uiState = MutableStateFlow(SavedProductsUiState())
     val uiState: StateFlow<SavedProductsUiState> = _uiState.asStateFlow()
+    private val accountWork = AccountWork(authRepository, viewModelScope) { _uiState.value = SavedProductsUiState() }
 
     fun load() {
         val userId = authRepository.currentUserId()
@@ -39,9 +41,9 @@ class SavedProductsViewModel(
             _uiState.value = SavedProductsUiState()
             return
         }
-        viewModelScope.launch {
+        accountWork.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-            savedProductRepository.getSavedProducts(userId).fold(
+            await { savedProductRepository.getSavedProducts(userId) }.fold(
                 onSuccess = { products ->
                     _uiState.value = _uiState.value.copy(isLoading = false, products = products)
                 },
@@ -69,8 +71,8 @@ class SavedProductsViewModel(
             pendingProductNumbers = _uiState.value.pendingProductNumbers + productNo,
             errorMessage = null,
         )
-        viewModelScope.launch {
-            val result = savedProductRepository.removeSavedProduct(userId, productNo)
+        accountWork.launch {
+            val result = await { savedProductRepository.removeSavedProduct(userId, productNo) }
             _uiState.value = _uiState.value.copy(
                 pendingProductNumbers = _uiState.value.pendingProductNumbers - productNo,
             )
@@ -98,8 +100,8 @@ class SavedProductsViewModel(
             pendingProductNumbers = _uiState.value.pendingProductNumbers + productNo,
             errorMessage = null,
         )
-        viewModelScope.launch {
-            val result = savedProductRepository.saveProduct(userId, productNo)
+        accountWork.launch {
+            val result = await { savedProductRepository.saveProduct(userId, productNo) }
             _uiState.value = _uiState.value.copy(
                 pendingProductNumbers = _uiState.value.pendingProductNumbers - productNo,
             )
@@ -127,7 +129,5 @@ class SavedProductsViewModel(
     }
 
     /** Resets to a clean slate on sign-out so the next signed-in user never sees a stale list. */
-    fun clear() {
-        _uiState.value = SavedProductsUiState()
-    }
+    fun clear() = accountWork.clear()
 }

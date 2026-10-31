@@ -1,6 +1,7 @@
 package com.example.weglow.data.remote.supabase
 
 import com.example.weglow.core.config.AppConfig
+import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
@@ -28,6 +29,7 @@ object SupabaseClientProvider {
             install(Storage)
 
             install(Auth) {
+                flowType = FlowType.PKCE
                 scheme = "weglow"
                 host = "login-callback"
             }

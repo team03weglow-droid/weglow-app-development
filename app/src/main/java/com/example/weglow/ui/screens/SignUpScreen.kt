@@ -9,6 +9,7 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,13 +34,10 @@ fun SignUpScreen(
     onTermsConditionsClick: () -> Unit = {},
     onPrivacyPolicyClick: () -> Unit = {},
 ) {
-    // rememberSaveable (not remember): opening Terms & Conditions or the Privacy Policy
-    // navigates away to a different destination, which disposes this screen's composition.
-    // Only rememberSaveable state survives that and is restored when the user presses Back -
-    // a plain remember would silently reset everything the user had already typed.
+    // Keep non-sensitive fields across legal-page navigation. Passwords remain transient.
     var fullName by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var agreed by rememberSaveable { mutableStateOf(false) }
 
     val formValid = fullName.isNotBlank() && email.isNotBlank() && password.length >= 8 && password.any(Char::isDigit) && agreed

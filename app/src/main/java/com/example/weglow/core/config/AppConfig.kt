@@ -11,11 +11,10 @@ import com.example.weglow.BuildConfig
 object AppConfig {
     val supabaseUrl: String get() = BuildConfig.SUPABASE_URL
     val supabasePublishableKey: String get() = BuildConfig.SUPABASE_PUBLISHABLE_KEY
-    val weatherApiKey: String get() = BuildConfig.WEATHER_API_KEY
     val chatUrl: String get() = BuildConfig.CHAT_URL
 
     fun requireSupabaseConfiguration() {
-        check(supabaseUrl.isNotBlank()) {
+        check(supabaseUrl.startsWith("https://")) {
             "Missing WEGLOW_SUPABASE_URL. Add it to local.properties or a Gradle property."
         }
         check(supabasePublishableKey.isNotBlank()) {
@@ -24,7 +23,7 @@ object AppConfig {
     }
 
     fun requireChatConfiguration() {
-        check(chatUrl.isNotBlank()) {
+        check(chatUrl.startsWith("https://")) {
             "Missing WEGLOW_CHAT_URL. Add it to local.properties or a Gradle property."
         }
     }

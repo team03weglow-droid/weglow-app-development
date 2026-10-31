@@ -49,12 +49,6 @@ android {
 
         buildConfigField(
             "String",
-            "WEATHER_API_KEY",
-            "\"${localProperties.getProperty("WEATHER_API_KEY", "")}\"",
-        )
-
-        buildConfigField(
-            "String",
             "CHAT_URL",
             "\"${localProperties.getProperty("WEGLOW_CHAT_URL", "")}\"",
         )

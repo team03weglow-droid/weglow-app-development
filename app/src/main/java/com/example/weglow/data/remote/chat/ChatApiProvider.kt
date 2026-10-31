@@ -16,6 +16,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 object ChatApiProvider {
 
     val api: ChatApi by lazy {
+        AppConfig.requireChatConfiguration()
         val logging = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         }

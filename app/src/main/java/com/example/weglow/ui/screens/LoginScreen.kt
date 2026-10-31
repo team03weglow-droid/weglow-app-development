@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weglow.R
-import com.example.weglow.ui.components.WeGlowPlannedFeature
+import androidx.compose.material3.*
 import com.example.weglow.ui.components.WeGlowErrorView
 import com.example.weglow.ui.components.WeGlowPasswordField
 import com.example.weglow.ui.components.WeGlowPrimaryButton
@@ -36,13 +36,40 @@ fun LoginScreen(
     onCreateAccountClick: () -> Unit,
     isLoading: Boolean = false,
     errorMessage: String? = null,
+    notice: String? = null,
+    onRequestRecovery: (String) -> Unit = {},
+    onResetPassword: (String, String, String) -> Unit = { _, _, _ -> },
     onTermsConditionsClick: () -> Unit = {},
     onPrivacyPolicyClick: () -> Unit = {},
 ) {
-    // rememberSaveable so opening a legal document from the footer below and pressing Back
-    // does not silently clear whatever the user had already typed here.
+    // Preserve the email across legal-page navigation; never save passwords in instance state.
     var email by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var showRecovery by remember { mutableStateOf(false) }
+    var recoveryCode by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+
+    if (showRecovery) {
+        AlertDialog(
+            onDismissRequest = { if (!isLoading) { showRecovery = false; recoveryCode = ""; newPassword = "" } },
+            title = { Text("Reset password") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Request an email code, then enter it with your new password.")
+                    WeGlowTextField(email, { email = it }, "Email", enabled = !isLoading)
+                    TextButton(onClick = { onRequestRecovery(email) }, enabled = !isLoading) { Text("Send recovery code") }
+                    WeGlowTextField(recoveryCode, { recoveryCode = it }, "Recovery code", enabled = !isLoading)
+                    WeGlowPasswordField(newPassword, { newPassword = it }, enabled = !isLoading)
+                    notice?.let { Text(it) }
+                    errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onResetPassword(email, recoveryCode, newPassword); recoveryCode = ""; newPassword = "" }, enabled = !isLoading && recoveryCode.isNotBlank() && newPassword.isNotBlank()) { Text("Update password") }
+            },
+            dismissButton = { TextButton(onClick = { showRecovery = false; recoveryCode = ""; newPassword = "" }, enabled = !isLoading) { Text("Cancel") } },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -107,7 +134,8 @@ fun LoginScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        WeGlowPlannedFeature("Forgot password?")
+        TextButton(onClick = { showRecovery = true }, enabled = !isLoading) { Text("Forgot password?") }
+        notice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         Spacer(Modifier.height(12.dp))
 
         // Email/password login

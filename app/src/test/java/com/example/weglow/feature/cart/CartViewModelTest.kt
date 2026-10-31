@@ -5,6 +5,11 @@ import com.example.weglow.domain.model.Product
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.AuthenticationState
 import com.example.weglow.domain.repository.CartRepository
+import com.example.weglow.security.SecurityTestAuth
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -34,6 +39,29 @@ class CartViewModelTest {
 
     @After
     fun tearDown() = Dispatchers.resetMain()
+
+    @Test
+    fun lateCartLoadCannotRestoreDataAfterLogout() = runTest(dispatcher) {
+        val auth = SecurityTestAuth()
+        val gate = CompletableDeferred<List<CartItem>>()
+        val repository = object : CartRepository {
+            override suspend fun getCartItems(userId: String) = Result.success(withContext(NonCancellable) { gate.await() })
+            override suspend fun addToCart(userId: String, productNo: Int) = Result.success(Unit)
+            override suspend fun updateQuantity(userId: String, productNo: Int, quantity: Int) = Result.success(Unit)
+            override suspend fun removeFromCart(userId: String, productNo: Int) = Result.success(Unit)
+        }
+        val vm = CartViewModel(auth, repository)
+        vm.load()
+        runCurrent()
+        auth.switchTo(null)
+        runCurrent()
+        auth.switchTo("bob")
+        runCurrent()
+        gate.complete(listOf(CartItem(product(1), 2)))
+        runCurrent()
+        assertTrue(vm.uiState.value.items.isEmpty())
+        assertFalse(vm.uiState.value.isLoading)
+    }
 
     // 1. Loading, then success.
     @Test

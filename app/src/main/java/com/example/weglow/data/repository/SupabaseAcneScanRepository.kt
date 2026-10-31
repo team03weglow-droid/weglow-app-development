@@ -5,6 +5,9 @@ import com.example.weglow.domain.repository.AcneScanRepository
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.ProfileRepository
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Runs the on-device acne model via [onDevice] and then mirrors the detected concerns to the
@@ -22,11 +25,14 @@ class SupabaseAcneScanRepository(
 ) : AcneScanRepository {
 
     override suspend fun analyze(photoReference: String): Result<AcneScanResult> {
+        val scanOwner = authRepository.currentUserId()
         return onDevice.analyze(photoReference).onSuccess { result ->
+            currentCoroutineContext().ensureActive()
+            if (scanOwner == null || authRepository.currentUserId() != scanOwner) throw CancellationException("Account changed")
             val summary = concernsSummary(result)
 
             if (summary.isNotEmpty()) {
-                authRepository.currentUserId()?.let { userId ->
+                scanOwner.let { userId ->
                     runCatching {
                         profileRepository.updateScanSummary(
                             userId,
