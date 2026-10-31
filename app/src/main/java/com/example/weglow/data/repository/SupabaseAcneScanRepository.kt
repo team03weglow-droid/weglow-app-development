@@ -28,21 +28,20 @@ class SupabaseAcneScanRepository(
         val scanOwner = authRepository.currentUserId()
         return onDevice.analyze(photoReference).onSuccess { result ->
             currentCoroutineContext().ensureActive()
-            if (scanOwner == null || authRepository.currentUserId() != scanOwner) throw CancellationException("Account changed")
-            val summary = concernsSummary(result)
-
-            if (summary.isNotEmpty()) {
-                scanOwner.let { userId ->
-                    runCatching {
-                        profileRepository.updateScanSummary(
-                            userId,
-                            summary,
-                            Instant.now(),
-                        )
-                    }
-                    // Best-effort: failures are ignored so the local scan still surfaces to the user.
-                }
+            if (scanOwner == null || authRepository.currentUserId() != scanOwner) {
+                throw CancellationException("Account changed")
             }
+            val summary = concernsSummary(result).ifBlank {
+                "No skin concerns detected in the latest scan"
+            }
+            runCatching {
+                profileRepository.updateScanSummary(
+                    scanOwner,
+                    summary,
+                    Instant.now(),
+                ).getOrThrow()
+            }
+            // Best-effort: failures are ignored so the local scan still surfaces to the user.
         }
     }
 
