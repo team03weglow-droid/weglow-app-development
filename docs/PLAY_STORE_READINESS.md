@@ -113,6 +113,90 @@ commercial/app-display rights, attribution, expiry and supporting evidence.
 - [ ] Run internal testing and applicable closed-testing/production-access process.
 - [ ] Review pre-launch results and verify the submitted release bundle.
 
+## 8. Repository release audit - 2 November 2026
+
+Submission is blocked pending the following work. This is a repository review,
+not a live backend or Play Console certification.
+
+### Build blocker found in this review
+
+- `assembleRelease lintRelease --no-configuration-cache --no-daemon` failed at
+  `mergeReleaseResources`: AAPT could not compile `home_figma_avatar.png`,
+  `chamomile_night_cream.png`, `home_scalp.png`, `white_jasmine_facial_serum.png`,
+  `home_hydration.png`, `matcha_cleansing_foam.png`, and `lavender_sleeping_mist.png`.
+  Inspect and normalize the image formats, then repeat the release build and lint.
+  Release lint did not complete; the previous debug lint report is stale and
+  cannot establish the current lint result.
+- The offline attempt failed because the Supabase release AAR was not cached.
+  The online retry resolved dependencies and exposed the resource errors above.
+- Four backend handler/security tests passed again during this review.
+
+### App and release configuration to change or verify
+
+- `app/build.gradle.kts`: choose the permanent application ID before initial
+  publication; it currently uses `com.example.weglow`. Update any dependent
+  OAuth/provider configuration when changing it.
+- Configure the upload key securely and Play App Signing; no release signing
+  configuration is declared in this build file. Build and validate a signed AAB
+  with `bundleRelease` after fixing resources. `assembleRelease` alone is not
+  evidence of a signed Play-ready bundle.
+- Release minification is currently disabled. Consider R8/resource shrinking
+  after verifying ONNX, LiteRT, serialization and Supabase in the optimized build.
+  This is an optimization recommendation, not itself a submission requirement.
+- Check the final native libraries and bundle for 16 KB page-size compatibility
+  and test on a 16 KB device/emulator; dependency version numbers alone do not
+  prove compatibility. ONNX Runtime, LiteRT and ML Kit bring native libraries.
+- Current compile/target SDK is 37. Verify the installed SDK is a stable,
+  Play-accepted platform at submission, and test its behavior changes.
+- Verify release Supabase URL/publishable key are populated; current build
+  configuration reads `local.properties` and otherwise emits empty values.
+  Keep service-role and provider secrets server-side.
+- Review Android 12+ device transfer of authentication/preferences. Manifest
+  disables backup, but extraction rules explicitly exclude only the routine
+  journal. Verify actual SDK storage and OEM behavior before claiming tokens
+  cannot transfer.
+- Review launcher icon rendering/adaptive and themed variants; the manifest
+  currently uses `@drawable/weglow_logo` for both normal and round icons.
+- Clean up lint findings and misleading image extensions; verify large-font,
+  TalkBack, denied-permission, offline and small-screen behavior on devices.
+
+### Operational and policy preparation, in priority order
+
+1. Review the complete metadata audit; establish deployed RLS, storage and RPC
+   permissions. Reconcile migration history, then stage necessary changes and
+   run real two-account isolation, recovery and account-deletion tests.
+2. Deploy and verify the retired chat endpoint and the required weather/deletion
+   services. Check recovery email templates, OAuth configuration, billing limits
+   and support procedures. A Git push does not deploy Supabase.
+3. Publish a public HTML privacy policy and a functioning external account
+   deletion request page. Confirm operator, contact, hosting regions, retention,
+   backups and deletion timing; align those facts with the in-app policy.
+4. Prepare Data safety from actual SDK/backend data flows: authentication,
+   profile photos, saved scan results, location/environment requests and logs.
+   Distinguish on-device scan images from uploaded profile photos.
+5. Treat skin-condition analysis as requiring a health-policy assessment. Complete
+   Health apps declarations, confirm developer account eligibility, and make
+   store claims match the tested capabilities. Prepare the required non-medical
+   disclaimer and professional-care advice for the applicable classification.
+6. Align the current minimum age of 14 with launch-country requirements, actual
+   onboarding and Console audience selections. Confirm asset/model/product
+   commercial rights and required attribution before publishing.
+7. Keep listing screenshots/descriptions consistent with unavailable chat,
+   unfinished checkout and other coming-soon features. Prepare app icon, feature
+   graphic, screenshots, support contact and reliable reviewer access.
+8. Run internal testing and the applicable closed-test/production-access process,
+   review Play pre-launch reports and re-test the actual signed release bundle.
+   For personal accounts created after 13 November 2023, current guidance requires
+   at least 12 opted-in testers continuously for 14 days before applying for
+   production access; confirm which account requirements apply to this app.
+
+Additional official references checked during this review:
+
+- Health content: https://support.google.com/googleplay/android-developer/answer/16679511
+- Health declaration: https://support.google.com/googleplay/android-developer/answer/14738291
+- Account type: https://support.google.com/googleplay/android-developer/answer/13634885
+- Personal account testing: https://support.google.com/googleplay/android-developer/answer/14151465
+
 ## Official references
 
 - Gemini terms: https://ai.google.dev/gemini-api/terms
