@@ -3,6 +3,11 @@
 .gradle/
 .kotlin/
 local.properties
+# Keep Android signing keys and local signing credentials out of version control.
+*.jks
+*.keystore
+keystore.properties
+signing.properties
 .idea/
 .DS_Store
 build/

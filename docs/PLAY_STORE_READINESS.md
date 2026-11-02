@@ -120,6 +120,39 @@ not a live backend or Play Console certification.
 
 ### Build blocker found in this review
 
+Resolution work has started:
+
+- Corrected all 32 JPEG drawables that used `.png` extensions by renaming them
+  to `.jpg`, preserving their bytes and Android resource identifiers. All 38
+  JPEG/PNG drawable signatures now match their extensions; no resource-name
+  collisions were found. The original AAPT failures below are resolved.
+- Release APK assembly now succeeds. The unsigned universal APK passes SDK
+  `zipalign -c -P 16 4`; all 16 arm64-v8a/x86_64 native libraries have ELF LOAD
+  alignment of at least 16 KB. Device runtime checks and verification of the
+  final signed AAB remain pending.
+- Backup rules now exclude all credential-protected, device-protected and
+  app-specific external data domains from cloud backup and device transfer.
+  `allowBackup=false` remains set. This extends the earlier journal-only rules
+  to cover SDK sessions and other private data. Real OEM transfer tests remain
+  pending; reinstalling/transferring should require sign-in and will not restore
+  the local journal through these backup paths.
+- Signing keystores and conventional local signing-property files are now
+  ignored by Git. A release signing key has not been created or configured.
+- `assembleRelease lintRelease --no-configuration-cache --no-daemon` passed
+  after correcting the image extensions. Lint reported 0 errors and 115
+  warnings; dependency-update suggestions, unused resources and other warnings
+  remain. This does not establish device behavior or backend readiness.
+- `bundleRelease lintRelease --offline --no-configuration-cache --no-daemon`
+  then passed with the updated backup rules (0 lint errors, 115 warnings).
+  Output: `app/build/outputs/bundle/release/app-release.aab` (134,877,676 bytes).
+  `jarsigner -verify` confirms this bundle is unsigned; configure signing before
+  uploading. The file size is not a measurement of Play's per-device download.
+
+Backup configuration reference:
+https://developer.android.com/identity/data/autobackup
+
+Original failed attempt (before the resource corrections):
+
 - `assembleRelease lintRelease --no-configuration-cache --no-daemon` failed at
   `mergeReleaseResources`: AAPT could not compile `home_figma_avatar.png`,
   `chamomile_night_cream.png`, `home_scalp.png`, `white_jasmine_facial_serum.png`,
