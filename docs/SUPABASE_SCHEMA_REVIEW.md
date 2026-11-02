@@ -1,5 +1,12 @@
 # Supabase schema and Android write review — 2 November 2026
 
+Update: the owner has now supplied the complete metadata JSON. See
+[Supabase live audit](SUPABASE_LIVE_AUDIT.md) for the current findings and tested
+repair order. It confirms the UUID defaults, composite uniqueness, onboarding
+constraint and current ownership policies. It also confirms missing privileged
+RPCs/environment columns and excessive grants. The partial-screenshot caveats
+below describe the earlier review and are superseded for those observed items.
+
 Evidence: the user's constraint descriptions and earlier pasted rows, repository
 migrations, DTO serialization and repository/ViewModel call sites. The latest
 screenshot is partial. No live SQL or production writes were performed.

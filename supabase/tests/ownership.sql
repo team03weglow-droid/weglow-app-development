@@ -6,8 +6,9 @@ insert into auth.users(id, email) values
 ('00000000-0000-4000-8000-0000000000b2', 'security-bob@example.invalid');
 insert into public.profiles(id) values
 ('00000000-0000-4000-8000-0000000000a1'), ('00000000-0000-4000-8000-0000000000b2');
-insert into public."Scan-profiles"(user_prof_id) values
-('00000000-0000-4000-8000-0000000000a1'), ('00000000-0000-4000-8000-0000000000b2');
+-- Existing deployed scan tables require Date_time and have no generated scan ID.
+insert into public."Scan-profiles"(user_prof_id, "Date_time") values
+('00000000-0000-4000-8000-0000000000a1', now()), ('00000000-0000-4000-8000-0000000000b2', now());
 do $$ begin
     if not exists (select 1 from public.products) then raise exception 'Seed a staging product first'; end if;
 end $$;
@@ -35,7 +36,7 @@ begin
     get diagnostics affected = row_count;
     if affected <> 0 then raise exception 'Cross-account delete succeeded'; end if;
     begin
-        insert into public."Scan-profiles"(user_prof_id) values ('00000000-0000-4000-8000-0000000000b2');
+        insert into public."Scan-profiles"(user_prof_id, "Date_time") values ('00000000-0000-4000-8000-0000000000b2', now());
         raise exception 'Cross-account insert succeeded';
     exception when insufficient_privilege then null; end;
     begin

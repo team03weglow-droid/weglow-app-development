@@ -6,6 +6,7 @@ tables as (
 with expected(schema_name, table_name) as (values
   ('public', 'profiles'), ('public', 'Scan-profiles'),
   ('public', 'cart_items'), ('public', 'saved_products'),
+  ('public', 'products'), ('public', 'hairstyles'),
   ('storage', 'objects')
 )
 select e.schema_name, e.table_name, c.oid is not null as table_exists,

@@ -37,6 +37,14 @@ Local verification:
 
 ## 2. Verify backend security and deletion
 
+Latest evidence: the owner supplied the full metadata JSON. RLS and current
+ownership policies/private photo storage are present, but the required
+deletion/quota RPCs, profile environment columns and later hardening are missing;
+client grants are excessive. See [Supabase live audit](SUPABASE_LIVE_AUDIT.md)
+for findings, the four-file repair order and passing local metadata-fixture
+checks. No production changes have been applied. The original access history
+below predates this complete result.
+
 Access check: repository identifies `weglow-backend` (`edmlbdkvrtmpcwigrqtr`).
 No connected Supabase tool or browser session was available. CLI access could not
 be established: the npm launcher lacked its Windows binary and the explicit

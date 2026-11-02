@@ -3,6 +3,8 @@
 .gradle/
 .kotlin/
 local.properties
+# Local live-database audit output.
+/security-audit.json
 # Keep Android signing keys and local signing credentials out of version control.
 *.jks
 *.keystore
