@@ -58,7 +58,7 @@ class TypographyLayoutTest {
         id = "typography-fixture",
         name = "Gentle Daily Facial Cleanser",
         priceLabel = "LKR 2,450",
-        imageUrl = "android.resource://com.example.weglow/${R.drawable.matcha_cleansing_foam}",
+        imageUrl = "android.resource://${BuildConfig.APPLICATION_ID}/${R.drawable.matcha_cleansing_foam}",
         description = "A gentle daily cleanser for your morning routine.",
         brandName = "WeGlow",
         category = "Cleanser",

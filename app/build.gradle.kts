@@ -21,6 +21,19 @@ if (localPropertiesFile.exists()) {
 
 val supabaseUrl = localProperties.getProperty("WEGLOW_SUPABASE_URL", "").trim()
 
+// Local upload-key credentials are never committed. Android Studio's signing
+// wizard can also supply credentials for an individual build.
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+    val missing = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+        .filter { keystoreProperties.getProperty(it).isNullOrBlank() }
+    check(missing.isEmpty()) {
+        "Incomplete keystore.properties: ${missing.joinToString()}. See docs/RELEASE_SIGNING.md."
+    }
+}
+
 android {
     namespace = "com.example.weglow"
 
@@ -29,7 +42,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.weglow"
+        applicationId = "com.team03weglow.app"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
@@ -51,9 +64,23 @@ android {
 
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("upload") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("upload")
+            }
 
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

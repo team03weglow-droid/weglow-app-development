@@ -80,6 +80,7 @@ class RoutineJournalTest {
         override val authenticationState = MutableStateFlow(AuthenticationState.AUTHENTICATED)
         override fun currentUserId() = id
         override fun currentUserDisplayName(): String? = null
+        override fun currentUserEmail(): String? = null
         override fun hasActiveSession() = id != null
         override suspend fun signUp(email: String, password: String) = Result.success(Unit)
         override suspend fun signIn(email: String, password: String) = Result.success(Unit)

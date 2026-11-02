@@ -94,7 +94,7 @@ commercial/app-display rights, attribution, expiry and supporting evidence.
 
 ## 6. Prepare release configuration and user experience
 
-- [ ] Select permanent application ID before initial publication.
+- [x] Set application ID to `com.team03weglow.app`; Play registration remains pending.
 - [ ] Configure protected release signing and Play App Signing.
 - [ ] Build release AAB; verify API compatibility and native 16 KB page support.
 - [ ] Test permissions granted/denied, approximate location and offline behaviour.
@@ -166,11 +166,15 @@ Original failed attempt (before the resource corrections):
 
 ### App and release configuration to change or verify
 
-- `app/build.gradle.kts`: choose the permanent application ID before initial
-  publication; it currently uses `com.example.weglow`. Update any dependent
-  OAuth/provider configuration when changing it.
-- Configure the upload key securely and Play App Signing; no release signing
-  configuration is declared in this build file. Build and validate a signed AAB
+- `app/build.gradle.kts`: application ID is now `com.team03weglow.app`; the Kotlin
+  namespace remains `com.example.weglow`. Debug/release merged manifests and
+  FileProvider authority reflect the new identity. Check Play registration and
+  any dependent OAuth/provider configuration before submission.
+- Optional upload-key signing now reads ignored root `keystore.properties`;
+  `keystore.properties.example` contains no credentials. Android Studio can
+  also supply credentials through its signing wizard. See `RELEASE_SIGNING.md`.
+  Key creation, signed-output verification and Play App Signing remain pending.
+  Build and validate a signed AAB
   with `bundleRelease` after fixing resources. `assembleRelease` alone is not
   evidence of a signed Play-ready bundle.
 - Release minification is currently disabled. Consider R8/resource shrinking
