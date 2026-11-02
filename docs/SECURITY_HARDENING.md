@@ -1,5 +1,11 @@
 # Security hardening — 31 October 2026
 
+> Launch update: chatbot functionality has been removed from Android. The `chat`
+> Edge Function is now a retirement stub returning HTTP 410 without AI calls.
+> Deploy that stub to retire any previously hosted chatbot. Chat/Gemini descriptions
+> below document the earlier implementation, not the current launch functionality.
+> See [Play Store readiness](PLAY_STORE_READINESS.md).
+
 ## Implemented in this change
 
 - Shared account-generation work ownership for chat, cart, saved products, profile, onboarding,

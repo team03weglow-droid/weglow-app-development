@@ -4,11 +4,9 @@ import android.content.Context
 import com.example.weglow.core.image.FaceImageValidator
 import com.example.weglow.core.image.FaceValidator
 import com.example.weglow.data.location.AndroidLocationProvider
-import com.example.weglow.data.remote.chat.ChatApiProvider
 import com.example.weglow.data.remote.supabase.SupabaseClientProvider
 import com.example.weglow.data.repository.LocalAcneScanRepository
 import com.example.weglow.data.repository.LocalHairstyleRepository
-import com.example.weglow.data.repository.RetrofitChatRepository
 import com.example.weglow.data.repository.SupabaseAcneScanRepository
 import com.example.weglow.data.repository.SupabaseAccountSecurityRepository
 import com.example.weglow.domain.repository.AccountSecurityRepository
@@ -25,7 +23,6 @@ import com.example.weglow.domain.repository.AcneScanRepository
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.CartRepository
 import com.example.weglow.domain.repository.CatalogRepository
-import com.example.weglow.domain.repository.ChatRepository
 import com.example.weglow.domain.repository.HairstyleRepository
 import com.example.weglow.domain.repository.ProfileImageRepository
 import com.example.weglow.domain.repository.ProfileRepository
@@ -88,13 +85,6 @@ class AppContainer {
 
     val catalogRepository: CatalogRepository by lazy {
         SupabaseCatalogRepository(supabaseClient)
-    }
-
-    val chatRepository: ChatRepository by lazy {
-        RetrofitChatRepository(
-            { ChatApiProvider.api },
-            supabaseClient
-        )
     }
 
     val scanProfileRepository: ScanProfileRepository by lazy {

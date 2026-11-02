@@ -43,7 +43,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Text(
-                "Effective Date: 16 September 2026",
+                "Effective Date: 1 November 2026",
                 style = MaterialTheme.typography.bodySmall,
                 color = SoftGray,
             )
@@ -138,17 +138,13 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
 
             LegalSection(
                 title = "7. Third-Party Services",
-                body = "WeGlow currently relies on third-party technology providers to operate " +
+                body = "Chatbot functionality is unavailable in this version. The icon displays a coming-soon " +
+                    "message; no chat messages are collected or sent to an AI chat provider.\n\n" +
+                    "WeGlow currently relies on third-party technology providers to operate " +
                     "certain features, including:\n\n" +
                     "Supabase — authentication, database services, and private profile-image " +
                     "storage.\n\n" +
                     "Google Sign-In — optional account authentication.\n\n" +
-                    "Google Gemini — processes messages you send to WeGlow AI, recent conversation " +
-                    "history, and relevant skin-profile, scan-summary and environmental readings to " +
-                    "generate replies. Full name, exact date of birth, profile photos, and location " +
-                    "name are excluded from the profile context sent by WeGlow. Information you type " +
-                    "into messages is still sent. Provider retention depends on the service terms " +
-                    "and account configuration; avoid sharing identifying or confidential information.\n\n" +
                     "WeatherAPI.com and Open-Meteo — environmental and weather-related information. " +
                     "Location coordinates may be transmitted when requesting relevant environmental " +
                     "information.\n\n" +

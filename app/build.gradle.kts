@@ -20,13 +20,6 @@ if (localPropertiesFile.exists()) {
 }
 
 val supabaseUrl = localProperties.getProperty("WEGLOW_SUPABASE_URL", "").trim()
-val chatUrl = localProperties.getProperty("WEGLOW_CHAT_URL", "").trim().ifBlank {
-    supabaseUrl
-        .takeIf { it.isNotBlank() }
-        ?.trimEnd('/')
-        ?.let { "$it/functions/v1/" }
-        .orEmpty()
-}
 
 android {
     namespace = "com.example.weglow"
@@ -56,11 +49,6 @@ android {
             "\"${localProperties.getProperty("WEGLOW_SUPABASE_PUBLISHABLE_KEY", "")}\"",
         )
 
-        buildConfigField(
-            "String",
-            "CHAT_URL",
-            "\"$chatUrl\"",
-        )
     }
 
     buildTypes {
@@ -155,12 +143,6 @@ dependencies {
     // Ktor
     implementation(libs.ktor.client.android)
 
-    // Retrofit / Gson
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.gson)
-
-    // OkHttp
-    implementation(libs.okhttp.logging.interceptor)
 
     // Images
     implementation(libs.coil.compose)

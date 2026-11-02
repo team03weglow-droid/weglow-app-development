@@ -53,3 +53,25 @@ fun ProfileRow.toUserProfile() = UserProfile(
     profileImagePath = profile_image_url,
     onboardingCompleted = onboarding_completed,
 )
+
+/** Onboarding must not overwrite photo, scan, face-shape or environmental columns. */
+@Serializable
+internal data class OnboardingProfileWrite(
+    val id: String,
+    val full_name: String?,
+    val age_range: String?,
+    val skin_type: String?,
+    val gender: String?,
+    val is_skin_sensitive: Boolean?,
+    val onboarding_completed: Boolean,
+)
+
+internal fun UserProfile.toOnboardingWrite() = OnboardingProfileWrite(
+    id = id,
+    full_name = fullName,
+    age_range = ageRange,
+    skin_type = skinType,
+    gender = gender,
+    is_skin_sensitive = isSkinSensitive,
+    onboarding_completed = onboardingCompleted,
+)

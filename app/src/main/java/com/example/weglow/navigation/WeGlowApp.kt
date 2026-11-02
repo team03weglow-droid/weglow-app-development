@@ -40,7 +40,6 @@ import com.example.weglow.feature.auth.AuthEvent
 import com.example.weglow.feature.auth.AuthViewModel
 import com.example.weglow.feature.auth.StartupDestination
 import com.example.weglow.feature.cart.CartViewModel
-import com.example.weglow.feature.chat.ChatViewModel
 import com.example.weglow.feature.discover.DiscoverViewModel
 import com.example.weglow.feature.environment.EnvironmentUiState
 import com.example.weglow.feature.environment.EnvironmentViewModel
@@ -72,6 +71,18 @@ fun WeGlowApp() {
 
     val navController = rememberNavController()
     val container = remember { AppContainer() }
+    var showChatComingSoon by remember { mutableStateOf(false) }
+
+    if (showChatComingSoon) {
+        AlertDialog(
+            onDismissRequest = { showChatComingSoon = false },
+            title = { Text("Chatbot coming soon") },
+            text = { Text("We're working on WeGlow's chatbot. It will be available in a future update.") },
+            confirmButton = {
+                TextButton(onClick = { showChatComingSoon = false }) { Text("OK") }
+            },
+        )
+    }
 
     val authViewModel: AuthViewModel = viewModel(
         factory = viewModelFactory {
@@ -131,12 +142,6 @@ fun WeGlowApp() {
                 container.profileRepository,
                 container.profileImageRepository
             )
-        }
-    )
-
-    val chatViewModel: ChatViewModel = viewModel(
-        factory = viewModelFactory {
-            ChatViewModel(container.chatRepository, container.authRepository)
         }
     )
 
@@ -293,7 +298,7 @@ fun WeGlowApp() {
             scanFlowViewModel.resetFlow()
             savedProductsViewModel.clear()
             cartViewModel.clear()
-            chatViewModel.clear()
+            showChatComingSoon = false
             profileViewModel.clear()
             recommendationViewModel.clear()
             routineViewModel.clear()
@@ -381,13 +386,7 @@ fun WeGlowApp() {
             if (currentRoute == Destination.Home.route) {
 
                 FloatingActionButton(
-                    onClick = {
-                        navController.navigate(
-                            Destination.Chatbot.route
-                        ) {
-                            launchSingleTop = true
-                        }
-                    },
+                    onClick = { showChatComingSoon = true },
                     shape = CircleShape,
                     containerColor = DarkGreen,
                     contentColor = Color.White,
@@ -395,7 +394,7 @@ fun WeGlowApp() {
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Chat,
-                        contentDescription = "Open chatbot"
+                        contentDescription = "Chatbot coming soon"
                     )
                 }
             }
@@ -1357,19 +1356,6 @@ fun WeGlowApp() {
                 )
             }
 
-            // ---------------------------------------------------------
-            // CHATBOT
-            // ---------------------------------------------------------
-
-            composable(Destination.Chatbot.route) {
-
-                WeGlowChatScreen(
-                    chatViewModel = chatViewModel,
-                    onBack = {
-                        navController.popBackStack()
-                    },
-                )
-            }
         }
     }
 }

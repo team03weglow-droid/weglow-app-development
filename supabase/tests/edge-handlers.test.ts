@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 let handler: (request: Request) => Promise<Response>;
 const values: Record<string, string> = {
   SUPABASE_URL: "https://project.test", SUPABASE_ANON_KEY: "public",
-  SUPABASE_SERVICE_ROLE_KEY: "server-secret", GEMINI_API_KEY: "gemini-secret", WEATHER_API_KEY: "weather-secret",
+  SUPABASE_SERVICE_ROLE_KEY: "server-secret", WEATHER_API_KEY: "weather-secret",
 };
 (globalThis as any).Deno = { env: { get: (key: string) => values[key] }, serve: (callback: typeof handler) => { handler = callback; } };
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
@@ -12,43 +12,22 @@ const request = (body: unknown, authorized = true) => new Request("https://proje
   method: "POST", headers: { "content-type": "application/json", ...(authorized ? { Authorization: "Bearer user-token" } : {}) }, body: JSON.stringify(body),
 });
 
-test("chat uses verified identity, minimizes context, denies invalid payloads, and hides upstream errors", async () => {
+test("retired chat rejects requests without reading messages or calling services", async () => {
   const originalFetch = globalThis.fetch;
-  let context = "";
-  let profileUrl = "";
-  let providerError = false;
-  globalThis.fetch = async (input, init) => {
-    const url = String(input);
-    if (url.endsWith("/auth/v1/user")) return response({ id: "verified-user" });
-    if (url.endsWith("reserve_api_request")) return response("reservation");
-    if (url.endsWith("release_api_request")) return response(null);
-    if (url.includes("/profiles?")) { profileUrl = url; return response([{ full_name: "PRIVATE NAME", date_of_birth: "PRIVATE DOB", location_name: "PRIVATE CITY", skin_type: "Dry", skin_concerns: "papules (2)" }]); }
-    if (url.includes("/products?") || url.includes("/hairstyles?")) return response([]);
-    if (url.includes("generativelanguage.googleapis.com")) {
-      context = String(init?.body);
-      return providerError ? response({ error: "secret upstream diagnostic" }, 500) : response({ candidates: [{ content: { parts: [{ text: "hello" }] } }] });
-    }
-    throw new Error(`Unexpected URL ${url}`);
-  };
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; throw new Error("Retired chat must not call services"); };
   try {
     await import("../functions/chat/index.ts");
-    assert.equal((await handler(request({ message: "hi" }, false))).status, 401);
-    assert.equal((await handler(request({ message: "x".repeat(70000) }))).status, 413);
-    assert.equal((await handler(request(null))).status, 400);
-    const result = await handler(request({ message: "hi", userId: "victim" }));
-    assert.equal(result.status, 200);
-    assert.match(profileUrl, /verified-user/);
-    assert.ok(!profileUrl.includes("victim"));
-    assert.ok(context.includes("Dry"));
-    for (const secret of ["PRIVATE NAME", "PRIVATE DOB", "PRIVATE CITY"]) assert.ok(!context.includes(secret));
-    providerError = true;
-    const failed = await handler(request({ message: "hi" }));
-    assert.equal(failed.status, 500);
-    const body = await failed.json();
-    assert.ok(!("detail" in body));
-    assert.ok(!JSON.stringify(body).includes("secret upstream"));
-    const preflight = await handler(new Request("https://project.test", { method: "OPTIONS" }));
-    assert.equal(preflight.status, 204);
+    for (const authorized of [true, false]) {
+      const result = await handler(request({ message: "private message" }, authorized));
+      assert.equal(result.status, 410);
+      assert.deepEqual(await result.json(), { error: "Chatbot coming soon" });
+    }
+    const malformed = new Request("https://project.test/functions/v1/chat/message", { method: "POST", body: "{" });
+    assert.equal((await handler(malformed)).status, 410);
+    assert.equal(malformed.bodyUsed, false);
+    assert.equal((await handler(new Request("https://project.test", { method: "OPTIONS" }))).status, 204);
+    assert.equal(calls, 0);
   } finally { globalThis.fetch = originalFetch; }
 });
 

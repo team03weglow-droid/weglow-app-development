@@ -115,6 +115,7 @@ class SupabaseCartRepository(
         ) {
             onConflict = "profile_id,product_no"
             ignoreDuplicates = true
+            select(columns = Columns.raw("quantity"))
         }.decodeList<JsonObject>()
         return inserted.isNotEmpty()
     }
@@ -123,6 +124,7 @@ class SupabaseCartRepository(
         val updated = client.postgrest[CART_ITEMS_TABLE].update(
             update = { set("quantity", previousQuantity + 1) },
         ) {
+            select(columns = Columns.raw("quantity"))
             filter {
                 eq("profile_id", userId)
                 eq("product_no", productNo)

@@ -11,7 +11,6 @@ import com.example.weglow.BuildConfig
 object AppConfig {
     val supabaseUrl: String get() = BuildConfig.SUPABASE_URL
     val supabasePublishableKey: String get() = BuildConfig.SUPABASE_PUBLISHABLE_KEY
-    val chatUrl: String get() = BuildConfig.CHAT_URL
 
     fun requireSupabaseConfiguration() {
         check(supabaseUrl.startsWith("https://")) {
@@ -22,9 +21,4 @@ object AppConfig {
         }
     }
 
-    fun requireChatConfiguration() {
-        check(chatUrl.startsWith("https://")) {
-            "Missing WEGLOW_CHAT_URL. Add it to local.properties or a Gradle property."
-        }
-    }
 }
