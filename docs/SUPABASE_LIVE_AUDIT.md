@@ -54,6 +54,12 @@ those are shared across buckets and must be considered alongside bucket policies
 
 ## Exact repair order to verify in staging
 
+The owner created `weglow-staging` at project ref `tkljmhlrmutcsciqimlq`.
+See `supabase/staging/README.md` and its locally verified `setup.sql` for the
+fresh-project setup. It recreates audited user-table shapes with synthetic
+catalogs and installs the repairs; it does not clone production user data or
+change the Android app's backend. Hosted execution remains to be verified.
+
 Take a recoverable backup and inspect migration history first. The repository
 has duplicate legacy migration timestamps; do not blindly run CLI db push or
 rename migrations already recorded by Supabase. These files already contain
