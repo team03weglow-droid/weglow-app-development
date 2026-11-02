@@ -9,6 +9,8 @@ local.properties
 keystore.properties
 signing.properties
 .signing/
+# Android Studio's signed-bundle wizard output.
+app/release/
 .idea/
 .DS_Store
 build/

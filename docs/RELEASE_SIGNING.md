@@ -73,10 +73,29 @@ development debug key.
   namespace.
 - Updated the device-test package assertion and resource URI. Fixed an existing
   routine-journal test AuthRepository stub missing `currentUserEmail()`.
-- The no-credentials release build passes. Loading an actual upload key and
-  verifying a signed artifact are still pending the owner's private key-creation
-  step. The Android Studio New Key Store dialog has been opened and prepared
-  with path/alias and 25-year validity; no passwords were entered by the agent.
+- The owner created `.signing/weglow-upload.jks` and generated the signed bundle
+  through Android Studio on 2 November 2026. No passwords were entered by the
+  agent. This does not configure command-line signing automatically; use the
+  wizard again or the optional ignored properties file for future signed builds.
+- Verified signed output: `app/release/app-release.aab` (134,916,058 bytes).
+  This is the artifact checked below; do not confuse it with an earlier unsigned
+  bundle in `app/build/outputs`. The entire wizard output folder is Git-ignored.
+- `jarsigner -verify`: `jar verified`. The JDK also reports self-signed-chain,
+  no-timestamp, ZIP attribute and JarInputStream manifest-order warnings. An
+  independent JarFile verification read every payload entry and confirmed all
+  650 payload entries are signed by one consistent certificate. These local
+  checks do not substitute for Play's upload checks.
+- Installed bundletool 1.18.3: bundle structure validation passed; manifest
+  application ID confirmed as `com.team03weglow.app`.
+- Upload certificate SHA-256 (public fingerprint):
+  `F8:51:2A:CD:5A:0D:91:7E:A5:17:20:75:36:40:0A:0B:46:05:2F:11:C7:17:E0:38:2A:74:9C:6E:CD:B8:9A:20`.
+  Certificate expires 27 October 2051. This is the upload certificate, not a
+  Play app-signing certificate.
+- Verified AAB SHA-256:
+  `2DEA6985AF9F35EC4A87500A2E5AD59632582762E7DDC75153007118C78B5A3E`.
+- Key/password backup by the owner, Play App Signing enrollment, store
+  registration and release-device/backend checks remain pending. No upload to
+  Play Console was performed.
 
 Official instructions:
 https://developer.android.com/studio/publish/app-signing

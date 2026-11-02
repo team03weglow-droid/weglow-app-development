@@ -95,7 +95,8 @@ commercial/app-display rights, attribution, expiry and supporting evidence.
 ## 6. Prepare release configuration and user experience
 
 - [x] Set application ID to `com.team03weglow.app`; Play registration remains pending.
-- [ ] Configure protected release signing and Play App Signing.
+- [x] Create local upload keystore and verify a signed release AAB.
+- [ ] Back up the upload key/passwords securely and enroll in Play App Signing.
 - [ ] Build release AAB; verify API compatibility and native 16 KB page support.
 - [ ] Test permissions granted/denied, approximate location and offline behaviour.
 - [ ] Test scans, profile uploads, the coming-soon dialog, reminders and account flows on devices.
@@ -137,7 +138,8 @@ Resolution work has started:
   pending; reinstalling/transferring should require sign-in and will not restore
   the local journal through these backup paths.
 - Signing keystores and conventional local signing-property files are now
-  ignored by Git. A release signing key has not been created or configured.
+  ignored by Git. The owner subsequently created the upload key and a verified
+  signed AAB through Android Studio; see `RELEASE_SIGNING.md` for current status.
 - `assembleRelease lintRelease --no-configuration-cache --no-daemon` passed
   after correcting the image extensions. Lint reported 0 errors and 115
   warnings; dependency-update suggestions, unused resources and other warnings
@@ -173,10 +175,12 @@ Original failed attempt (before the resource corrections):
 - Optional upload-key signing now reads ignored root `keystore.properties`;
   `keystore.properties.example` contains no credentials. Android Studio can
   also supply credentials through its signing wizard. See `RELEASE_SIGNING.md`.
-  Key creation, signed-output verification and Play App Signing remain pending.
-  Build and validate a signed AAB
-  with `bundleRelease` after fixing resources. `assembleRelease` alone is not
-  evidence of a signed Play-ready bundle.
+  The owner has now created the upload key and generated
+  `app/release/app-release.aab` through Android Studio. Bundletool validates its
+  structure and application ID; all 650 payload signatures verify with one
+  certificate. See `RELEASE_SIGNING.md` for artifact/certificate fingerprints.
+  Owner backup, Play App Signing and Play upload checks remain pending.
+  `assembleRelease` alone is not evidence of a signed Play-ready bundle.
 - Release minification is currently disabled. Consider R8/resource shrinking
   after verifying ONNX, LiteRT, serialization and Supabase in the optimized build.
   This is an optimization recommendation, not itself a submission requirement.
