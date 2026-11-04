@@ -6,6 +6,29 @@ Dashboard: https://supabase.com/dashboard/project/tkljmhlrmutcsciqimlq
 The current application and `supabase/config.toml` still target the existing
 backend. Creating this project does not redirect the app or deploy functions.
 
+## Hosted checkpoint reported by the owner
+
+- Setup returned `staging_setup_complete`.
+- The ownership script returned the expected simulated authenticated identity;
+  no error was reported. That output alone does not establish full execution
+  through the final rollback.
+- Supplied audit metadata shows all seven expected tables with RLS enabled,
+  ownership guards, bounded photo paths, restricted application-table grants,
+  read-only catalogs and the five environment columns.
+- A separate complete result confirms the private `profile-images` bucket,
+  5 MiB limit and JPEG/PNG/WebP allowlist. All three privileged RPCs exist,
+  use security-definer execution with an empty search path, deny execution to
+  anon/authenticated and allow service_role.
+- The first audit paste ended partway through constraints. The visible age and
+  cart bounds are installed as NOT VALID, as designed; the complete remaining
+  constraint metadata has not been reviewed.
+
+These are owner-supplied hosted results, not direct project inspection. Real
+Auth login, two-account Storage API isolation, deployed endpoint behavior and
+end-to-end account deletion remain pending. Production remains unverified.
+
+## Setup and verification procedure
+
 1. Open this staging project's SQL Editor and create a new query as postgres.
 2. Paste the **entire** `setup.sql` file and run it. Expect
    `staging_setup_complete`. It creates the four audited user-table shapes,
