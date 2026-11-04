@@ -18,6 +18,8 @@ data class AuthUiState(
     val errorMessage: String? = null,
     val event: AuthEvent? = null,
     val notice: String? = null,
+    val recoveryActive: Boolean = false,
+    val recoveryReady: Boolean = false,
 )
 
 sealed interface AuthEvent {
@@ -95,6 +97,10 @@ class AuthViewModel(
                     AuthenticationState.NOT_AUTHENTICATED -> {
                         val sessionEnded = hadAuthenticatedSession
                         hadAuthenticatedSession = false
+                        if (currentOperation == AuthOperation.RECOVERY) {
+                            _startupDestination.value = StartupDestination.LOGIN
+                            return@collectLatest
+                        }
                         currentOperation = AuthOperation.NONE
                         if (sessionEnded) {
                             _uiState.value = _uiState.value.copy(
@@ -124,6 +130,7 @@ class AuthViewModel(
                         val userId = authRepository.currentUserId()
                         val destination = determineDestination()
                         ensureActive()
+                        if (currentOperation == AuthOperation.RECOVERY) return@collectLatest
                         if (userId != authRepository.currentUserId()) return@collectLatest
 
                         if (_startupDestination.value == null) {
@@ -361,38 +368,87 @@ class AuthViewModel(
         }
     }
 
+    fun clearAuthFeedback() {
+        if (!_uiState.value.isLoading && !_uiState.value.recoveryActive) _uiState.value = AuthUiState()
+    }
+
     fun requestPasswordRecovery(email: String) {
         val repository = accountSecurityRepository ?: return
         if (_uiState.value.isLoading) return
-        if (!email.contains("@") || email.length > 254) {
-            _uiState.value = AuthUiState(errorMessage = "Enter your email address.")
+        if (!PasswordRecovery.isValidEmail(email.trim())) {
+            _uiState.value = AuthUiState(errorMessage = "Enter a valid email address.")
             return
         }
         _uiState.value = AuthUiState(isLoading = true)
         viewModelScope.launch {
             repository.requestPasswordRecovery(email.trim()).fold(
-                onSuccess = { _uiState.value = AuthUiState(notice = "If an account exists, a recovery code has been sent. Check your email.") },
-                onFailure = { _uiState.value = AuthUiState(errorMessage = "Could not request recovery. Please try again later.") },
+                onSuccess = { _uiState.value = AuthUiState(notice = "If an account exists for this email, you will receive a password reset link.") },
+                onFailure = { _uiState.value = AuthUiState(errorMessage = "Could not send the reset link. Please try again later.") },
             )
         }
     }
 
-    fun resetPassword(email: String, code: String, password: String) {
-        val repository = accountSecurityRepository ?: return
+    fun openPasswordRecovery(link: String) {
         if (_uiState.value.isLoading) return
-        if (code.length !in 6..10 || code.any { !it.isDigit() } || password.length < 8 || password.none(Char::isDigit)) {
-            _uiState.value = AuthUiState(errorMessage = "Enter the emailed code and a password of at least 8 characters with a number.")
+        currentOperation = AuthOperation.RECOVERY
+        _uiState.value = AuthUiState(isLoading = true, recoveryActive = true)
+        viewModelScope.launch {
+            val repository = accountSecurityRepository
+            repository?.cancelPasswordRecovery()
+            val tokenHash = PasswordRecovery.tokenHash(link)
+            if (repository == null || tokenHash == null) {
+                _uiState.value = AuthUiState(recoveryActive = true, errorMessage = INVALID_RECOVERY_LINK)
+                return@launch
+            }
+            repository.verifyPasswordRecovery(tokenHash).fold(
+                onSuccess = { _uiState.value = AuthUiState(recoveryActive = true, recoveryReady = true) },
+                onFailure = { _uiState.value = AuthUiState(recoveryActive = true, errorMessage = INVALID_RECOVERY_LINK) },
+            )
+        }
+    }
+
+    fun resetPassword(password: String, confirmation: String) {
+        val repository = accountSecurityRepository ?: return
+        val state = _uiState.value
+        if (state.isLoading || !state.recoveryReady) return
+        val error = when {
+            password.length < 8 || password.none(Char::isDigit) -> "Use at least 8 characters, with a number."
+            password != confirmation -> "Passwords do not match."
+            else -> null
+        }
+        if (error != null) {
+            _uiState.value = state.copy(errorMessage = error)
             return
         }
-        currentOperation = AuthOperation.RECOVERY
-        _uiState.value = AuthUiState(isLoading = true)
+        _uiState.value = state.copy(isLoading = true, errorMessage = null)
         viewModelScope.launch {
-            repository.resetPassword(email.trim(), code.trim(), password).fold(
-                onSuccess = { _uiState.value = AuthUiState(notice = "Password updated. Sign in with your new password.", event = AuthEvent.SignedOut) },
-                onFailure = { _uiState.value = AuthUiState(errorMessage = "Could not reset your password. Check the code or request a new one.") },
+            repository.resetPassword(password).fold(
+                onSuccess = {
+                    _uiState.value = AuthUiState(recoveryActive = true, notice = "Password updated. Sign in with your new password.")
+                },
+                onFailure = {
+                    repository.cancelPasswordRecovery()
+                    _uiState.value = AuthUiState(recoveryActive = true, errorMessage = "Could not update your password. Request a new link and check the password requirements.")
+                },
             )
-            currentOperation = AuthOperation.NONE
         }
+    }
+
+    fun closePasswordRecovery() {
+        if (_uiState.value.isLoading) return
+        _uiState.value = _uiState.value.copy(isLoading = true)
+        viewModelScope.launch {
+            accountSecurityRepository?.cancelPasswordRecovery()
+            // Leave any prior identity through the existing logout path as well.
+            authRepository.signOut()
+            hadAuthenticatedSession = false
+            currentOperation = AuthOperation.NONE
+            _uiState.value = AuthUiState(event = AuthEvent.SignedOut)
+        }
+    }
+
+    private companion object {
+        const val INVALID_RECOVERY_LINK = "This reset link is invalid, expired, or already used. Request a new link."
     }
 
     fun deleteAccount() {

@@ -67,7 +67,7 @@ private val tabs = listOf(
 )
 
 @Composable
-fun WeGlowApp() {
+fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit = {}) {
 
     val navController = rememberNavController()
     val container = remember { AppContainer() }
@@ -247,6 +247,22 @@ fun WeGlowApp() {
     val routineState by routineViewModel.uiState.collectAsState()
     val savedProductsState by savedProductsViewModel.uiState.collectAsState()
     val cartState by cartViewModel.uiState.collectAsState()
+
+    LaunchedEffect(recoveryLink, authState.isLoading) {
+        recoveryLink?.takeIf { !authState.isLoading }?.let {
+            authViewModel.openPasswordRecovery(it)
+            onRecoveryLinkConsumed()
+        }
+    }
+
+    LaunchedEffect(authState.recoveryActive) {
+        if (authState.recoveryActive) {
+            navController.navigate(Destination.ResetPassword.route) {
+                popUpTo(navController.graph.id) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     LaunchedEffect(environmentState) {
         val environment =
@@ -428,6 +444,8 @@ fun WeGlowApp() {
                     startupDestination
                 ) {
 
+                    if (authState.recoveryActive) return@LaunchedEffect
+
                     val target =
                         startupDestination ?: return@LaunchedEffect
 
@@ -484,8 +502,10 @@ fun WeGlowApp() {
                     isLoading = authState.isLoading,
                     errorMessage = authState.errorMessage,
                     notice = authState.notice,
-                    onRequestRecovery = authViewModel::requestPasswordRecovery,
-                    onResetPassword = authViewModel::resetPassword,
+                    onForgotPassword = {
+                        authViewModel.clearAuthFeedback()
+                        navController.navigate(Destination.ForgotPassword.route) { launchSingleTop = true }
+                    },
                     onTermsConditionsClick = { navController.navigate(Destination.TermsConditions.route) { launchSingleTop = true } },
                     onPrivacyPolicyClick = { navController.navigate(Destination.PrivacyPolicy.route) { launchSingleTop = true } },
                 )
@@ -522,6 +542,29 @@ fun WeGlowApp() {
                         else -> Unit
                     }
                 }
+            }
+
+            composable(Destination.ForgotPassword.route) {
+                PasswordRecoveryScreen(
+                    state = authState,
+                    isReset = false,
+                    onSendLink = authViewModel::requestPasswordRecovery,
+                    onSavePassword = { _, _ -> },
+                    onBack = {
+                        authViewModel.clearAuthFeedback()
+                        navController.popBackStack()
+                    },
+                )
+            }
+
+            composable(Destination.ResetPassword.route) {
+                PasswordRecoveryScreen(
+                    state = authState,
+                    isReset = true,
+                    onSendLink = {},
+                    onSavePassword = authViewModel::resetPassword,
+                    onBack = authViewModel::closePasswordRecovery,
+                )
             }
 
             composable(Destination.Signup.route) {

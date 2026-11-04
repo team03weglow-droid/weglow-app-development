@@ -38,6 +38,117 @@ class AuthViewModelTest {
     }
 
     @Test
+    fun recoveryRejectsEmptyAndMalformedEmailsWithoutSending() = runTest(dispatcher) {
+        val security = FakeRecoveryRepository()
+        val vm = AuthViewModel(FakeAuthRepository(false), FakeProfileRepository(), security)
+        advanceUntilIdle()
+        listOf("", "person", "person@", "person@@example.com", ".person@example.com").forEach {
+            vm.requestPasswordRecovery(it)
+            assertTrue(vm.uiState.value.errorMessage != null)
+        }
+        assertEquals(0, security.requests)
+    }
+
+    @Test
+    fun recoveryRequestsAreTrimmedAndDuplicatePressesAreIgnored() = runTest(dispatcher) {
+        val security = FakeRecoveryRepository()
+        val vm = AuthViewModel(FakeAuthRepository(false), FakeProfileRepository(), security)
+        advanceUntilIdle()
+        vm.requestPasswordRecovery(" person@example.com ")
+        vm.requestPasswordRecovery("person@example.com")
+        assertTrue(vm.uiState.value.isLoading)
+        advanceUntilIdle()
+        assertEquals(1, security.requests)
+        assertEquals("person@example.com", security.email)
+        assertFalse(vm.uiState.value.isLoading)
+    }
+
+    @Test
+    fun requestFailureUsesSafeMessageAndAllowsRetry() = runTest(dispatcher) {
+        val security = FakeRecoveryRepository().apply { failRequest = true }
+        val vm = AuthViewModel(FakeAuthRepository(false), FakeProfileRepository(), security)
+        advanceUntilIdle()
+        vm.requestPasswordRecovery("person@example.com")
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isLoading)
+        assertFalse(vm.uiState.value.errorMessage!!.contains("secret"))
+        security.failRequest = false
+        vm.requestPasswordRecovery("person@example.com")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.notice!!.startsWith("If an account exists"))
+    }
+
+    @Test
+    fun existingLoginSessionCannotAuthorizePasswordReset() = runTest(dispatcher) {
+        val security = FakeRecoveryRepository()
+        val vm = AuthViewModel(FakeAuthRepository(true), FakeProfileRepository(), security)
+        advanceUntilIdle()
+        vm.resetPassword("password123", "password123")
+        advanceUntilIdle()
+        assertEquals(0, security.updates)
+    }
+
+    @Test
+    fun invalidAndExpiredRecoveryLinksNeverEnablePasswordUpdate() = runTest(dispatcher) {
+        val security = FakeRecoveryRepository().apply { failVerification = true }
+        val vm = AuthViewModel(FakeAuthRepository(false), FakeProfileRepository(), security)
+        advanceUntilIdle()
+        vm.openPasswordRecovery("weglow://password-reset?code=oauth-code")
+        advanceUntilIdle()
+        assertEquals(0, security.verifications)
+        vm.openPasswordRecovery(VALID_RECOVERY_LINK)
+        advanceUntilIdle()
+        assertEquals(1, security.verifications)
+        assertFalse(vm.uiState.value.recoveryReady)
+        assertTrue(vm.uiState.value.errorMessage!!.contains("expired"))
+        vm.resetPassword("password123", "password123")
+        advanceUntilIdle()
+        assertEquals(0, security.updates)
+    }
+
+    @Test
+    fun resetValidatesPolicyAndConfirmationAndPreventsDuplicateUpdates() = runTest(dispatcher) {
+        val security = FakeRecoveryRepository()
+        val vm = AuthViewModel(FakeAuthRepository(false), FakeProfileRepository(), security)
+        advanceUntilIdle()
+        vm.openPasswordRecovery(VALID_RECOVERY_LINK)
+        advanceUntilIdle()
+        listOf("", "short1", "noNumbers").forEach {
+            vm.resetPassword(it, it)
+            assertTrue(vm.uiState.value.errorMessage != null)
+        }
+        vm.resetPassword("password123", "different123")
+        assertEquals("Passwords do not match.", vm.uiState.value.errorMessage)
+        assertEquals(0, security.updates)
+        vm.resetPassword("password123", "password123")
+        vm.resetPassword("password123", "password123")
+        advanceUntilIdle()
+        assertEquals(1, security.updates)
+        assertFalse(vm.uiState.value.recoveryReady)
+        assertTrue(vm.uiState.value.notice!!.startsWith("Password updated"))
+        vm.closePasswordRecovery()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.event is AuthEvent.SignedOut)
+    }
+
+    @Test
+    fun failedPasswordUpdateDisablesConsumedRecoverySession() = runTest(dispatcher) {
+        val security = FakeRecoveryRepository().apply { failUpdate = true }
+        val vm = AuthViewModel(FakeAuthRepository(false), FakeProfileRepository(), security)
+        advanceUntilIdle()
+        vm.openPasswordRecovery(VALID_RECOVERY_LINK)
+        advanceUntilIdle()
+        vm.resetPassword("password123", "password123")
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.recoveryReady)
+        assertFalse(vm.uiState.value.isLoading)
+        assertTrue(vm.uiState.value.errorMessage!!.contains("Request a new link"))
+        vm.resetPassword("password123", "password123")
+        advanceUntilIdle()
+        assertEquals(1, security.updates)
+    }
+
+    @Test
     fun externalSessionLossEmitsSignedOut() = runTest(dispatcher) {
         val auth = FakeAuthRepository(active = true)
         val vm = AuthViewModel(auth, FakeProfileRepository(completed = true))
@@ -54,8 +165,13 @@ class AuthViewModelTest {
         val auth = FakeAuthRepository(active = false)
         val security = object : AccountSecurityRepository {
             override suspend fun requestPasswordRecovery(email: String) = Result.success(Unit)
-            override suspend fun resetPassword(email: String, code: String, password: String): Result<Unit> {
-                auth.signIn(email, password)
+            override suspend fun verifyPasswordRecovery(tokenHash: String): Result<Unit> {
+                auth.signIn("person@example.com", "unused")
+                kotlinx.coroutines.yield()
+                return Result.success(Unit)
+            }
+            override suspend fun cancelPasswordRecovery() = Result.success(Unit)
+            override suspend fun resetPassword(password: String): Result<Unit> {
                 kotlinx.coroutines.yield()
                 auth.signOut()
                 return Result.success(Unit)
@@ -67,9 +183,13 @@ class AuthViewModelTest {
         vm.requestPasswordRecovery("person@example.com")
         advanceUntilIdle()
         assertTrue(vm.uiState.value.notice!!.startsWith("If an account exists"))
-        vm.resetPassword("person@example.com", "123456", "password123")
+        vm.openPasswordRecovery("weglow://password-reset?token_hash=${"a".repeat(64)}&type=recovery")
         advanceUntilIdle()
-        assertTrue(vm.uiState.value.event is AuthEvent.SignedOut)
+        assertTrue(vm.uiState.value.recoveryReady)
+        assertNull(vm.uiState.value.event)
+        vm.resetPassword("password123", "password123")
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.event)
         assertFalse(auth.hasActiveSession())
         assertEquals("Password updated. Sign in with your new password.", vm.uiState.value.notice)
     }
@@ -79,7 +199,9 @@ class AuthViewModelTest {
         val auth = FakeAuthRepository(active = true)
         val security = object : AccountSecurityRepository {
             override suspend fun requestPasswordRecovery(email: String) = Result.success(Unit)
-            override suspend fun resetPassword(email: String, code: String, password: String) = Result.success(Unit)
+            override suspend fun verifyPasswordRecovery(tokenHash: String) = Result.success(Unit)
+            override suspend fun cancelPasswordRecovery() = Result.success(Unit)
+            override suspend fun resetPassword(password: String) = Result.success(Unit)
             override suspend fun deleteAccount(): Result<String> {
                 auth.signOut()
                 return Result.success("user-1")
@@ -442,3 +564,32 @@ private class FakeProfileRepository(
         gender: String,
     ): Result<Unit> =
         Result.success(Unit)}
+
+private val VALID_RECOVERY_LINK = "weglow://password-reset?token_hash=${"a".repeat(64)}&type=recovery"
+
+private class FakeRecoveryRepository : AccountSecurityRepository {
+    var requests = 0
+    var verifications = 0
+    var updates = 0
+    var email: String? = null
+    var failRequest = false
+    var failVerification = false
+    var failUpdate = false
+    override suspend fun requestPasswordRecovery(email: String): Result<Unit> {
+        requests++
+        this.email = email
+        kotlinx.coroutines.yield()
+        return if (failRequest) Result.failure(IllegalStateException("secret")) else Result.success(Unit)
+    }
+    override suspend fun verifyPasswordRecovery(tokenHash: String): Result<Unit> {
+        verifications++
+        return if (failVerification) Result.failure(IllegalStateException("expired")) else Result.success(Unit)
+    }
+    override suspend fun resetPassword(password: String): Result<Unit> {
+        updates++
+        kotlinx.coroutines.yield()
+        return if (failUpdate) Result.failure(IllegalStateException("secret")) else Result.success(Unit)
+    }
+    override suspend fun cancelPasswordRecovery() = Result.success(Unit)
+    override suspend fun deleteAccount(): Result<String> = Result.failure(IllegalStateException())
+}

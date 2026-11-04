@@ -23,21 +23,51 @@ class SupabaseAccountSecurityRepository(
         install(HttpTimeout) { requestTimeoutMillis = 90_000 }
     },
 ) : AccountSecurityRepository {
+    // Only a successfully verified RECOVERY token can authorize an update.
+    private var recoveryUserId: String? = null
+    private var recoveryRefreshToken: String? = null
+
     override suspend fun requestPasswordRecovery(email: String): Result<Unit> = runCatching {
-        client.auth.resetPasswordForEmail(email)
+        client.auth.resetPasswordForEmail(email, redirectUrl = "weglow://password-reset")
     }
 
-    override suspend fun resetPassword(email: String, code: String, password: String): Result<Unit> = runCatching {
-        // Recovery email template must display {{ .Token }}. A code proves email ownership.
-        client.auth.verifyEmailOtp(OtpType.Email.RECOVERY, email, code)
+    override suspend fun verifyPasswordRecovery(tokenHash: String): Result<Unit> = runCatching {
+        recoveryUserId = null
+        recoveryRefreshToken = null
+        client.auth.awaitInitialization()
+        client.auth.verifyEmailOtp(type = OtpType.Email.RECOVERY, tokenHash = tokenHash)
+        recoveryUserId = checkNotNull(client.auth.currentUserOrNull()?.id)
+        recoveryRefreshToken = checkNotNull(client.auth.currentSessionOrNull()?.refreshToken)
+    }
+
+    override suspend fun resetPassword(password: String): Result<Unit> = runCatching {
+        val userId = checkNotNull(recoveryUserId) { "Open a new recovery link." }
+        check(client.auth.currentUserOrNull()?.id == userId)
+        check(recoveryRefreshToken != null && client.auth.currentSessionOrNull()?.refreshToken == recoveryRefreshToken)
         try {
             client.auth.updateUser { this.password = password }
-            client.auth.signOut(SignOutScope.GLOBAL)
+            // A revocation network failure must not report a successful update as a failure.
+            try {
+                client.auth.signOut(SignOutScope.GLOBAL)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Local cleanup below still prevents reuse of this recovery session.
+            }
         } finally {
-            // Never leave a recovery session active, including after an update/revocation failure.
+            recoveryUserId = null
+            recoveryRefreshToken = null
             client.auth.clearSession()
         }
         Unit
+    }
+
+    override suspend fun cancelPasswordRecovery(): Result<Unit> = runCatching {
+        if (recoveryUserId != null) {
+            recoveryUserId = null
+            recoveryRefreshToken = null
+            client.auth.clearSession()
+        }
     }
 
     override suspend fun deleteAccount(): Result<String> = runCatching {
