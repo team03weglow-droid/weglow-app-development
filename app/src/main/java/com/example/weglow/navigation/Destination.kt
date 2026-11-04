@@ -3,6 +3,8 @@ package com.example.weglow.navigation
 sealed class Destination(val route: String) {
     data object Loading : Destination("loading")
     data object Login : Destination("login")
+    data object ForgotPassword : Destination("forgot_password")
+    data object ResetPassword : Destination("reset_password")
     data object Signup : Destination("signup")
     data object AgeSelection : Destination("age_selection")
     data object SkinType : Destination("skin_type")

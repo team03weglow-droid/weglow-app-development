@@ -144,3 +144,14 @@ delivered code, logout and two-account ownership with the destination build.
 The public/publishable key will be needed to point Android at this project.
 Do not substitute a secret/service-role key. Weather/account deletion functions
 still need deployment before their end-to-end checks can pass.
+
+## Password recovery after merging the main branch
+
+The merged app now uses verified recovery links instead of entering a recovery
+code. Replace the hosted Reset Password email body with the adjacent
+`reset-password-email.html`; it uses `.RedirectTo` and `.TokenHash`.
+Allow `weglow-dev://password-reset` for debug, `weglow-staging://password-reset`
+for staging, and `weglow://password-reset` for production in the corresponding
+project redirect allowlists. Each build requests and accepts its own scheme.
+This Git merge does not update hosted email templates or redirect allowlists;
+these setup changes and a live recovery check remain pending.

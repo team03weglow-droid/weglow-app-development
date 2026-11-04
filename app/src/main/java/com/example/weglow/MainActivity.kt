@@ -2,6 +2,8 @@ package com.example.weglow
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -16,6 +18,8 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    private var recoveryLink by androidx.compose.runtime.mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -27,7 +31,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             WeGlowTheme {
-                WeGlowApp()
+                WeGlowApp(recoveryLink = recoveryLink, onRecoveryLinkConsumed = { recoveryLink = null })
             }
         }
     }
@@ -40,6 +44,12 @@ class MainActivity : ComponentActivity() {
 
     private fun handleAuthCallback(intent: Intent) {
         val uri = intent.data ?: return
+        if (uri.scheme == AppConfig.authScheme && uri.host == "password-reset") {
+            recoveryLink = uri.toString()
+            // Do not retain recovery credentials in the Activity intent across recreation.
+            intent.data = null
+            return
+        }
         if (uri.scheme != AppConfig.authScheme || uri.host != "login-callback") return
         val code = runCatching { uri.getQueryParameter("code") }.getOrNull()
             ?.takeIf { it.isNotBlank() && it.length <= 4096 } ?: return

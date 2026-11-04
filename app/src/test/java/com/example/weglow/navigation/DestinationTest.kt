@@ -9,6 +9,8 @@ class DestinationTest {
     private val allDestinations = listOf(
         Destination.Loading,
         Destination.Login,
+        Destination.ForgotPassword,
+        Destination.ResetPassword,
         Destination.Signup,
         Destination.AgeSelection,
         Destination.SkinType,
