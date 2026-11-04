@@ -17,6 +17,10 @@ interface AuthRepository {
         password: String,
     ): Result<Unit>
 
+    /** Keep the name with Auth signup when confirmation delays profile creation. */
+    suspend fun signUpWithName(fullName: String, email: String, password: String): Result<Unit> =
+        signUp(email, password)
+
     suspend fun signIn(
         email: String,
         password: String,
@@ -32,8 +36,8 @@ interface AuthRepository {
 
     /**
      * Best-effort display name taken from the authenticated identity provider's
-     * user metadata (e.g. Google). Null when nothing usable is present. This is
-     * never a fabricated value and never a name supplied by the UI layer.
+     * user metadata (e.g. Google or the name recorded at signup). Null when
+     * unavailable; never use a cached anonymous form from another account.
      */
     fun currentUserDisplayName(): String?
 

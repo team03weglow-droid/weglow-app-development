@@ -1,6 +1,6 @@
 package com.example.weglow.domain.model
 
-/** A current, non-persisted environmental reading for the device's approximate area. */
+/** Weather for the device's area or an explicitly labeled country default city. */
 data class EnvironmentInfo(
     val latitude: Double,
     val longitude: Double,
@@ -15,9 +15,10 @@ data class EnvironmentInfo(
     val pm10: Double?,
     val lastUpdated: String?,
     val uvDailyHistory: List<UvDailyReading> = emptyList(),
+    val isCountryFallback: Boolean = false,
 )
 
-/** A real daily UV value returned by WeatherAPI, used only for the Home card trend graph. */
+/** A daily UV value for the Home trend graph (history supplied by Open-Meteo). */
 data class UvDailyReading(val date: String, val uvIndex: Double)
 
 fun uvCategoryFor(value: Double): String = when {

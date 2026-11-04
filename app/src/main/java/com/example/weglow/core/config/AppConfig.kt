@@ -11,6 +11,8 @@ import com.example.weglow.BuildConfig
 object AppConfig {
     val supabaseUrl: String get() = BuildConfig.SUPABASE_URL
     val supabasePublishableKey: String get() = BuildConfig.SUPABASE_PUBLISHABLE_KEY
+    val environment: String get() = BuildConfig.ENVIRONMENT
+    val authScheme: String get() = BuildConfig.AUTH_SCHEME
 
     fun requireSupabaseConfiguration() {
         check(supabaseUrl.startsWith("https://")) {
@@ -18,6 +20,9 @@ object AppConfig {
         }
         check(supabasePublishableKey.isNotBlank()) {
             "Missing WEGLOW_SUPABASE_PUBLISHABLE_KEY. Add it to local.properties or a Gradle property."
+        }
+        check(!supabasePublishableKey.startsWith("sb_secret_")) {
+            "Use a publishable API key for Android."
         }
     }
 

@@ -22,7 +22,7 @@ data class RoutineJournalState(
     val errorMessage: String? = null,
 )
 
-/** Account-scoped, device-local journal. No cloud synchronization is implied. */
+/** Device-local notes and legacy keys. Production task checkmarks use ProgressRepository. */
 class RoutineJournalViewModel(context: Context, private val authRepository: AuthRepository) : ViewModel() {
     private val preferences = context.getSharedPreferences("routine_journal", Context.MODE_PRIVATE)
     private val mutex = Mutex()

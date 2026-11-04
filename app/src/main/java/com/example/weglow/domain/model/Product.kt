@@ -1,5 +1,6 @@
 package com.example.weglow.domain.model
 
+@kotlinx.serialization.Serializable
 data class Product(
     val id: String,
     val name: String,

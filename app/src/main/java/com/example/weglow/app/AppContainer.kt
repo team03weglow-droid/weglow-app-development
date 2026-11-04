@@ -1,9 +1,10 @@
 package com.example.weglow.app
 
+import com.example.weglow.data.location.AndroidLocationProvider
+
 import android.content.Context
 import com.example.weglow.core.image.FaceImageValidator
 import com.example.weglow.core.image.FaceValidator
-import com.example.weglow.data.location.AndroidLocationProvider
 import com.example.weglow.data.remote.supabase.SupabaseClientProvider
 import com.example.weglow.data.repository.LocalAcneScanRepository
 import com.example.weglow.data.repository.LocalHairstyleRepository
@@ -95,6 +96,10 @@ class AppContainer {
         )
     }
 
+    val progressRepository: com.example.weglow.domain.repository.ProgressRepository by lazy {
+        com.example.weglow.data.repository.SupabaseProgressRepository(supabaseClient, authRepository)
+    }
+
     val savedProductRepository: SavedProductRepository by lazy {
         SupabaseSavedProductRepository(supabaseClient)
     }
@@ -136,4 +141,5 @@ class AppContainer {
     )
 
     fun locationProvider(context: Context) = AndroidLocationProvider(context)
+
 }

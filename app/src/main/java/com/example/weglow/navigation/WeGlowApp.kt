@@ -171,6 +171,13 @@ fun WeGlowApp() {
         }
     )
 
+    val progressViewModel: com.example.weglow.feature.progress.ProgressViewModel = viewModel(
+        factory = viewModelFactory {
+            com.example.weglow.feature.progress.ProgressViewModel(container.progressRepository, container.authRepository)
+        }
+    )
+    val progressState by progressViewModel.uiState.collectAsState()
+
     val savedProductsViewModel: SavedProductsViewModel = viewModel(
         factory = viewModelFactory {
             SavedProductsViewModel(
@@ -201,6 +208,12 @@ fun WeGlowApp() {
     )
 
     val environmentState by environmentViewModel.uiState.collectAsState()
+    var weatherLocationRequested by remember { mutableStateOf(false) }
+    val weatherLocationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        environmentViewModel.refresh(context.hasWeatherLocationPermission())
+    }
 
     val uvAlertNotifier = remember { UvAlertNotifier(context) }
 
@@ -216,17 +229,6 @@ fun WeGlowApp() {
                 ?.environment
                 ?.let(uvAlertNotifier::notifyIfHigh)
         }
-    }
-
-    var hasLocationPermission by remember {
-        mutableStateOf(context.hasEnvironmentLocationPermission())
-    }
-
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) {
-        hasLocationPermission = context.hasEnvironmentLocationPermission()
-        environmentViewModel.refresh(hasLocationPermission)
     }
 
     val journalState by journalViewModel.uiState.collectAsState()
@@ -247,6 +249,18 @@ fun WeGlowApp() {
     val routineState by routineViewModel.uiState.collectAsState()
     val savedProductsState by savedProductsViewModel.uiState.collectAsState()
     val cartState by cartViewModel.uiState.collectAsState()
+
+    LaunchedEffect(routineState.plan, scanState.saveState) {
+        if (routineState.plan != null || scanState.saveState is com.example.weglow.feature.scan.ScanSaveState.Saved) {
+            progressViewModel.refresh(routineState.plan)
+        }
+    }
+    LaunchedEffect(progressViewModel) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            progressViewModel.updateDueTimes()
+        }
+    }
 
     LaunchedEffect(environmentState) {
         val environment =
@@ -302,6 +316,7 @@ fun WeGlowApp() {
             profileViewModel.clear()
             recommendationViewModel.clear()
             routineViewModel.clear()
+            progressViewModel.clear()
             onboardingViewModel.clear()
             environmentViewModel.clear()
 
@@ -538,24 +553,36 @@ fun WeGlowApp() {
 
                     val event = authState.event
 
-                    if (event is AuthEvent.SignedUp) {
-
-                        onboardingViewModel.start(
-                            event.fullName
-                        )
-
-                        navController.navigate(
-                            Destination.AgeSelection.route
-                        ) {
-
-                            popUpTo(Destination.Login.route) {
-                                inclusive = true
+                    when (event) {
+                        AuthEvent.ConfirmationRequired -> {
+                            navController.navigate(Destination.Login.route) {
+                                popUpTo(Destination.Login.route) { inclusive = true }
+                                launchSingleTop = true
                             }
-
-                            launchSingleTop = true
+                            authViewModel.consumeEvent()
                         }
-
-                        authViewModel.consumeEvent()
+                        is AuthEvent.SignedUp -> {
+                            onboardingViewModel.start(event.fullName)
+                            navController.navigate(Destination.AgeSelection.route) {
+                                popUpTo(Destination.Login.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                            authViewModel.consumeEvent()
+                        }
+                        is AuthEvent.SignedIn -> {
+                            // Confirmation may return to the app while Signup is
+                            // still visible. Handle the established session here too.
+                            val target = if (event.destination == StartupDestination.HOME) Destination.Home else {
+                                onboardingViewModel.start()
+                                Destination.AgeSelection
+                            }
+                            navController.navigate(target.route) {
+                                popUpTo(Destination.Login.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                            authViewModel.consumeEvent()
+                        }
+                        else -> Unit
                     }
                 }
             }
@@ -687,12 +714,9 @@ fun WeGlowApp() {
 
                             if (event == Lifecycle.Event.ON_RESUME) {
 
-                                hasLocationPermission =
-                                    context.hasEnvironmentLocationPermission()
+                                progressViewModel.refresh(routineState.plan)
 
-                                if (hasLocationPermission) {
-                                    environmentViewModel.refresh(true)
-                                }
+                                environmentViewModel.refresh(context.hasWeatherLocationPermission())
                             }
                         }
 
@@ -707,16 +731,16 @@ fun WeGlowApp() {
 
                     profileViewModel.refresh()
                     routineViewModel.load()
+                    progressViewModel.refresh(routineState.plan)
 
-                    if (hasLocationPermission) {
-                        environmentViewModel.refresh(true)
-                    } else {
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                            )
-                        )
+                    val locationAllowed = context.hasWeatherLocationPermission()
+                    environmentViewModel.refresh(locationAllowed)
+                    if (!locationAllowed && !weatherLocationRequested) {
+                        weatherLocationRequested = true
+                        weatherLocationLauncher.launch(arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        ))
                     }
                 }
 
@@ -726,32 +750,30 @@ fun WeGlowApp() {
                     environmentState = environmentState,
 
                     onEnvironmentRetry = {
-
-                        if (hasLocationPermission) {
-                            environmentViewModel.refresh(true)
-                        } else {
-                            locationPermissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                                )
-                            )
+                        val locationAllowed = context.hasWeatherLocationPermission()
+                        environmentViewModel.refresh(locationAllowed)
+                        if (!locationAllowed) {
+                            weatherLocationRequested = true
+                            weatherLocationLauncher.launch(arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            ))
                         }
                     },
 
                     profileImage = profileState.profileImage,
 
                     morningRoutine =
-                        routineState.plan?.morning.orEmpty(),
+                        progressState.planOn(java.time.LocalDate.now())?.morning.orEmpty(),
 
                     eveningRoutine =
-                        routineState.plan?.evening.orEmpty(),
+                        progressState.planOn(java.time.LocalDate.now())?.evening.orEmpty(),
 
                     isRoutineLoading =
-                        routineState.isLoading,
+                        routineState.isLoading || progressState.loading,
 
                     routineError =
-                        journalState.errorMessage
+                        progressState.error ?: journalState.errorMessage
                             ?: routineState.errorMessage,
 
                     onProfileClick = {
@@ -781,10 +803,12 @@ fun WeGlowApp() {
                     },
 
                     completedRoutineKeys =
-                        journalState.completedKeys,
+                        progressState.completedKeys,
 
-                    onToggleRoutineStep =
-                        journalViewModel::toggleCompletion,
+                    onSetRoutineCompletion = progressViewModel::setCompletion,
+                    completableRoutineKeys = progressState.tasksByKey.keys - progressState.pendingKeys,
+                    progressState = progressState,
+                    onProgressRetry = { progressViewModel.refresh(routineState.plan) },
 
                     onScanClick = {
 
@@ -1085,33 +1109,37 @@ fun WeGlowApp() {
 
                     routineViewModel.load()
                     profileViewModel.refresh()
+                    progressViewModel.refresh(routineState.plan)
                 }
 
                 RoutinesScreen(
 
                     isLoading =
-                        routineState.isLoading,
+                        routineState.isLoading || progressState.loading,
 
                     errorMessage =
-                        routineState.errorMessage,
+                        progressState.error ?: routineState.errorMessage,
 
                     plan =
                         routineState.plan,
 
                     journal =
-                        journalState,
+                        journalState.copy(completedKeys = progressState.completedKeys),
 
                     initialMorning =
                         homeRoutineMorning,
 
-                    onToggleRoutineStep =
-                        journalViewModel::toggleCompletion,
+                    onSetRoutineCompletion = progressViewModel::setCompletion,
+                    completableRoutineKeys = progressState.tasksByKey.keys - progressState.pendingKeys,
+                    planOnDate = progressState::planOn,
 
                     onSaveNote =
                         journalViewModel::saveNote,
 
-                    onRetry =
-                        routineViewModel::load,
+                    onRetry = {
+                        routineViewModel.load()
+                        progressViewModel.refresh(routineState.plan)
+                    },
 
                     displayName =
                         profileState.displayName,
@@ -1360,12 +1388,6 @@ fun WeGlowApp() {
     }
 }
 
-private fun android.content.Context.hasEnvironmentLocationPermission(): Boolean =
-    ContextCompat.checkSelfPermission(
-        this,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+private fun android.content.Context.hasWeatherLocationPermission(): Boolean =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED

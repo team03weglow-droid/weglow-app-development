@@ -15,4 +15,6 @@ data class AcneScanResult(
     val imageHeight: Int,
     val modelVersion: String,
     val confidenceThreshold: Float,
+    /** Exact model/post-processing fingerprint; absent means not comparable. */
+    val detectionSettings: String? = null,
 )

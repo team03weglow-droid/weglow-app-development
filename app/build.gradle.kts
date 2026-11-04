@@ -1,8 +1,12 @@
 import java.util.Properties
+import java.net.URI
+import java.util.Base64
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.TaskAction
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
 
 plugins {
     alias(libs.plugins.android.application)
@@ -19,7 +23,25 @@ if (localPropertiesFile.exists()) {
     }
 }
 
-val supabaseUrl = localProperties.getProperty("WEGLOW_SUPABASE_URL", "").trim()
+fun configValue(name: String, fallback: String = ""): String = providers.gradleProperty(name)
+    .orElse(providers.environmentVariable(name))
+    .orElse(localProperties.getProperty(name, fallback)).get().trim()
+
+fun buildString(value: String): String = "\"" + value.replace("\\", "\\\\")
+    .replace("\"", "\\\"").replace("\r", "\\r").replace("\n", "\\n") + "\""
+
+val approvedProductionUrl = "https://nkrxygqtptvarntzxawk.supabase.co"
+val developmentUrl = configValue("WEGLOW_DEV_SUPABASE_URL", configValue("WEGLOW_SUPABASE_URL"))
+val developmentKey = configValue("WEGLOW_DEV_SUPABASE_PUBLISHABLE_KEY", configValue("WEGLOW_SUPABASE_PUBLISHABLE_KEY"))
+val stagingUrl = configValue("WEGLOW_STAGING_SUPABASE_URL")
+val stagingKey = configValue("WEGLOW_STAGING_SUPABASE_PUBLISHABLE_KEY")
+val releaseUrl = configValue("WEGLOW_PROD_SUPABASE_URL", approvedProductionUrl)
+val releaseKey = configValue("WEGLOW_PROD_SUPABASE_PUBLISHABLE_KEY")
+val releaseVersionCode = configValue("WEGLOW_VERSION_CODE", "1").toIntOrNull()
+    ?.takeIf { it > 0 } ?: error("WEGLOW_VERSION_CODE must be a positive integer.")
+val releaseVersionName = configValue("WEGLOW_VERSION_NAME", "1.0").also {
+    check(it.isNotBlank()) { "WEGLOW_VERSION_NAME must not be blank." }
+}
 
 // Local upload-key credentials are never committed. Android Studio's signing
 // wizard can also supply credentials for an individual build.
@@ -27,11 +49,60 @@ val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
-    val missing = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
-        .filter { keystoreProperties.getProperty(it).isNullOrBlank() }
-    check(missing.isEmpty()) {
-        "Incomplete keystore.properties: ${missing.joinToString()}. See docs/RELEASE_SIGNING.md."
+}
+mapOf("storeFile" to "WEGLOW_UPLOAD_STORE_FILE", "storePassword" to "WEGLOW_UPLOAD_STORE_PASSWORD",
+    "keyAlias" to "WEGLOW_UPLOAD_KEY_ALIAS", "keyPassword" to "WEGLOW_UPLOAD_KEY_PASSWORD").forEach { (field, variable) ->
+    providers.environmentVariable(variable).orNull?.takeIf { it.isNotBlank() }?.let { keystoreProperties.setProperty(field, it) }
+}
+val uploadSigningConfigured = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    .all { !keystoreProperties.getProperty(it).isNullOrBlank() }
+val studioSigningConfigured = providers.gradleProperty("android.injected.signing.store.file").isPresent
+
+abstract class ValidateBackendEnvironmentTask : DefaultTask() {
+    @get:Input abstract val environmentName: Property<String>
+    @get:Input abstract val backendUrl: Property<String>
+    @get:Input abstract val publishableKey: Property<String>
+    @get:Input abstract val productionUrl: Property<String>
+
+    @TaskAction fun validate() {
+        val label = environmentName.get()
+        val url = backendUrl.get()
+        val uri = runCatching { URI(url) }.getOrNull()
+        check(uri != null && uri.scheme == "https" && uri.host?.endsWith(".supabase.co") == true
+            && uri.userInfo == null && uri.query == null && uri.fragment == null && uri.port == -1
+            && uri.path.orEmpty() in listOf("", "/")) { "Configure the $label Supabase HTTPS project URL. See docs/ENVIRONMENTS.md." }
+        if (label == "production") check(url.trimEnd('/') == productionUrl.get()) { "Release must use the approved new production project." }
+        if (label == "staging") check(url.trimEnd('/') != productionUrl.get()) { "Staging must use a separate Supabase project." }
+        val key = publishableKey.get()
+        val legacyClaims = if (key.startsWith("eyJ")) runCatching {
+            val payload = String(Base64.getUrlDecoder().decode(key.split('.')[1]), Charsets.UTF_8)
+            groovy.json.JsonSlurper().parseText(payload) as Map<*, *>
+        }.getOrNull() else null
+        check(key.startsWith("sb_publishable_") && key.length > 20 || legacyClaims?.get("role") == "anon") {
+            "Configure the $label publishable/anon key. Secret and service-role keys are forbidden in Android."
+        }
+        legacyClaims?.get("ref")?.let { reference ->
+            check(uri!!.host == "$reference.supabase.co") { "The $label legacy anon key belongs to another project." }
+        }
+        logger.lifecycle("Validated $label backend configuration (key omitted).")
     }
+}
+
+abstract class ValidateUploadSigningTask : DefaultTask() {
+    @get:Input abstract val configured: Property<Boolean>
+    @TaskAction fun validate() {
+        check(configured.get()) { "Release upload signing is missing. Use Android Studio's signed bundle wizard, keystore.properties, or documented CI signing variables. See docs/RELEASE_SIGNING.md." }
+    }
+}
+
+val validateReleaseEnvironment = tasks.register<ValidateBackendEnvironmentTask>("validateReleaseEnvironment") {
+    environmentName.set("production"); backendUrl.set(releaseUrl); publishableKey.set(releaseKey); productionUrl.set(approvedProductionUrl)
+}
+val validateStagingEnvironment = tasks.register<ValidateBackendEnvironmentTask>("validateStagingEnvironment") {
+    environmentName.set("staging"); backendUrl.set(stagingUrl); publishableKey.set(stagingKey); productionUrl.set(approvedProductionUrl)
+}
+val validateReleaseSigning = tasks.register<ValidateUploadSigningTask>("validateReleaseSigning") {
+    configured.set(uploadSigningConfigured || studioSigningConfigured)
 }
 
 android {
@@ -45,27 +116,27 @@ android {
         applicationId = "com.team03weglow.app"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField(
             "String",
             "SUPABASE_URL",
-            "\"$supabaseUrl\"",
+            buildString(developmentUrl),
         )
 
         buildConfigField(
             "String",
             "SUPABASE_PUBLISHABLE_KEY",
-            "\"${localProperties.getProperty("WEGLOW_SUPABASE_PUBLISHABLE_KEY", "")}\"",
+            buildString(developmentKey),
         )
 
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
+        if (uploadSigningConfigured) {
             create("upload") {
                 storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
                 storePassword = keystoreProperties.getProperty("storePassword")
@@ -76,9 +147,35 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-dev"
+            resValue("string", "app_name", "WeGlow Dev")
+            buildConfigField("String", "ENVIRONMENT", buildString("development"))
+            buildConfigField("String", "AUTH_SCHEME", buildString("weglow-dev"))
+            manifestPlaceholders["authScheme"] = "weglow-dev"
+        }
+        create("staging") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-staging"
+            matchingFallbacks += listOf("debug")
+            resValue("string", "app_name", "WeGlow Staging")
+            buildConfigField("String", "ENVIRONMENT", buildString("staging"))
+            buildConfigField("String", "AUTH_SCHEME", buildString("weglow-staging"))
+            manifestPlaceholders["authScheme"] = "weglow-staging"
+            buildConfigField("String", "SUPABASE_URL", buildString(stagingUrl))
+            buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", buildString(stagingKey))
+        }
         release {
             isMinifyEnabled = false
-            if (keystorePropertiesFile.exists()) {
+            isDebuggable = false
+            buildConfigField("String", "ENVIRONMENT", buildString("production"))
+            buildConfigField("String", "AUTH_SCHEME", buildString("weglow"))
+            manifestPlaceholders["authScheme"] = "weglow"
+            buildConfigField("String", "SUPABASE_URL", buildString(releaseUrl))
+            buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", buildString(releaseKey))
+            if (uploadSigningConfigured) {
                 signingConfig = signingConfigs.getByName("upload")
             }
 
@@ -98,6 +195,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 
     packaging {
@@ -128,6 +226,13 @@ android {
             "lite",
         )
     }
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateReleaseEnvironment, validateReleaseSigning)
+}
+tasks.matching { it.name == "preStagingBuild" }.configureEach {
+    dependsOn(validateStagingEnvironment)
 }
 
 dependencies {
@@ -239,9 +344,13 @@ abstract class CheckArchitectureTask : DefaultTask() {
             .filter { it.isFile && it.extension == "kt" }
             .forEach { file ->
                 val text = file.readText()
+                val relativePath = file.relativeTo(root).invariantSeparatorsPath
 
                 forbiddenImports.forEach { forbidden ->
-                    if (text.contains(forbidden)) {
+                    // Android image decoding is the intended ContentResolver boundary.
+                    val imageBoundary = forbidden == "android.content.ContentResolver" &&
+                        relativePath.startsWith("com/example/weglow/core/image/")
+                    if (!imageBoundary && text.contains(forbidden)) {
                         violations += "${file.relativeTo(root)} -> $forbidden"
                     }
                 }

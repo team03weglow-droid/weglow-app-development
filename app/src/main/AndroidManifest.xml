@@ -4,8 +4,6 @@
 
     <!-- Required for Supabase / OAuth network requests -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Foreground-only environmental readings. Background location is intentionally not requested. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
@@ -62,7 +60,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data
-                    android:scheme="weglow"
+                    android:scheme="${authScheme}"
                     android:host="login-callback" />
             </intent-filter>
 

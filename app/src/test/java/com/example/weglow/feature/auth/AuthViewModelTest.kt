@@ -5,6 +5,7 @@ import com.example.weglow.domain.repository.AccountSecurityRepository
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.AuthenticationState
 import com.example.weglow.domain.repository.ProfileRepository
+import com.example.weglow.feature.onboarding.OnboardingViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -314,14 +315,95 @@ class AuthViewModelTest {
                 viewModel.uiState.value.event is AuthEvent.SignedOut
             )
         }
+
+    @Test fun confirmationRequiredSignupReturnsToLoginWithoutAnAuthorizedOnboardingEvent() = runTest(dispatcher) {
+        val auth = FakeAuthRepository(active = false, confirmationRequired = true)
+        val profiles = FakeProfileRepository()
+        val vm = AuthViewModel(auth, profiles)
+        advanceUntilIdle()
+        vm.signUp("  Alex Doe  ", "alex@example.invalid", "password123")
+        advanceUntilIdle()
+        assertEquals(AuthEvent.ConfirmationRequired, vm.uiState.value.event)
+        assertFalse(auth.hasActiveSession())
+        assertNull(auth.currentUserId())
+        assertNull(profiles.savedProfile)
+        assertEquals(StartupDestination.LOGIN, vm.startupDestination.value)
+        assertEquals("Alex Doe", auth.registeredName)
+        vm.consumeEvent()
+        assertNull(vm.uiState.value.event)
+        assertTrue(vm.uiState.value.notice!!.contains("confirm your account"))
+    }
+
+    @Test fun unconfirmedEmailCannotSignInOrBeginOnboarding() = runTest(dispatcher) {
+        val auth = FakeAuthRepository(active = false, confirmationRequired = true)
+        val vm = AuthViewModel(auth, FakeProfileRepository())
+        advanceUntilIdle()
+        vm.signUp("Alex", "alex@example.invalid", "password123")
+        advanceUntilIdle()
+        vm.consumeEvent()
+        vm.signIn("alex@example.invalid", "password123")
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.event)
+        assertEquals("Email not confirmed.", vm.uiState.value.errorMessage)
+        assertFalse(auth.hasActiveSession())
+    }
+
+    @Test fun confirmedEmailSignInAllowsFinalOnboardingSaveWithOriginalName() = runTest(dispatcher) {
+        val auth = FakeAuthRepository(active = false, confirmationRequired = true)
+        val profiles = FakeProfileRepository()
+        val vm = AuthViewModel(auth, profiles)
+        advanceUntilIdle()
+        vm.signUp("Alex Doe", "alex@example.invalid", "password123")
+        advanceUntilIdle()
+        assertEquals(AuthEvent.ConfirmationRequired, vm.uiState.value.event)
+        vm.consumeEvent()
+        auth.confirmEmail()
+        vm.signIn("alex@example.invalid", "password123")
+        advanceUntilIdle()
+        assertEquals(AuthEvent.SignedIn(StartupDestination.ONBOARDING), vm.uiState.value.event)
+        val onboarding = OnboardingViewModel(auth, profiles)
+        advanceUntilIdle()
+        onboarding.start()
+        onboarding.setAge("25–35")
+        onboarding.setSkinType("Combination")
+        onboarding.setGender("Female")
+        onboarding.setSensitivityAndSave(false)
+        advanceUntilIdle()
+        assertTrue(onboarding.uiState.value.saveCompleted)
+        assertEquals("user-1", profiles.savedProfile!!.id)
+        assertEquals("Alex Doe", profiles.savedProfile!!.fullName)
+        assertTrue(profiles.savedProfile!!.onboardingCompleted)
+    }
+
+    @Test fun confirmationCallbackCanEstablishSessionBeforeManualLogin() = runTest(dispatcher) {
+        val auth = FakeAuthRepository(active = false, confirmationRequired = true)
+        val vm = AuthViewModel(auth, FakeProfileRepository())
+        advanceUntilIdle()
+        vm.signUp("Alex", "alex@example.invalid", "password123")
+        advanceUntilIdle()
+        auth.completeEmailConfirmation()
+        advanceUntilIdle()
+        assertEquals(AuthEvent.SignedIn(StartupDestination.ONBOARDING), vm.uiState.value.event)
+    }
 }
 
 private class FakeAuthRepository(
     active: Boolean,
     private val googleCompletesImmediately: Boolean = false,
+    private val confirmationRequired: Boolean = false,
 ) : AuthRepository {
 
     private var activeSession = active
+    private var emailConfirmed = !confirmationRequired
+    var registeredName: String? = null
+
+    override suspend fun signUpWithName(fullName: String, email: String, password: String): Result<Unit> {
+        registeredName = fullName
+        return signUp(email, password)
+    }
+
+    fun confirmEmail() { emailConfirmed = true }
+    fun completeEmailConfirmation() { confirmEmail(); completeGoogleAuthentication() }
 
     private val _authenticationState =
         MutableStateFlow(
@@ -339,7 +421,7 @@ private class FakeAuthRepository(
         email: String,
         password: String,
     ): Result<Unit> {
-
+        if (confirmationRequired) return Result.success(Unit)
         activeSession = true
 
         _authenticationState.value =
@@ -352,7 +434,7 @@ private class FakeAuthRepository(
         email: String,
         password: String,
     ): Result<Unit> {
-
+        if (!emailConfirmed) return Result.failure(IllegalStateException("Email not confirmed."))
         activeSession = true
 
         _authenticationState.value =
@@ -397,7 +479,7 @@ private class FakeAuthRepository(
     override fun hasActiveSession(): Boolean =
         activeSession
 
-    override fun currentUserDisplayName(): String? = null
+    override fun currentUserDisplayName(): String? = registeredName.takeIf { activeSession }
 
     override fun currentUserEmail(): String? = null
 }
@@ -406,11 +488,12 @@ private class FakeProfileRepository(
     private val completed: Boolean = false,
     private val storedProfile: UserProfile? = null,
 ) : ProfileRepository {
+    var savedProfile: UserProfile? = null
 
     override suspend fun saveProfile(
         profile: UserProfile,
     ): Result<Unit> =
-        Result.success(Unit)
+        Result.success(Unit).also { savedProfile = profile }
 
     override suspend fun getProfile(
         userId: String,

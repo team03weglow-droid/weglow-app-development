@@ -18,6 +18,8 @@ data class ScanProfileInsert(
     val pustules: Int,
     val freckles: Int,
     @SerialName("user_prof_id") val userProfileId: String,
+    @SerialName("progress_scan_id") val progressScanId: String? = null,
+    @SerialName("detection_settings") val detectionSettings: String? = null,
 )
 
 fun AcneScanResult.toScanProfileInsert(userProfileId: String, dateTime: String): ScanProfileInsert {
@@ -35,5 +37,7 @@ fun AcneScanResult.toScanProfileInsert(userProfileId: String, dateTime: String):
         pustules = counts["pustules"] ?: 0,
         freckles = counts["freckles"] ?: 0,
         userProfileId = userProfileId,
+        progressScanId = java.util.UUID.nameUUIDFromBytes("$userProfileId/$dateTime".toByteArray(Charsets.UTF_8)).toString(),
+        detectionSettings = detectionSettings,
     )
 }

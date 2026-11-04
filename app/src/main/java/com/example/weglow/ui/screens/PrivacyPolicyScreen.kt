@@ -43,7 +43,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Text(
-                "Effective Date: 1 November 2026",
+                "Effective Date: 4 November 2026",
                 style = MaterialTheme.typography.bodySmall,
                 color = SoftGray,
             )
@@ -78,7 +78,13 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                     "record counts relating to supported visible skin concerns, including dark spots, " +
                     "open pores, blackheads, acne scars, papules, whiteheads, nodules, cysts, pustules, " +
                     "and freckles.\n\n" +
-                    "These automated results may be inaccurate and are not a medical diagnosis.",
+                    "These automated results may be inaccurate and are not a medical diagnosis.\n\n" +
+                    "Routine and progress information:\n" +
+                    "Your routine schedule snapshots, completion states and associated dates may " +
+                    "be saved to your authenticated account. We combine detected-concern changes " +
+                    "with scheduled routine completion to display interval progress. This is an " +
+                    "engagement indicator, not a medically validated skin health score. Daily " +
+                    "skin-note text remains stored locally on your device.",
             )
 
             LegalSection(
@@ -100,17 +106,14 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
 
             LegalSection(
                 title = "4. Location and Environmental Information",
-                body = "With your permission, WeGlow may access your device's foreground location " +
-                    "to provide location-relevant information such as:\n" +
-                    "• UV information\n" +
-                    "• humidity\n" +
-                    "• weather conditions\n" +
-                    "• air-quality/environmental information supported by the application\n\n" +
-                    "Location coordinates are used to obtain this environmental information and are " +
-                    "not stored in WeGlow's application database as part of the current " +
-                    "implementation.\n\n" +
-                    "Location information may be transmitted to environmental-data providers when " +
-                    "necessary to provide these features.",
+                body = "With your permission, WeGlow uses your foreground location for weather, " +
+                    "UV, humidity and air-quality readings. If location permission is denied, " +
+                    "Location is off, or a current fix is unavailable, WeGlow uses a default city " +
+                    "for the country indicated by your mobile network, SIM or phone region. " +
+                    "For Sri Lanka the default city is Colombo. The card labels this fallback. " +
+                    "Selected coordinates are sent to environmental-data providers; device " +
+                    "coordinates are not stored in the application database. No background " +
+                    "location is requested.",
             )
 
             LegalSection(
@@ -121,7 +124,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                     "• maintain your profile and preferences;\n" +
                     "• perform skin and face-shape analysis;\n" +
                     "• provide skincare and hairstyle recommendations;\n" +
-                    "• provide location-relevant environmental information;\n" +
+                    "• provide local environmental information or a labeled country default;\n" +
                     "• maintain your Saved Products and Cart;\n" +
                     "• operate, secure, and maintain the application; and\n" +
                     "• provide functionality you request.",

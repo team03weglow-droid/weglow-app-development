@@ -1,6 +1,8 @@
 # Supabase CLI configuration for WEGlow.
 # Chat is a retirement stub for older clients; it makes no AI calls.
-project_id = "edmlbdkvrtmpcwigrqtr"
+# Local CLI stack identifier; this does not select a hosted deployment target.
+# Always pass --project-ref explicitly. Production: nkrxygqtptvarntzxawk.
+project_id = "weglow"
 
 [functions.chat]
 verify_jwt = true

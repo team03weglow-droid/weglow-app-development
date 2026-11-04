@@ -1,9 +1,10 @@
 package com.example.weglow.feature.environment
 
 import com.example.weglow.core.auth.AccountWork
+import com.example.weglow.data.location.LocationProvider
+import com.example.weglow.data.location.resolveWeatherLocation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.weglow.data.location.LocationProvider
 import com.example.weglow.domain.model.EnvironmentInfo
 import com.example.weglow.domain.repository.AuthRepository
 import com.example.weglow.domain.repository.EnvironmentRepository
@@ -16,7 +17,6 @@ import kotlinx.coroutines.Job
 
 sealed interface EnvironmentUiState {
     data object Loading : EnvironmentUiState
-    data object PermissionRequired : EnvironmentUiState
     data class Success(val environment: EnvironmentInfo) : EnvironmentUiState
     data class Error(val message: String) : EnvironmentUiState
 }
@@ -28,6 +28,7 @@ class EnvironmentViewModel(
     private val authRepository: AuthRepository,
 ) : ViewModel() {
     private var refreshJob: Job? = null
+    private var locationAllowed: Boolean? = null
     private val _uiState = MutableStateFlow<EnvironmentUiState>(EnvironmentUiState.Loading)
     val uiState: StateFlow<EnvironmentUiState> = _uiState.asStateFlow()
     private val accountWork = AccountWork(authRepository, viewModelScope) {
@@ -39,36 +40,36 @@ class EnvironmentViewModel(
 
     /** Safe on Home entry/resume: repository caching prevents repeat HTTP requests. */
     fun refresh(hasLocationPermission: Boolean) {
-        if (!hasLocationPermission) {
-            refreshJob?.cancel()
-            _uiState.value = EnvironmentUiState.PermissionRequired
-            return
-        }
-        if (refreshJob?.isActive == true) return
+        if (refreshJob?.isActive == true && locationAllowed == hasLocationPermission) return
+        refreshJob?.cancel()
+        locationAllowed = hasLocationPermission
         refreshJob = accountWork.launch {
             val requestUserId = authRepository.currentUserId()
             _uiState.value = EnvironmentUiState.Loading
-            await { locationProvider.getCurrentLocation() }.fold(
-                onSuccess = { coordinates ->
-                    await { repository.getEnvironmentForLocation(coordinates.latitude, coordinates.longitude) }.fold(
-                        onSuccess = { env ->
-                            _uiState.value = EnvironmentUiState.Success(env)
-                            requestUserId?.let { userId ->
-                                accountWork.launch {
-                                    runCatching {
-                                        profileRepository.updateEnvironment(
-                                            userId,
-                                            env.uvIndex,
-                                            env.uvCategory,
-                                            env.humidity,
-                                            env.locationName ?: "",
-                                        )
-                                    }
-                                }
-                            }
-                        },
-                        onFailure = { _uiState.value = EnvironmentUiState.Error(it.userMessage()) },
+            val coordinates = await { locationProvider.resolveWeatherLocation(hasLocationPermission) }.getOrElse {
+                _uiState.value = EnvironmentUiState.Error(it.userMessage())
+                return@launch
+            }
+            await { repository.getEnvironmentForLocation(coordinates.latitude, coordinates.longitude) }.fold(
+                onSuccess = { reading ->
+                    val env = reading.copy(
+                        locationName = coordinates.displayName ?: reading.locationName,
+                        isCountryFallback = coordinates.isCountryFallback,
                     )
+                    _uiState.value = EnvironmentUiState.Success(env)
+                    requestUserId?.let { userId ->
+                        accountWork.launch {
+                            runCatching {
+                                profileRepository.updateEnvironment(
+                                    userId,
+                                    env.uvIndex,
+                                    env.uvCategory,
+                                    env.humidity,
+                                    env.locationName.orEmpty(),
+                                )
+                            }
+                        }
+                    }
                 },
                 onFailure = { _uiState.value = EnvironmentUiState.Error(it.userMessage()) },
             )

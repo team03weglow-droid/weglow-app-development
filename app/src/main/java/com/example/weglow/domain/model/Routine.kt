@@ -5,12 +5,14 @@ package com.example.weglow.domain.model
  * product could be matched to this category, which the UI must show as a missing/optional
  * step rather than inventing one.
  */
+@kotlinx.serialization.Serializable
 data class RoutineStep(
     val label: String,
     val product: Product?,
     val reasons: List<String>,
 )
 
+@kotlinx.serialization.Serializable
 data class RoutinePlan(
     val morning: List<RoutineStep>,
     val evening: List<RoutineStep>,

@@ -72,6 +72,9 @@ fun RoutinesScreen(
     onToggleRoutineStep: (String) -> Unit = {},
     onSaveNote: (String, String?, String) -> Unit = { _, _, _ -> },
     initialMorning: Boolean? = null,
+    planOnDate: ((LocalDate) -> RoutinePlan?)? = null,
+    onSetRoutineCompletion: ((String, Boolean) -> Unit)? = null,
+    completableRoutineKeys: Set<String>? = null,
 ) {
 
     var isMorning by remember(initialMorning) { mutableStateOf(initialMorning ?: (LocalTime.now().hour < 12)) }
@@ -118,10 +121,11 @@ fun RoutinesScreen(
     var selectedFeeling by remember(noteKey, savedNote) { mutableStateOf(savedNote?.feeling) }
     var observations by remember(noteKey, savedNote) { mutableStateOf(savedNote?.observations.orEmpty()) }
 
+    val scheduledPlan = if (planOnDate != null) planOnDate(selectedDate) else plan
     val activeSteps = if (isMorning) {
-        plan?.morning.orEmpty()
+        scheduledPlan?.morning.orEmpty()
     } else {
-        plan?.evening.orEmpty()
+        scheduledPlan?.evening.orEmpty()
     }
 
     Column(
@@ -167,6 +171,8 @@ fun RoutinesScreen(
             TextButton(onClick = { calendarAnchor = calendarAnchor.plusWeeks(1) }) { Text("Next week") }
         }
         journal.errorMessage?.let { WeGlowErrorView(it) }
+        Text("Tasks are due at 8 AM and 8 PM in the schedule's time zone. Future tasks cannot be checked. Routine changes start the following day; past tasks keep their original plan.",
+            style = MaterialTheme.typography.bodySmall, color = SoftGray)
 
         AnimatedContent(
             targetState = calendarAnchor,
@@ -426,7 +432,8 @@ fun RoutinesScreen(
                         if (product != null) {
                             CircleRoutineCheck(
                                 checked = done,
-                                onClick = { onToggleRoutineStep(stepKey) },
+                                onClick = { onSetRoutineCompletion?.invoke(stepKey, !done) ?: onToggleRoutineStep(stepKey) },
+                                enabled = completableRoutineKeys == null || stepKey in completableRoutineKeys,
                                 contentDescription = "Complete ${product.name}",
                             )
                         }
@@ -577,12 +584,12 @@ private fun RoutineStatusPill(label: String) {
 }
 
 @Composable
-private fun CircleRoutineCheck(checked: Boolean, onClick: () -> Unit, contentDescription: String) {
+private fun CircleRoutineCheck(checked: Boolean, onClick: () -> Unit, contentDescription: String, enabled: Boolean = true) {
     Box(
         modifier = Modifier
             .size(48.dp)
             .semantics { this.contentDescription = contentDescription }
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Box(

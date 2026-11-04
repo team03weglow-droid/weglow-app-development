@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class SupabaseAuthRepository(
     private val client: SupabaseClient,
@@ -37,10 +39,15 @@ class SupabaseAuthRepository(
     override suspend fun signUp(
         email: String,
         password: String,
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> = signUpWithName("", email, password)
+
+    override suspend fun signUpWithName(fullName: String, email: String, password: String): Result<Unit> = runCatching {
         client.auth.signUpWith(Email) {
             this.email = email
             this.password = password
+            data = buildJsonObject {
+                fullName.trim().takeIf { it.isNotBlank() }?.let { put("full_name", it) }
+            }
         }
         Unit
     }

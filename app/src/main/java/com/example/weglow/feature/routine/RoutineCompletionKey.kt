@@ -4,7 +4,7 @@ import java.time.LocalDate
 
 /**
  * Builds the key `RoutinesScreen` uses to track one routine step's completion checkbox for a
- * specific selected date and period. Shared by Home and the device-local routine journal.
+ * specific selected date and period. Shared by Home and cloud-backed routine tracking.
  * Always pass the original plan index, not an index after filtering unmatched products.
  * [date] is the complete ISO-8601 calendar date, [isMorning] keeps Morning and Evening independent
  * of each other, [stepIndex] is the step's position within that period, and [productId]
