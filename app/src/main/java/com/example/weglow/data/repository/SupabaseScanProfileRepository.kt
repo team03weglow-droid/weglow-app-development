@@ -21,13 +21,19 @@ class SupabaseScanProfileRepository(
         val profile = profileRepository.getProfile(authenticatedUserId).getOrThrow()
             ?: error("No profile is available for the current user.")
         check(profile.id == authenticatedUserId) { "The current profile does not match the signed-in user." }
+        check(authRepository.currentUserId() == authenticatedUserId && authRepository.hasActiveSession()) {
+            "Your session changed before the scan could be saved."
+        }
 
-        client.postgrest[SCAN_PROFILES_TABLE].insert(
+        client.postgrest[SCAN_PROFILES_TABLE].upsert(
             result.toScanProfileInsert(
                 userProfileId = profile.id,
                 dateTime = scannedAt.toString(),
             ),
-        )
+        ) {
+            onConflict = "progress_scan_id"
+            ignoreDuplicates = true
+        }
         Unit
     }
 

@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.example.weglow.data.remote.supabase.SupabaseClientProvider
+import com.example.weglow.core.config.AppConfig
 import com.example.weglow.navigation.WeGlowApp
 import com.example.weglow.ui.theme.WeGlowTheme
 import androidx.lifecycle.lifecycleScope
@@ -43,13 +44,13 @@ class MainActivity : ComponentActivity() {
 
     private fun handleAuthCallback(intent: Intent) {
         val uri = intent.data ?: return
-        if (uri.scheme == "weglow" && uri.host == "password-reset") {
+        if (uri.scheme == AppConfig.authScheme && uri.host == "password-reset") {
             recoveryLink = uri.toString()
             // Do not retain recovery credentials in the Activity intent across recreation.
             intent.data = null
             return
         }
-        if (uri.scheme != "weglow" || uri.host != "login-callback") return
+        if (uri.scheme != AppConfig.authScheme || uri.host != "login-callback") return
         val code = runCatching { uri.getQueryParameter("code") }.getOrNull()
             ?.takeIf { it.isNotBlank() && it.length <= 4096 } ?: return
         lifecycleScope.launch {

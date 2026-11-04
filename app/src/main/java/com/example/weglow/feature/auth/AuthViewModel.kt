@@ -31,6 +31,8 @@ sealed interface AuthEvent {
         val fullName: String,
     ) : AuthEvent
 
+    data object ConfirmationRequired : AuthEvent
+
     data object SignedOut : AuthEvent
     data class AccountDeleted(val userId: String) : AuthEvent
 }
@@ -299,7 +301,8 @@ class AuthViewModel(
             _uiState.value =
                 AuthUiState(isLoading = true)
 
-            authRepository.signUp(
+            authRepository.signUpWithName(
+                fullName = fullName.trim(),
                 email = email.trim(),
                 password = password,
             ).onSuccess {
@@ -311,16 +314,20 @@ class AuthViewModel(
                  * SignedIn while SIGN_UP is active so that the
                  * user's full name cannot be lost.
                  */
-                hadAuthenticatedSession =
-                    authRepository.hasActiveSession()
+                hadAuthenticatedSession = authRepository.hasActiveSession() && authRepository.currentUserId() != null
 
                 currentOperation = AuthOperation.NONE
 
-                _uiState.value = AuthUiState(
-                    event = AuthEvent.SignedUp(
-                        fullName = fullName.trim()
+                _uiState.value = if (hadAuthenticatedSession) {
+                    AuthUiState(event = AuthEvent.SignedUp(fullName = fullName.trim()))
+                } else {
+                    // A successful signup can create only an unconfirmed user,
+                    // with no access token. Onboarding requires a real session.
+                    AuthUiState(
+                        event = AuthEvent.ConfirmationRequired,
+                        notice = "Check your email to confirm your account, then sign in to continue.",
                     )
-                )
+                }
 
             }.onFailure { error ->
 

@@ -1,5 +1,12 @@
 # WeGlow upload signing
 
+Current build updates: development/staging now have separate app IDs. Production
+keeps the existing package and upload certificate. Release requires an explicit
+production backend key and upload signing; unsigned release attempts are rejected.
+See [ENVIRONMENTS.md](ENVIRONMENTS.md). Historical unsigned-build notes below
+describe earlier behavior. Rebuild the candidate after configuration and checks;
+the old verified wizard artifact predates the current changes.
+
 Application ID: `com.team03weglow.app`. The Kotlin namespace stays
 `com.example.weglow`; this does not change the installed application's identity.
 Play Console must still accept/register the new ID. No store registration has

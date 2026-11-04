@@ -128,7 +128,8 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
                                     photo.width,
                                     photo.height,
                                     metadata.model_sha256.take(12),
-                                    metadata.confidence_threshold,
+                                    0.05f,
+                                    "${metadata.model_sha256}/face-box-v1/letterbox-${metadata.input_size}/confidence-0.05/iou-${metadata.iou_threshold}/max-${metadata.max_detections}/labels-${metadata.labels.joinToString(",")}",
                                 ),
                             )
                         }
@@ -138,6 +139,8 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (failure: ScanFailureException) {
+                Result.failure(failure)
             } catch (error: IOException) {
                 Result.failure(ScanFailureException(ScanFailure.InvalidImage, error))
             } catch (error: OutOfMemoryError) {
@@ -182,7 +185,7 @@ class LocalAcneScanRepository(context: Context) : AcneScanRepository {
                     face.boundingBox.contains(x.toInt(), y.toInt())
                 }
             }
-            .orEmpty()
+            ?: throw ScanFailureException(ScanFailure.InvalidImage)
 }
 
 private data class SessionHandle(val session: OrtSession, val inputShape: LongArray)

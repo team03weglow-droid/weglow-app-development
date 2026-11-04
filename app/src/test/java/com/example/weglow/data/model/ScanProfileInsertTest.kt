@@ -34,5 +34,14 @@ class ScanProfileInsertTest {
         assertEquals(0, insert.freckles)
     }
 
+    @Test fun retriesUseTheSameIdentityAndPersistTheExactDetectionSettings() {
+        val result = AcneScanResult(listOf(detection("papules")), 640, 480, "model-hash", 0.05f, "model-hash/pipeline-v1/confidence-0.05")
+        val first = result.toScanProfileInsert("alice", "2026-11-04T12:00:00Z")
+        val retry = result.toScanProfileInsert("alice", "2026-11-04T12:00:00Z")
+        assertEquals(first.progressScanId, retry.progressScanId)
+        assertEquals(result.detectionSettings, first.detectionSettings)
+        org.junit.Assert.assertNotEquals(first.progressScanId, result.toScanProfileInsert("bob", "2026-11-04T12:00:00Z").progressScanId)
+    }
+
     private fun detection(label: String) = AcneDetection(label, 0.9f, 0f, 0f, 1f, 1f)
 }

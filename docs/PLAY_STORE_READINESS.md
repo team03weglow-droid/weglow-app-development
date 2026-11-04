@@ -1,6 +1,15 @@
 # WeGlow Play Store readiness
 
-Working branch: `Making-the-app-ready-to-launch-in-playstore`
+Working branch: `refining-the-app-for-playstore`
+
+Current environment preparation: see [ENVIRONMENTS.md](ENVIRONMENTS.md).
+Development/staging/production build separation, distinct app/callback identities
+and release configuration/signing checks are prepared. New backend
+`nkrxygqtptvarntzxawk` has owner-reported database/Google/SMTP/template checkpoints.
+The publishable key is configured locally and public Auth/access probes passed.
+Live end-to-end checks, staging setup, function deployment and
+Play Console work remain pending. Older sections below are historical evidence,
+not certification of the current candidate.
 
 This checklist tracks release work. An implementation in the repository is not
 proof that the production service is deployed, configured, or verified.

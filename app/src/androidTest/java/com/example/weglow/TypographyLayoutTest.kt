@@ -157,7 +157,7 @@ class TypographyLayoutTest {
 
     @Test fun homeFigmaSectionsRemainReachableWithLargeText() {
         render(fontScale = 1.3f) { HomeScreen({}, {}, {}, morningRoutine = listOf(step)) }
-        listOf("Today's Skin Environment", "WeGlow Insights", "Your progress", "Curated For You").forEachIndexed { index, title ->
+        listOf("Today's Skin Environment", "WeGlow Insights", "Combined Progress", "Curated For You").forEachIndexed { index, title ->
             compose.onNodeWithTag("home").performScrollToNode(hasText(title))
             compose.onNodeWithText(title).assertIsDisplayed()
             screenshot("home-figma-section-$index")

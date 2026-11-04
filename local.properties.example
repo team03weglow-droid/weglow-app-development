@@ -4,3 +4,17 @@ WEGLOW_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 WEGLOW_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
 
 # Acne scans run using the model bundled in the APK; no server URL is required.
+
+# Development/debug: legacy values above are accepted only as a debug fallback.
+WEGLOW_DEV_SUPABASE_URL=https://YOUR_DEV_PROJECT.supabase.co
+WEGLOW_DEV_SUPABASE_PUBLISHABLE_KEY=YOUR_DEV_PUBLISHABLE_KEY
+
+# Staging must use a separate project; release never falls back to these values.
+WEGLOW_STAGING_SUPABASE_URL=https://YOUR_STAGING_PROJECT.supabase.co
+WEGLOW_STAGING_SUPABASE_PUBLISHABLE_KEY=YOUR_STAGING_PUBLISHABLE_KEY
+
+# Approved production destination. Use its public publishable key only.
+WEGLOW_PROD_SUPABASE_URL=https://nkrxygqtptvarntzxawk.supabase.co
+WEGLOW_PROD_SUPABASE_PUBLISHABLE_KEY=YOUR_PRODUCTION_PUBLISHABLE_KEY
+WEGLOW_VERSION_CODE=1
+WEGLOW_VERSION_NAME=1.0

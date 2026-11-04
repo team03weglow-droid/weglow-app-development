@@ -66,7 +66,7 @@ class OnboardingViewModel(
     private fun save() {
         val userId = authRepository.currentUserId()
         if (userId == null) {
-            _uiState.value = _uiState.value.copy(errorMessage = "Your session is no longer active.")
+            _uiState.value = _uiState.value.copy(errorMessage = "Sign in before saving your profile. If you just signed up, confirm your email first.")
             return
         }
         val state = _uiState.value

@@ -34,7 +34,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.painterResource
 import com.example.weglow.R
@@ -48,7 +47,6 @@ import com.example.weglow.ui.components.WeGlowProductImage
 import com.example.weglow.ui.components.rememberDecodedBitmap
 import com.example.weglow.ui.theme.*
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -75,6 +73,10 @@ fun HomeScreen(
     routineError: String? = null,
     onProfileClick: () -> Unit = {},
     onRoutinesPeriodClick: ((Boolean) -> Unit)? = null,
+    progressState: com.example.weglow.feature.progress.ProgressUiState = com.example.weglow.feature.progress.ProgressUiState(),
+    onProgressRetry: () -> Unit = {},
+    onSetRoutineCompletion: ((String, Boolean) -> Unit)? = null,
+    completableRoutineKeys: Set<String>? = null,
 ) {
     var today by remember { mutableStateOf(LocalDate.now()) }
     LaunchedEffect(Unit) {
@@ -91,7 +93,6 @@ fun HomeScreen(
     // so a plain remember here resets the viewport to the top on return
     // without touching any business/data state.
     val listState = remember { LazyListState() }
-    val scope = rememberCoroutineScope()
     val activeSteps = if (isMorning) morningRoutine else eveningRoutine
     val openRoutine = { onRoutinesPeriodClick?.invoke(isMorning) ?: onRoutinesClick() }
 
@@ -178,37 +179,13 @@ fun HomeScreen(
         }
         item(key = "scan") { HomeScanHero(onScanClick) }
         // Environment is an early daily decision point, so keep UV, humidity and air quality
-        // above the longer routine and editorial content.
+        // above the routine and progress content.
         item(key = "environment") { HomeEnvironment(environmentState, onEnvironmentRetry) }
         item(key = "routine") {
             HomeRoutine(
                 activeSteps, today, isMorning, { isMorning = it }, completedRoutineKeys,
-                onToggleRoutineStep, isRoutineLoading, routineError, openRoutine,
-            )
-        }
-        item(key = "shortcuts") {
-            val largeText = LocalDensity.current.fontScale > 1.15f
-            val shortcuts: @Composable RowScope.() -> Unit = {
-                HomeShortcut("Find hairstyles", "Face-shape analysis", onScanClick, Modifier.weight(1f))
-                HomeShortcut("Routines", "Daily steps", openRoutine, Modifier.weight(1f))
-                HomeShortcut("Progress", "Skin history", {
-                    scope.launch { listState.animateScrollToItem(7) }
-                }, Modifier.weight(1f))
-            }
-            if (largeText) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HomeShortcut("Find hairstyles", "Face-shape analysis", onScanClick, Modifier.fillMaxWidth())
-                    HomeShortcut("Routines", "Daily steps", openRoutine, Modifier.fillMaxWidth())
-                    HomeShortcut("Progress", "Skin history", { scope.launch { listState.animateScrollToItem(7) } }, Modifier.fillMaxWidth())
-                }
-            } else Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                // IntrinsicSize.Min sizes the row to its tallest child's natural height, and
-                // each HomeShortcut below fills that height, so all three always share one
-                // consistent geometry (width via weight(1f) above, height via this) no matter
-                // how their two-line labels happen to wrap on a given device/font scale.
-                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                content = shortcuts,
+                { key -> onSetRoutineCompletion?.invoke(key, key !in completedRoutineKeys) ?: onToggleRoutineStep(key) },
+                isRoutineLoading, routineError, openRoutine, completableRoutineKeys,
             )
         }
         item(key = "recommendations") {
@@ -222,60 +199,8 @@ fun HomeScreen(
                 }
             }
         }
-        item(key = "insights") {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                HomeSectionHeading("WeGlow Insights", "Daily care tips")
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item {
-                        HomeInsight("Gentle hydration", "Keep track of how your skin feels in your daily note.",
-                            "Adjust routine", openRoutine, R.drawable.home_hydration)
-                    }
-                    item {
-                        HomeInsight("UV & barrier alerts", "You'll receive a sunscreen reminder when the local UV index is high.",
-                            "Set reminder", null, R.drawable.home_environment)
-                    }
-                    item {
-                        HomeInsight("Barrier recovery", "Your skin-history trends will appear when progress tracking is connected.",
-                            "View progress", { scope.launch { listState.animateScrollToItem(7) } }, R.drawable.home_hydration)
-                    }
-                    item {
-                        HomeInsight("Daily sun care", "Your everyday sun-care step belongs in your morning routine.",
-                            "Open routine", openRoutine, R.drawable.home_environment)
-                    }
-                    item {
-                        HomeInsight("Evening reset", "Keep your night routine simple and consistent.",
-                            "Open routine", { onRoutinesPeriodClick?.invoke(false) ?: onRoutinesClick() }, R.drawable.home_hydration)
-                    }
-                }
-            }
-        }
         item(key = "progress") {
-            HomeSurface {
-                HomeSectionHeading("Your progress", "Skin history · Coming soon")
-                Text("Skin scores and changes over time are not available yet.",
-                    style = MaterialTheme.typography.bodyMedium, color = SoftGray)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HomeMetric("Hydration", "Not connected", Modifier.weight(1f))
-                    HomeMetric("Clarity", "Not connected", Modifier.weight(1f))
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HomeMetric("Texture", "Not connected", Modifier.weight(1f))
-                    HomeMetric("Skin score", "Not connected", Modifier.weight(1f))
-                }
-                WeGlowPlannedFeature("View skin history")
-            }
-        }
-        item(key = "editorial") {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                HomeSectionHeading("Curated For You", "Skincare & hair inspiration")
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item { HomeEditorial("Layering Botanicals Guide", "Skincare", R.drawable.home_botanicals) }
-                    item { HomeEditorial("Scalp Barrier for Waves", "Hair & scalp", R.drawable.home_scalp) }
-                    item { HomeEditorial("The Complete Guide to Layering Skincare Products", "Basics", R.drawable.home_botanicals) }
-                }
-                WeGlowPlannedFeature("See all guides")
-                TextButton(onClick = onDiscoverClick, modifier = Modifier.fillMaxWidth()) { Text("Explore products") }
-            }
+            com.example.weglow.ui.components.CombinedProgress(progressState, onProgressRetry)
         }
     }
 }
@@ -309,12 +234,15 @@ private fun HomeScanHero(onScanClick: () -> Unit) {
 private fun HomeRoutine(
     steps: List<RoutineStep>, today: LocalDate, morning: Boolean, onPeriodChange: (Boolean) -> Unit,
     completed: Set<String>, onToggle: (String) -> Unit, loading: Boolean, error: String?, onOpen: () -> Unit,
+    completableKeys: Set<String>?,
 ) {
     val matched = steps.withIndex().filter { it.value.product != null }
     val doneCount = matched.count { routineStepKey(today, morning, it.index, it.value.product?.id) in completed }
     val nextIndex = matched.firstOrNull { routineStepKey(today, morning, it.index, it.value.product?.id) !in completed }?.index
     HomeSurface {
         HomeSectionHeading("Your daily routine", "$doneCount of ${matched.size} done")
+        Text("Daily checkmarks are separate from scan-interval progress. Tasks are due at 8 AM and 8 PM; checkmarks unlock when due.",
+            style = MaterialTheme.typography.bodySmall, color = SoftGray)
         val periodColors = FilterChipDefaults.filterChipColors(
             containerColor = PageBackground,
             labelColor = DarkGreen,
@@ -352,7 +280,7 @@ private fun HomeRoutine(
                     }
                     IconToggleButton(
                         checked = done,
-                        enabled = product != null,
+                        enabled = product != null && (completableKeys == null || key in completableKeys),
                         onCheckedChange = { onToggle(key) },
                         modifier = Modifier
                             .size(48.dp)
@@ -384,19 +312,21 @@ private fun HomeEnvironment(environmentState: EnvironmentUiState, onRetry: () ->
     val uvHistory = (environmentState as? EnvironmentUiState.Success)?.environment?.uvDailyHistory.orEmpty()
     val display = when (environmentState) {
         EnvironmentUiState.Loading -> EnvironmentDisplay("Loading…", "Loading…", "Loading…", "Getting local conditions…")
-        EnvironmentUiState.PermissionRequired -> EnvironmentDisplay("Unavailable", "Unavailable", "Unavailable", "Location permission is needed for local readings.")
         is EnvironmentUiState.Error -> EnvironmentDisplay("Unavailable", "Unavailable", "Unavailable", environmentState.message)
         is EnvironmentUiState.Success -> environmentState.environment.let { environment ->
             EnvironmentDisplay(
                 "${formatUv(environment.uvIndex)} · ${environment.uvCategory}",
                 "${environment.humidity}%",
                 environment.airQualityIndex?.let { "$it · ${environment.airQualityLabel}" } ?: environment.airQualityLabel,
-                environment.locationName?.let { "Current conditions for $it" } ?: "Current local conditions",
+                if (environment.isCountryFallback) {
+                    "Using your country's default city because current location is unavailable."
+                } else environment.locationName?.let { "Current conditions for $it" } ?: "Current local conditions",
             )
         }
     }
     HomeSurface {
-        HomeSectionHeading("Today's Skin Environment", "Your daily conditions at a glance")
+        HomeSectionHeading("Today's Skin Environment",
+            (environmentState as? EnvironmentUiState.Success)?.environment?.locationName ?: "Local weather and UV")
         UvHistoryGraph(uvHistory)
         HomeMetric("UV index", display.uv, Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -405,8 +335,11 @@ private fun HomeEnvironment(environmentState: EnvironmentUiState, onRetry: () ->
         }
         Text(display.detail,
             style = MaterialTheme.typography.bodySmall, color = SoftGray)
-        if (environmentState is EnvironmentUiState.Error || environmentState is EnvironmentUiState.PermissionRequired) {
-            TextButton(onClick = onRetry) { Text("Retry", color = DarkGreen) }
+        if (environmentState is EnvironmentUiState.Error ||
+            (environmentState as? EnvironmentUiState.Success)?.environment?.isCountryFallback == true) {
+            TextButton(onClick = onRetry) {
+                Text(if (environmentState is EnvironmentUiState.Success) "Use current location" else "Retry", color = DarkGreen)
+            }
         }
         WeGlowPlannedFeature("Log SPF")
     }
@@ -517,80 +450,5 @@ private fun HomeMetric(title: String, value: String, modifier: Modifier) {
     Column(modifier.clip(RoundedCornerShape(12.dp)).background(PageBackground).padding(12.dp)) {
         Text(title, style = MaterialTheme.typography.labelMedium, color = DarkGreen)
         Text(value, style = MaterialTheme.typography.bodySmall, color = SoftGray)
-    }
-}
-
-@Composable
-private fun HomeShortcut(title: String, subtitle: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Card(
-        onClick = onClick,
-        // fillMaxHeight() lets this card stretch to match its siblings' shared
-        // IntrinsicSize.Min row height (see the "shortcuts" item above) instead of
-        // wrapping to its own content, which is what let differently-wrapped labels
-        // produce differently-sized cards before.
-        modifier = modifier.fillMaxHeight(),
-        colors = CardDefaults.cardColors(containerColor = CardWhite),
-    ) {
-        Column(
-            Modifier.fillMaxWidth().fillMaxHeight().padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.labelMedium,
-                color = DarkGreen,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = SoftGray,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeInsight(title: String, body: String, action: String, onClick: (() -> Unit)?, image: Int) {
-    Column(Modifier.width(264.dp).clip(RoundedCornerShape(16.dp)).background(CardWhite)) {
-        Image(painterResource(image), null, Modifier.fillMaxWidth().height(88.dp), contentScale = ContentScale.Crop)
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = DarkGreen)
-            Text(body, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
-            if (onClick == null) WeGlowPlannedFeature(action)
-            else TextButton(onClick = onClick) { Text(action, color = DarkGreen) }
-        }
-    }
-}
-
-@Composable
-private fun HomeEditorial(title: String, category: String, image: Int) {
-    // Every guide card shares the same width, image height, padding, and a fixed
-    // two-line title area (minLines + maxLines) so a long title never grows one
-    // card taller than its neighbors in the horizontal list - it wraps within its
-    // own reserved space and is ellipsized instead of pushing the layout around.
-    Column(Modifier.width(264.dp).clip(RoundedCornerShape(16.dp)).background(CardWhite)) {
-        Image(painterResource(image), null, Modifier.fillMaxWidth().height(140.dp), contentScale = ContentScale.Crop)
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                category,
-                style = MaterialTheme.typography.labelMedium,
-                color = SoftGray,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                color = DarkGreen,
-                minLines = 2,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            WeGlowPlannedFeature("Read guide")
-        }
     }
 }

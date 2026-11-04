@@ -1,6 +1,14 @@
 package com.example.weglow.data.repository
 
 import com.example.weglow.domain.model.UserProfile
+import com.example.weglow.domain.model.RoutinePlan
+import com.example.weglow.domain.model.RoutineStep
+import com.example.weglow.domain.model.Product
+import com.example.weglow.domain.progress.ScheduledTask
+import com.example.weglow.security.SecurityTestAuth
+import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.MemorySessionManager
+import io.github.jan.supabase.auth.MemoryCodeVerifierCache
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.ktor.client.engine.HttpClientEngineBase
@@ -19,6 +27,74 @@ import org.junit.Test
 
 /** Exercises real SDK request construction; the engine never connects to a server. */
 class SupabaseWriteContractTest {
+    @Test fun confirmationSignupSendsFullNameMetadataWithoutCreatingASession() = runTest {
+        val engine = ScriptedEngine(mutableListOf("""{"id":"00000000-0000-4000-8000-000000000001","aud":"authenticated","email":"alex@example.invalid","created_at":"2026-11-04T00:00:00Z","app_metadata":{"provider":"email","providers":["email"]},"user_metadata":{"full_name":"Alex Doe"},"identities":[]}"""))
+        val client = createSupabaseClient("https://contract.invalid", "test-key") {
+            httpEngine = engine
+            install(Auth) {
+                sessionManager = MemorySessionManager()
+                codeVerifierCache = MemoryCodeVerifierCache()
+                autoLoadFromStorage = false
+                autoSaveToStorage = false
+                alwaysAutoRefresh = false
+                enableLifecycleCallbacks = false
+            }
+        }
+        try {
+            val repository = SupabaseAuthRepository(client)
+            repository.signUpWithName("  Alex Doe  ", "alex@example.invalid", "password123").getOrThrow()
+            val request = engine.requests.single()
+            assertEquals("/auth/v1/signup", request.url.encodedPath)
+            assertEquals("Alex Doe", request.jsonBody()["data"]!!.jsonObject["full_name"]!!.jsonPrimitive.content)
+            assertFalse(repository.hasActiveSession())
+            assertNull(repository.currentUserId())
+        } finally { client.close() }
+    }
+
+    @Test fun progressCompletionsSendExplicitDesiredStateAndScheduleIdentityToTheRpc() = runTest {
+        val engine = ScriptedEngine(mutableListOf("null", "null", "null"))
+        val client = client(engine)
+        try {
+            val repository = SupabaseProgressRepository(client, SecurityTestAuth())
+            val task = ScheduledTask("schedule-id", java.time.LocalDate.of(2026, 11, 1), false, 2, java.time.Instant.parse("2026-11-01T20:00:00Z"))
+            repository.setCompletion("alice", task, true).getOrThrow()
+            repository.setCompletion("alice", task, true).getOrThrow()
+            repository.setCompletion("alice", task, false).getOrThrow()
+            assertEquals(3, engine.requests.size)
+            val body = engine.requests.first().jsonBody()
+            assertEquals("/rest/v1/rpc/set_routine_task_completion", engine.requests.first().url.encodedPath)
+            assertEquals("schedule-id", body["p_schedule_id"]?.jsonPrimitive?.content)
+            assertEquals("2026-11-01", body["p_task_date"]?.jsonPrimitive?.content)
+            assertEquals(false, body["p_morning"]?.jsonPrimitive?.boolean)
+            assertEquals(2, body["p_step_index"]?.jsonPrimitive?.int)
+            assertEquals(true, body["p_completed"]?.jsonPrimitive?.boolean)
+            assertEquals(body, engine.requests[1].jsonBody())
+            assertEquals(false, engine.requests[2].jsonBody()["p_completed"]?.jsonPrimitive?.boolean)
+            assertFalse(body.containsKey("profile_id")) // ownership is derived on the server
+        } finally { client.close() }
+    }
+
+    @Test fun progressLoadsUseOwnerFiltersAndScheduleRegistrationKeepsTheProductSnapshot() = runTest {
+        val engine = ScriptedEngine(mutableListOf("null", "[]", "[]", "[]"))
+        val client = client(engine)
+        try {
+            val repository = SupabaseProgressRepository(client, SecurityTestAuth())
+            val plan = RoutinePlan(listOf(RoutineStep("Cleanse", Product("p", "Cleanser", "", null), emptyList())), emptyList())
+            repository.registerSchedule("alice", plan, java.time.ZoneId.of("Asia/Colombo")).getOrThrow()
+            repository.load("alice").getOrThrow()
+            val body = engine.requests.first().jsonBody()
+            assertEquals("Asia/Colombo", body["p_zone"]?.jsonPrimitive?.content)
+            val step = body["p_plan"]!!.jsonObject["morning"]!!.jsonArray.single().jsonObject
+            assertEquals("Cleanser", step["product"]!!.jsonObject["name"]!!.jsonPrimitive.content)
+            val reads = engine.requests.drop(1)
+            assertEquals("eq.alice", reads[0].url.parameters["user_prof_id"])
+            assertEquals("eq.alice", reads[1].url.parameters["profile_id"])
+            assertEquals("eq.alice", reads[2].url.parameters["profile_id"])
+            assertTrue(repository.load("bob").isFailure)
+            assertEquals(4, engine.requests.size)
+        } finally { client.close() }
+    }
+
     @Test fun cartInsertRequestsReturnedRowsAndDoesNotRetrySuccessfulWrite() = runTest {
         val engine = ScriptedEngine(mutableListOf("[]", "[{\"quantity\":1}]"))
         val client = client(engine)
