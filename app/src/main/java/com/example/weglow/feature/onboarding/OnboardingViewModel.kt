@@ -45,7 +45,7 @@ class OnboardingViewModel(
         _uiState.value = OnboardingUiState(fullName = resolvedName.orEmpty())
     }
     /**
-     * Only accepts a value from [AgeRange.OPTIONS] - WeGlow's minimum age of 14 means "Under 14"
+     * Only accepts a value from [AgeRange.OPTIONS] - WeGlow's minimum age of 18 means "Under 18"
      * (and anything else outside that list) is not a value this app will save, regardless of
      * whether the UI still offers it. This is the single point every age answer passes through
      * on its way into the saved profile, so guarding here is enough to keep an under-14 value

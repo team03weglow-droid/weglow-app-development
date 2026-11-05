@@ -195,8 +195,8 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
 
             LegalSection(
                 title = "11. Age Requirement",
-                body = "WeGlow is intended for users who are at least 14 years old.\n\n" +
-                    "Users under the age of 14 should not create or use a WeGlow account.",
+                body = "WeGlow is intended for users who are at least 18 years old.\n\n" +
+                    "Users under the age of 18 should not create or use a WeGlow account.",
             )
 
             LegalSection(

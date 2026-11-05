@@ -171,7 +171,7 @@ fun RoutinesScreen(
             TextButton(onClick = { calendarAnchor = calendarAnchor.plusWeeks(1) }) { Text("Next week") }
         }
         journal.errorMessage?.let { WeGlowErrorView(it) }
-        Text("Tasks are due at 8 AM and 8 PM in the schedule's time zone. Future tasks cannot be checked. Routine changes start the following day; past tasks keep their original plan.",
+        if (activeSteps.any { it.product != null }) Text("Tasks are due at 8 AM and 8 PM in the schedule's time zone. Future tasks cannot be checked. Routine changes start the following day; past tasks keep their original plan.",
             style = MaterialTheme.typography.bodySmall, color = SoftGray)
 
         AnimatedContent(
@@ -326,12 +326,13 @@ fun RoutinesScreen(
         // ROUTINE STEPS
         when {
             isLoading -> WeGlowLoadingView(message = "Building your routine…")
-            errorMessage != null -> WeGlowErrorView(message = errorMessage, onRetry = onRetry)
-            activeSteps.isEmpty() -> Text(
-                "No routine steps are available yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = SoftGray,
-            )
+            errorMessage != null -> {
+                WeGlowErrorView(message = errorMessage, onRetry = onRetry)
+                if (activeSteps.none { it.product != null }) com.example.weglow.ui.components.DemoRoutine(isMorning)
+            }
+            activeSteps.none { it.product != null } -> key(selectedDate) {
+                com.example.weglow.ui.components.DemoRoutine(isMorning)
+            }
             else -> activeSteps.forEachIndexed { index, step ->
                 // Keyed by the selected date so completion never leaks between dates (each date
                 // gets its own independent checkmarks for this session) - see routineStepKey.

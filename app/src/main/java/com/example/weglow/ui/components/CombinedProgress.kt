@@ -12,12 +12,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.weglow.domain.progress.ProgressInterval
 import com.example.weglow.feature.progress.ProgressUiState
+import com.example.weglow.feature.progress.DemoProgress
 import com.example.weglow.ui.theme.*
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -26,9 +30,17 @@ import kotlin.math.abs
 
 @Composable
 fun CombinedProgress(state: ProgressUiState, onRetry: () -> Unit) {
+    val hasRealPoints = state.history.points.isNotEmpty()
+    var showDemo by remember(hasRealPoints) { mutableStateOf(!hasRealPoints) }
+    val demo = remember { ProgressUiState(loaded = true, loading = false, history = DemoProgress.history()) }
+    CombinedProgressCard(if (showDemo) demo else state, onRetry, showDemo) { showDemo = !showDemo }
+}
+
+@Composable
+private fun CombinedProgressCard(state: ProgressUiState, onRetry: () -> Unit, isDemo: Boolean, onToggleDemo: () -> Unit) {
     val history = state.history
     val intervals = history.intervals
-    var selectedId by remember { mutableStateOf<String?>(null) }
+    var selectedId by remember(isDemo) { mutableStateOf<String?>(null) }
     val selected = intervals.firstOrNull { it.current.id == selectedId } ?: intervals.lastOrNull()
     val latest = intervals.lastOrNull()
     Column(
@@ -36,6 +48,12 @@ fun CombinedProgress(state: ProgressUiState, onRetry: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Combined Progress", style = MaterialTheme.typography.titleLarge, color = DarkGreen)
+        if (isDemo) {
+            Text("Demo results · Sample data", style = MaterialTheme.typography.titleSmall, color = AccentText)
+            Text("These example scans and routine completions are not your results. Demo routine checkboxes do not change this preview.",
+                style = MaterialTheme.typography.bodySmall, color = SoftGray)
+        }
+        TextButton(onClick = onToggleDemo) { Text(if (isDemo) "Show my results" else "Show demo results") }
         Text("50% scan improvement + 50% routine completion", style = MaterialTheme.typography.bodySmall, color = SoftGray)
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = DarkGreen)
         state.error?.let {
@@ -70,7 +88,7 @@ fun CombinedProgress(state: ProgressUiState, onRetry: () -> Unit) {
                 color = SoftGray, style = MaterialTheme.typography.bodySmall,
             )
             if (intervals.isNotEmpty()) {
-                ProgressLineChart(intervals, selected?.current?.id) { selectedId = it }
+                ProgressLineChart(intervals, selected?.current?.id, curved = isDemo) { selectedId = it }
                 selected?.let { IntervalDetails(it) }
             }
         }
@@ -82,7 +100,7 @@ fun CombinedProgress(state: ProgressUiState, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun ProgressLineChart(intervals: List<ProgressInterval>, selectedId: String?, onSelect: (String) -> Unit) {
+private fun ProgressLineChart(intervals: List<ProgressInterval>, selectedId: String?, curved: Boolean, onSelect: (String) -> Unit) {
     Row(Modifier.fillMaxWidth()) {
         Column(Modifier.height(180.dp).padding(end = 8.dp), verticalArrangement = Arrangement.SpaceBetween) {
             listOf("100", "50", "0").forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = SoftGray) }
@@ -107,7 +125,20 @@ private fun ProgressLineChart(intervals: List<ProgressInterval>, selectedId: Str
                 intervals.forEachIndexed { index, interval ->
                     interval.score?.let { score ->
                         if (index > 0) intervals[index - 1].score?.let { previous ->
-                            drawLine(DarkGreen, point(index - 1, previous), point(index, score), strokeWidth = 2.dp.toPx())
+                            val start = point(index - 1, previous)
+                            val end = point(index, score)
+                            if (curved) {
+                                // Sample-data preview: rounded connections preserve every point
+                                // and stay within each pair's values without overshooting.
+                                val middleX = (start.x + end.x) / 2f
+                                val path = Path().apply {
+                                    moveTo(start.x, start.y)
+                                    cubicTo(middleX, start.y, middleX, end.y, end.x, end.y)
+                                }
+                                drawPath(path, DarkGreen, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round))
+                            } else {
+                                drawLine(DarkGreen, start, end, strokeWidth = 2.dp.toPx())
+                            }
                         }
                         drawCircle(if (interval.current.id == selectedId) AccentText else DarkGreen,
                             radius = if (interval.current.id == selectedId) 6.dp.toPx() else 4.dp.toPx(), center = point(index, score))

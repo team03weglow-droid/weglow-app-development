@@ -139,3 +139,14 @@ The initial `:app:checkArchitecture` run failed on pre-existing ContentResolver
 imports in the image helpers. Subsequent environment preparation corrected that
 rule to permit ContentResolver within the intended `core/image` boundary only;
 the architecture check now passes. The helper implementations remain unchanged.
+
+## Temporary demonstration preview
+
+Home offers clearly labeled Demo results when there are no real scored intervals,
+with a Show my results / Show demo results toggle. The synthetic history lives in
+`feature/progress/DemoProgress.kt` and uses ProgressCalculator without writing to
+any repository. Real scored intervals are shown by default once available.
+Sample scores are 40, 45, 60 and 65. The second interval worsens by 25% and earns
+zero scan points; the latest uses 50 to 25 concerns and 80% routine completion
+(25 scan points + 40 routine points = 65). Preview checkboxes do not alter these
+sample intervals, saved completions or genuine user scores.

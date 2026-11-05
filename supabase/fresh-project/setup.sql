@@ -545,9 +545,8 @@ grant execute on function public.delete_account_data(uuid) to service_role;
 
 
 -- Source: 20261104000000_combined_progress.sql
--- SHA-256: 8efa5bbc0918052961762c98cb619aa9f28e036f463b4879d1048c86e49a8c9f
+-- SHA-256: 9c1e2ff723d83068624bdc7148d80a52bf5f42141c4a0b66b503a1ab81281178
 -- Apply after the existing user-data security migrations. No legacy counts/settings are invented.
-
 alter table public."Scan-profiles" add column if not exists progress_scan_id uuid not null default gen_random_uuid();
 alter table public."Scan-profiles" add column if not exists detection_settings text;
 create unique index if not exists scan_progress_id_unique on public."Scan-profiles"(progress_scan_id);
@@ -671,6 +670,37 @@ revoke all on function public.set_routine_task_completion(uuid,date,boolean,inte
 grant execute on function public.register_routine_schedule(jsonb,text) to authenticated;
 grant execute on function public.set_routine_task_completion(uuid,date,boolean,integer,boolean) to authenticated;
 -- Both new tables cascade on profile deletion, including the existing deletion RPC.
+
+
+-- Source: 20261105000000_adult_onboarding_age_range.sql
+-- SHA-256: 4ea41dbf8b0cb92b1f04bd4541c1ecafc526ad7808d0cc9e55132a3353226519
+
+
+-- Keep legacy cohorts readable without claiming that their users were 18+.
+-- New selections use 18–24; existing 14–24 values may remain unchanged.
+alter table public.profiles drop constraint if exists profiles_allowed_age_range;
+alter table public.profiles add constraint profiles_allowed_age_range
+    check (age_range is null or age_range in ('18–24', '14–24', '25–35', '36–45', '46–59', '60+')) not valid;
+
+create or replace function public.enforce_adult_profile_age_range()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+    if new.age_range = '14–24' then
+        if tg_op = 'INSERT' then
+            raise exception 'Select an age range starting at 18 or above.' using errcode = '23514';
+        elsif new.age_range is distinct from old.age_range then
+            raise exception 'Select an age range starting at 18 or above.' using errcode = '23514';
+        end if;
+    end if;
+    return new;
+end;
+$$;
+
+revoke all on function public.enforce_adult_profile_age_range() from public, anon, authenticated;
+drop trigger if exists enforce_adult_profile_age_range on public.profiles;
+create trigger enforce_adult_profile_age_range
+before insert or update of age_range on public.profiles
+for each row execute function public.enforce_adult_profile_age_range();
 
 
 

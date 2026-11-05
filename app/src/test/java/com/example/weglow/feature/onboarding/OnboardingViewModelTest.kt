@@ -175,22 +175,31 @@ class OnboardingViewModelTest {
         assertFalse(state.saveCompleted)
     }
 
-    // --- Minimum age of 14: setAge() is the single point every age value passes through on
-    // its way into the saved profile, so these confirm it never accepts "Under 14" (or any
+    // --- Minimum age of 18: setAge() is the single point every age value passes through on
+    // its way into the saved profile, so these confirm it never accepts "Under 18" (or any
     // other value outside the real AgeRange.OPTIONS), regardless of what a caller passes it.
 
-    // 7. "Under 14" is never accepted into onboarding state.
+    // 7. "Under 18" is never accepted into onboarding state.
     @Test
-    fun setAge_underFourteen_isRejected() = runTest(dispatcher) {
+    fun setAge_underEighteen_isRejected() = runTest(dispatcher) {
         val viewModel = OnboardingViewModel(SignedInAuthRepository(), RecordingProfileRepository())
 
-        viewModel.setAge("Under 14")
+        viewModel.setAge("Under 18")
 
         assertNull(viewModel.uiState.value.ageRange)
     }
 
+    @Test
+    fun setAge_legacyTeenRange_isRejected() = runTest(dispatcher) {
+        val viewModel = OnboardingViewModel(SignedInAuthRepository(), RecordingProfileRepository())
+        viewModel.setAge("14–24")
+        assertNull(viewModel.uiState.value.ageRange)
+        viewModel.setAge("18–24")
+        assertEquals("18–24", viewModel.uiState.value.ageRange)
+    }
+
     // 8. Any value outside the real, supported age ranges is rejected the same way -
-    // this is a defense-in-depth guard, not a hardcoded special case for "Under 14".
+    // this is a defense-in-depth guard, not a hardcoded special case for "Under 18".
     @Test
     fun setAge_unrecognizedValue_isRejected() = runTest(dispatcher) {
         val viewModel = OnboardingViewModel(SignedInAuthRepository(), RecordingProfileRepository())
@@ -212,15 +221,15 @@ class OnboardingViewModelTest {
         }
     }
 
-    // 10. End-to-end: even if "Under 14" were somehow passed to setAge(), it can never reach
-    // the saved profile - onboarding completes with ageRange left null, not "Under 14".
+    // 10. End-to-end: even if "Under 18" were somehow passed to setAge(), it can never reach
+    // the saved profile - onboarding completes with ageRange left null, not "Under 18".
     @Test
     fun finalAnswer_afterRejectedAge_neverPersistsIt() = runTest(dispatcher) {
         val profiles = RecordingProfileRepository()
         val viewModel = OnboardingViewModel(SignedInAuthRepository(), profiles)
 
         viewModel.start("Alex Doe")
-        viewModel.setAge("Under 14")
+        viewModel.setAge("Under 18")
         viewModel.setSkinType("Combination")
         viewModel.setGender("Female")
         viewModel.setSensitivityAndSave(true)
@@ -236,7 +245,7 @@ class OnboardingViewModelTest {
         val viewModel = OnboardingViewModel(SignedInAuthRepository(), RecordingProfileRepository())
 
         viewModel.setAge("25–35")
-        viewModel.setAge("Under 14")
+        viewModel.setAge("Under 18")
 
         assertEquals("25–35", viewModel.uiState.value.ageRange)
     }

@@ -236,7 +236,7 @@ Original failed attempt (before the resource corrections):
    Health apps declarations, confirm developer account eligibility, and make
    store claims match the tested capabilities. Prepare the required non-medical
    disclaimer and professional-care advice for the applicable classification.
-6. Align the current minimum age of 14 with launch-country requirements, actual
+6. Align the current minimum age of 18 with launch-country requirements, actual
    onboarding and Console audience selections. Confirm asset/model/product
    commercial rights and required attribution before publishing.
 7. Keep listing screenshots/descriptions consistent with unavailable chat,

@@ -75,3 +75,12 @@ database, private Storage, validated constraints, empty catalogs, ownership/RPC/
 quota checks, and safe rejection of reruns. It also verifies real-value hairstyle
 export/import, including quotes, Unicode, NULLs and duplicate-import rejection,
 using synthetic isolated fixtures. No hosted project is contacted by these tests.
+
+### Age range update (2026-11-05)
+
+Onboarding now starts at 18–24. Existing projects must apply only
+`supabase/migrations/20261105000000_adult_onboarding_age_range.sql`, not rerun the
+fresh setup. Applied to nkrxygqtptvarntzxawk on 2026-11-05. Existing 14–24 cohorts
+remain unchanged; new inserts or selections of that legacy cohort are rejected.
+The generated fresh setup includes this migration. App onboarding tests and the
+isolated SQL age-range/fresh-setup checks pass.

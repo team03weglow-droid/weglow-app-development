@@ -69,7 +69,7 @@ fun AgeSelectionScreen(onContinue: (String) -> Unit) {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "You must be at least 14 years old to use WeGlow.",
+            text = "You must be at least 18 years old to use WeGlow.",
             style = MaterialTheme.typography.bodySmall,
             color = SoftGray,
             textAlign = TextAlign.Center,

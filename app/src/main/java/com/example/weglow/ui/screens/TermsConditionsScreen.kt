@@ -58,7 +58,7 @@ fun TermsConditionsScreen(onBack: () -> Unit) {
 
             LegalSection(
                 title = "2. Age Requirement",
-                body = "You must be at least 14 years old to create and use a WeGlow account.",
+                body = "You must be at least 18 years old to create and use a WeGlow account.",
             )
 
             LegalSection(

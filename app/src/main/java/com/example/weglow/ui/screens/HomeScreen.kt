@@ -240,8 +240,8 @@ private fun HomeRoutine(
     val doneCount = matched.count { routineStepKey(today, morning, it.index, it.value.product?.id) in completed }
     val nextIndex = matched.firstOrNull { routineStepKey(today, morning, it.index, it.value.product?.id) !in completed }?.index
     HomeSurface {
-        HomeSectionHeading("Your daily routine", "$doneCount of ${matched.size} done")
-        Text("Daily checkmarks are separate from scan-interval progress. Tasks are due at 8 AM and 8 PM; checkmarks unlock when due.",
+        HomeSectionHeading("Your daily routine", if (matched.isEmpty() && !loading) "Sample routine" else "$doneCount of ${matched.size} done")
+        if (matched.isNotEmpty()) Text("Daily checkmarks are separate from scan-interval progress. Tasks are due at 8 AM and 8 PM; checkmarks unlock when due.",
             style = MaterialTheme.typography.bodySmall, color = SoftGray)
         val periodColors = FilterChipDefaults.filterChipColors(
             containerColor = PageBackground,
@@ -258,6 +258,9 @@ private fun HomeRoutine(
             Text("Preparing your routine…", style = MaterialTheme.typography.bodyMedium, color = SoftGray)
         } else if (error != null) {
             Text(error, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
+            if (matched.isEmpty()) com.example.weglow.ui.components.DemoRoutine(morning)
+        } else if (matched.isEmpty()) {
+            com.example.weglow.ui.components.DemoRoutine(morning)
         } else {
             LinearProgressIndicator(progress = { if (matched.isEmpty()) 0f else doneCount.toFloat() / matched.size },
                 modifier = Modifier.fillMaxWidth(), color = DarkGreen, trackColor = MintChip)
