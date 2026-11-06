@@ -1,6 +1,16 @@
 package com.example.weglow.ui.screens
 
+import com.example.weglow.core.config.AppConfig
+
+import androidx.compose.ui.semantics.Role
+
 import androidx.compose.foundation.Image
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +35,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -148,16 +162,17 @@ fun HomeScreen(
                         IconButton(
                             onClick = { showNotifications = true },
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(48.dp)
                                 .semantics { contentDescription = "Open alerts" },
                         ) {
                             Icon(Icons.Default.NotificationsNone, contentDescription = null, tint = DarkGreen)
                         }
                         Box(
+                            contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(48.dp)
                                 .clip(CircleShape)
-                                .clickable(onClick = onProfileClick)
+                                .clickable(role = Role.Button, onClick = onProfileClick)
                                 .semantics { contentDescription = "Open profile" },
                         ) {
                             ProfileAvatar(image = rememberDecodedBitmap(profileImage), size = 36.dp)
@@ -174,7 +189,7 @@ fun HomeScreen(
                 Text(displayName?.let { "Hello, ${homeGreetingName(it)}" } ?: "Hello there",
                     style = MaterialTheme.typography.headlineLarge, color = DarkGreen)
                 Text("A little care, every day.", style = MaterialTheme.typography.bodyMedium, color = SoftGray)
-                Text("Skin sync · Coming soon", style = MaterialTheme.typography.bodySmall, color = SoftGray)
+                if (AppConfig.demoFeaturesEnabled) Text("Skin sync · Coming soon", style = MaterialTheme.typography.bodySmall, color = SoftGray)
             }
         }
         item(key = "scan") { HomeScanHero(onScanClick) }
@@ -188,7 +203,7 @@ fun HomeScreen(
                 isRoutineLoading, routineError, openRoutine, completableRoutineKeys,
             )
         }
-        item(key = "recommendations") {
+        if (AppConfig.commerceEnabled) item(key = "recommendations") {
             Card(onClick = onRecommendationsClick, colors = CardDefaults.cardColors(containerColor = CardWhite)) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -219,13 +234,43 @@ private fun HomeScanHero(onScanClick: () -> Unit) {
                     Text("Explore possible skin concerns", style = MaterialTheme.typography.bodyMedium, color = TextOnDark)
                 }
             }
-            Button(onClick = onScanClick,
-                colors = ButtonDefaults.buttonColors(containerColor = CoralAccent, contentColor = OnCoral),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                Text("Start Scan", style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.width(8.dp))
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
-            }
+            ScanWaveButton(onScanClick)
+        }
+    }
+}
+
+@Composable
+private fun ScanWaveButton(onClick: () -> Unit) {
+    val transition = rememberInfiniteTransition(label = "Scan button waves")
+    val phase = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2800, easing = LinearEasing), RepeatMode.Restart),
+        label = "Wave expansion",
+    )
+    // Reserve space for two expanding outlines so they stay inside the hero card.
+    // Read animation state during drawing; the button itself stays still and tappable.
+    Box(Modifier.fillMaxWidth().drawBehind {
+        val margin = 10.dp.toPx()
+        repeat(2) { index ->
+            val progress = (phase.value + index * 0.5f) % 1f
+            val inset = margin * (1f - progress)
+            drawRoundRect(
+                color = CoralAccent.copy(alpha = 0.5f * (1f - progress)),
+                topLeft = Offset(inset, inset),
+                size = Size(size.width - 2f * inset, size.height - 2f * inset),
+                cornerRadius = CornerRadius(size.height / 2f),
+                style = Stroke(width = 1.5.dp.toPx()),
+            )
+        }
+    }.padding(10.dp)) {
+        Button(onClick = onClick,
+            shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(containerColor = CoralAccent, contentColor = OnCoral),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            Text("Start Scan", style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
         }
     }
 }
@@ -236,11 +281,13 @@ private fun HomeRoutine(
     completed: Set<String>, onToggle: (String) -> Unit, loading: Boolean, error: String?, onOpen: () -> Unit,
     completableKeys: Set<String>?,
 ) {
-    val matched = steps.withIndex().filter { it.value.product != null }
+    val matched = steps.withIndex().filter { it.value.isTrackable }
     val doneCount = matched.count { routineStepKey(today, morning, it.index, it.value.product?.id) in completed }
     val nextIndex = matched.firstOrNull { routineStepKey(today, morning, it.index, it.value.product?.id) !in completed }?.index
     HomeSurface {
-        HomeSectionHeading("Your daily routine", if (matched.isEmpty() && !loading) "Sample routine" else "$doneCount of ${matched.size} done")
+        HomeSectionHeading("Your daily routine", if (matched.isEmpty() && !loading) {
+            if (AppConfig.demoFeaturesEnabled) "Sample routine" else "No tasks due"
+        } else "$doneCount of ${matched.size} done")
         if (matched.isNotEmpty()) Text("Daily checkmarks are separate from scan-interval progress. Tasks are due at 8 AM and 8 PM; checkmarks unlock when due.",
             style = MaterialTheme.typography.bodySmall, color = SoftGray)
         val periodColors = FilterChipDefaults.filterChipColors(
@@ -258,11 +305,12 @@ private fun HomeRoutine(
             Text("Preparing your routine…", style = MaterialTheme.typography.bodyMedium, color = SoftGray)
         } else if (error != null) {
             Text(error, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
-            if (matched.isEmpty()) com.example.weglow.ui.components.DemoRoutine(morning)
+            if (matched.isEmpty() && AppConfig.demoFeaturesEnabled) com.example.weglow.ui.components.DemoRoutine(morning)
         } else if (matched.isEmpty()) {
-            com.example.weglow.ui.components.DemoRoutine(morning)
+            if (AppConfig.demoFeaturesEnabled) com.example.weglow.ui.components.DemoRoutine(morning)
+            else Text("No tasks are scheduled for this period. Open Routines to view upcoming tasks.", color = SoftGray)
         } else {
-            LinearProgressIndicator(progress = { if (matched.isEmpty()) 0f else doneCount.toFloat() / matched.size },
+            com.example.weglow.ui.components.WeGlowAnimatedProgress(progress = { if (matched.isEmpty()) 0f else doneCount.toFloat() / matched.size },
                 modifier = Modifier.fillMaxWidth(), color = DarkGreen, trackColor = MintChip)
             if (steps.isEmpty()) Text("Your routine is not available yet. Open Routines to get started.",
                 style = MaterialTheme.typography.bodyMedium, color = SoftGray)
@@ -277,13 +325,13 @@ private fun HomeRoutine(
                     }
                     Column(Modifier.weight(1f)) {
                         Text(product?.name ?: step.label, style = MaterialTheme.typography.titleSmall, color = DarkGreen)
-                        Text(step.label, style = MaterialTheme.typography.bodySmall, color = SoftGray)
-                        Text(when { product == null -> "Product not matched yet"; done -> "Done"; index == nextIndex -> "Up next"; else -> "Queued" },
+                        Text(if (product == null && step.isTrackable) "Use your own product" else step.label, style = MaterialTheme.typography.bodySmall, color = SoftGray)
+                        Text(when { !step.isTrackable -> "Product not matched yet"; done -> "Done"; index == nextIndex -> "Up next"; else -> "Queued" },
                             style = MaterialTheme.typography.labelMedium, color = if (index == nextIndex) AccentText else SoftGray)
                     }
                     IconToggleButton(
                         checked = done,
-                        enabled = product != null && (completableKeys == null || key in completableKeys),
+                        enabled = step.isTrackable && (completableKeys == null || key in completableKeys),
                         onCheckedChange = { onToggle(key) },
                         modifier = Modifier
                             .size(48.dp)
@@ -344,7 +392,7 @@ private fun HomeEnvironment(environmentState: EnvironmentUiState, onRetry: () ->
                 Text(if (environmentState is EnvironmentUiState.Success) "Use current location" else "Retry", color = DarkGreen)
             }
         }
-        WeGlowPlannedFeature("Log SPF")
+        if (AppConfig.demoFeaturesEnabled) WeGlowPlannedFeature("Log SPF")
     }
 }
 

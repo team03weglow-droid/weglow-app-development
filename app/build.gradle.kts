@@ -148,6 +148,8 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField("boolean", "DEMO_FEATURES_ENABLED", "true")
+            buildConfigField("boolean", "COMMERCE_ENABLED", "true")
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-dev"
             resValue("string", "app_name", "WeGlow Dev")
@@ -157,6 +159,8 @@ android {
         }
         create("staging") {
             initWith(getByName("debug"))
+            buildConfigField("boolean", "DEMO_FEATURES_ENABLED", "false")
+            buildConfigField("boolean", "COMMERCE_ENABLED", "false")
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-staging"
             matchingFallbacks += listOf("debug")
@@ -168,6 +172,8 @@ android {
             buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", buildString(stagingKey))
         }
         release {
+            buildConfigField("boolean", "DEMO_FEATURES_ENABLED", "false")
+            buildConfigField("boolean", "COMMERCE_ENABLED", "false")
             isMinifyEnabled = false
             isDebuggable = false
             buildConfigField("String", "ENVIRONMENT", buildString("production"))

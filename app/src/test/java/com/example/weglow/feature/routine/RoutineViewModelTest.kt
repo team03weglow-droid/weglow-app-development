@@ -35,6 +35,16 @@ class RoutineViewModelTest {
     private val cleanser = Product(id = "1", name = "Gentle Face Wash", priceLabel = "LKR 900", imageUrl = null, category = "Cleanser", targetSkinType = "Oily")
     private val moisturizer = Product(id = "2", name = "Hydra Moisturizer", priceLabel = "LKR 1200", imageUrl = null, category = "Moisturizer", targetSkinType = "Oily")
 
+    @Test fun emptyCatalogStillBuildsRealTrackableRoutine() = runTest(dispatcher) {
+        val vm = RoutineViewModel(FakeAuthRepository("u1"), FakeProfileRepository(UserProfile(id = "u1")),
+            FakeCatalogRepository(Result.success(emptyList())))
+        vm.load()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(5, vm.uiState.value.plan?.let { it.morning.size + it.evening.size })
+        assertEquals(true, vm.uiState.value.plan?.morning?.all { it.isTrackable && it.product == null })
+        assertNull(vm.uiState.value.errorMessage)
+    }
+
     @Test
     fun successfulLoad_buildsPlanFromRealCatalog() = runTest(dispatcher) {
         val vm = RoutineViewModel(
@@ -68,7 +78,7 @@ class RoutineViewModelTest {
     }
 
     @Test
-    fun catalogFailure_surfacesRealErrorNotFakeSteps() = runTest(dispatcher) {
+    fun catalogFailure_stillProvidesProductIndependentTasks() = runTest(dispatcher) {
         val vm = RoutineViewModel(
             FakeAuthRepository("u1"),
             FakeProfileRepository(UserProfile(id = "u1", skinType = "Oily")),
@@ -78,8 +88,9 @@ class RoutineViewModelTest {
         vm.load()
         dispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals("catalog unavailable", vm.uiState.value.errorMessage)
-        assertNull(vm.uiState.value.plan)
+        assertNull(vm.uiState.value.errorMessage)
+        assertEquals(3, vm.uiState.value.plan?.morning?.size)
+        assertEquals(true, vm.uiState.value.plan?.morning?.all { it.product == null && it.isTrackable })
     }
 
     @Test

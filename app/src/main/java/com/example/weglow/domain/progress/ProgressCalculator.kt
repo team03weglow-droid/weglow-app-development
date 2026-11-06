@@ -43,7 +43,7 @@ object RoutineScheduleTasks {
                     val dueAt = date.atTime(if (morning) morningTime else eveningTime).atZone(schedule.zone).toInstant()
                     if (dueAt >= schedule.startsAt && dueAt <= through && (until == null || dueAt < until)) {
                         steps.forEachIndexed { index, step ->
-                            if (step.product != null) add(ScheduledTask(schedule.id, date, morning, index, dueAt))
+                            if (step.isTrackable) add(ScheduledTask(schedule.id, date, morning, index, dueAt))
                         }
                     }
                 }

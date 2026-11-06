@@ -1,5 +1,12 @@
 # WeGlow environments and release handoff
 
+2026-11-06 update: see [the dated launch-fix report](LAUNCH_FIXES_2026-11-06.md).
+Product-independent routines and production feature gates are implemented;
+weather, account deletion and retired-chat handlers are deployed. Disposable-user
+live checks passed for completion persistence, isolation, Storage, recovery-token
+password changes and deletion. Inbox delivery, public policy/deletion pages,
+staging configuration and upload signing remain owner/release setup items.
+
 Latest hosted checkpoint: the owner reports Google sign-in working in WeGlow
 Dev against the new backend. Email signup/confirmation and recovery delivery,
 authenticated profile/Storage behavior and release-build tests are still pending.

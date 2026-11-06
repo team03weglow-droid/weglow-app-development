@@ -72,7 +72,7 @@ fun SkinSensitivityScreen(
             enabled = !isSaving,
             colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = MaterialTheme.colorScheme.onPrimary),
             shape = RoundedCornerShape(999.dp),
-            modifier = Modifier.fillMaxWidth().height(58.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp)
         ) {
             Text("Yes, it is sensitive", style = MaterialTheme.typography.labelLarge)
         }
@@ -82,7 +82,7 @@ fun SkinSensitivityScreen(
             enabled = !isSaving,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = DarkGreen),
             shape = RoundedCornerShape(999.dp),
-            modifier = Modifier.fillMaxWidth().height(58.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp)
         ) {
             Text("No, not usually", style = MaterialTheme.typography.labelLarge)
         }

@@ -1,5 +1,7 @@
 package com.example.weglow.ui.screens
 
+import com.example.weglow.core.config.AppConfig
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
@@ -9,6 +11,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -171,7 +176,7 @@ fun RoutinesScreen(
             TextButton(onClick = { calendarAnchor = calendarAnchor.plusWeeks(1) }) { Text("Next week") }
         }
         journal.errorMessage?.let { WeGlowErrorView(it) }
-        if (activeSteps.any { it.product != null }) Text("Tasks are due at 8 AM and 8 PM in the schedule's time zone. Future tasks cannot be checked. Routine changes start the following day; past tasks keep their original plan.",
+        if (activeSteps.any { it.isTrackable }) Text("Tasks are due at 8 AM and 8 PM in the schedule's time zone. Future tasks cannot be checked. Routine changes start the following day; past tasks keep their original plan.",
             style = MaterialTheme.typography.bodySmall, color = SoftGray)
 
         AnimatedContent(
@@ -230,9 +235,12 @@ fun RoutinesScreen(
                 key(day.date.toString()) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.clickable {
-                            selectedDate = day.date
-                        }
+                        modifier = Modifier
+                            .selectable(selected = day.isSelected, role = Role.RadioButton, onClick = { selectedDate = day.date })
+                            .semantics {
+                                contentDescription = day.date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", locale)) +
+                                    if (day.isToday) ", Today" else ""
+                            }
                     ) {
 
                     Text(
@@ -328,10 +336,11 @@ fun RoutinesScreen(
             isLoading -> WeGlowLoadingView(message = "Building your routine…")
             errorMessage != null -> {
                 WeGlowErrorView(message = errorMessage, onRetry = onRetry)
-                if (activeSteps.none { it.product != null }) com.example.weglow.ui.components.DemoRoutine(isMorning)
+                if (activeSteps.none { it.isTrackable } && AppConfig.demoFeaturesEnabled) com.example.weglow.ui.components.DemoRoutine(isMorning)
             }
-            activeSteps.none { it.product != null } -> key(selectedDate) {
-                com.example.weglow.ui.components.DemoRoutine(isMorning)
+            activeSteps.none { it.isTrackable } -> key(selectedDate) {
+                if (AppConfig.demoFeaturesEnabled) com.example.weglow.ui.components.DemoRoutine(isMorning)
+                else Text("No tasks are scheduled for this date. Check tomorrow for upcoming tasks.", color = SoftGray)
             }
             else -> activeSteps.forEachIndexed { index, step ->
                 // Keyed by the selected date so completion never leaks between dates (each date
@@ -393,10 +402,10 @@ fun RoutinesScreen(
                                 color = SoftGray
                             )
 
-                            if (product != null) {
-                                RoutineStatusPill(if (done) "DONE" else if (index == activeSteps.indexOfFirst { it.product != null && routineStepKey(selectedDate, isMorning, activeSteps.indexOf(it), it.product?.id) !in doneState }) "UP NEXT" else "QUEUED")
+                            if (step.isTrackable) {
+                                RoutineStatusPill(if (done) "DONE" else if (index == activeSteps.indexOfFirst { it.isTrackable && routineStepKey(selectedDate, isMorning, activeSteps.indexOf(it), it.product?.id) !in doneState }) "UP NEXT" else "QUEUED")
                                 Text(
-                                    product.name,
+                                    product?.name ?: step.label,
                                     style = MaterialTheme.typography.titleSmall,
                                     color = PrimaryBlack,
                                     textDecoration = if (done) {
@@ -408,7 +417,7 @@ fun RoutinesScreen(
                                 )
 
                                 Text(
-                                    listOfNotNull(product.brandName, product.priceLabel).joinToString(" · "),
+                                    if (product == null) "Use your own product" else listOfNotNull(product.brandName, product.priceLabel).joinToString(" · "),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SoftGray,
                                     textDecoration = if (done) {
@@ -430,12 +439,12 @@ fun RoutinesScreen(
                         Spacer(Modifier.width(8.dp))
 
                         // Circular completion control, matching the Figma routine cards.
-                        if (product != null) {
+                        if (step.isTrackable) {
                             CircleRoutineCheck(
                                 checked = done,
                                 onClick = { onSetRoutineCompletion?.invoke(stepKey, !done) ?: onToggleRoutineStep(stepKey) },
                                 enabled = completableRoutineKeys == null || stepKey in completableRoutineKeys,
-                                contentDescription = "Complete ${product.name}",
+                                contentDescription = "Complete ${product?.name ?: step.label}",
                             )
                         }
                     }
@@ -590,7 +599,7 @@ private fun CircleRoutineCheck(checked: Boolean, onClick: () -> Unit, contentDes
         modifier = Modifier
             .size(48.dp)
             .semantics { this.contentDescription = contentDescription }
-            .clickable(enabled = enabled, onClick = onClick),
+            .toggleable(value = checked, enabled = enabled, role = Role.Checkbox, onValueChange = { onClick() }),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -645,7 +654,8 @@ private fun FeelingChip(
                     )
                 }
             )
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .heightIn(min = 48.dp)
             .padding(
                 horizontal = 12.dp,
                 vertical = 8.dp
@@ -679,7 +689,8 @@ private fun RowScope.ToggleHalf(
                     Color.Transparent
                 }
             )
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .heightIn(min = 48.dp)
             .padding(vertical = 10.dp)
     )
 }

@@ -1,6 +1,8 @@
 package com.example.weglow.feature.routine
 
 import com.example.weglow.core.auth.AccountWork
+import com.example.weglow.core.config.AppConfig
+import com.example.weglow.domain.recommendation.BasicRoutine
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weglow.domain.model.RoutinePlan
@@ -81,17 +83,21 @@ class RoutineViewModel(
                 return@launch
             }
 
+            if (!AppConfig.commerceEnabled) {
+                _uiState.value = RoutineUiState(isLoading = false, plan = BasicRoutine.create())
+                return@launch
+            }
             await { catalogRepository.products() }.fold(
                 onSuccess = { products ->
                     val recommendations = RecommendationEngine.recommend(profileResult.getOrNull(), null, products)
                         .recommendations
-                    val plan = RoutineBuilder.build(recommendations, products)
+                    val plan = if (products.isEmpty()) BasicRoutine.create() else RoutineBuilder.build(recommendations, products)
                     _uiState.value = RoutineUiState(isLoading = false, plan = plan)
                 },
                 onFailure = { error ->
                     _uiState.value = RoutineUiState(
                         isLoading = false,
-                        errorMessage = error.message ?: "Products could not be loaded.",
+                        plan = BasicRoutine.create(),
                     )
                 },
             )

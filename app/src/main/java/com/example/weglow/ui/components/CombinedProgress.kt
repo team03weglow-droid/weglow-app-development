@@ -1,5 +1,7 @@
 package com.example.weglow.ui.components
 
+import com.example.weglow.core.config.AppConfig
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -18,6 +20,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import com.example.weglow.domain.progress.ProgressInterval
 import com.example.weglow.feature.progress.ProgressUiState
@@ -33,7 +36,8 @@ fun CombinedProgress(state: ProgressUiState, onRetry: () -> Unit) {
     val hasRealPoints = state.history.points.isNotEmpty()
     var showDemo by remember(hasRealPoints) { mutableStateOf(!hasRealPoints) }
     val demo = remember { ProgressUiState(loaded = true, loading = false, history = DemoProgress.history()) }
-    CombinedProgressCard(if (showDemo) demo else state, onRetry, showDemo) { showDemo = !showDemo }
+    val preview = AppConfig.demoFeaturesEnabled && showDemo
+    CombinedProgressCard(if (preview) demo else state, onRetry, preview) { showDemo = !showDemo }
 }
 
 @Composable
@@ -53,7 +57,7 @@ private fun CombinedProgressCard(state: ProgressUiState, onRetry: () -> Unit, is
             Text("These example scans and routine completions are not your results. Demo routine checkboxes do not change this preview.",
                 style = MaterialTheme.typography.bodySmall, color = SoftGray)
         }
-        TextButton(onClick = onToggleDemo) { Text(if (isDemo) "Show my results" else "Show demo results") }
+        if (AppConfig.demoFeaturesEnabled) TextButton(onClick = onToggleDemo) { Text(if (isDemo) "Show my results" else "Show demo results") }
         Text("50% scan improvement + 50% routine completion", style = MaterialTheme.typography.bodySmall, color = SoftGray)
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = DarkGreen)
         state.error?.let {
@@ -64,7 +68,7 @@ private fun CombinedProgressCard(state: ProgressUiState, onRetry: () -> Unit, is
             Text("Latest interval: ${latest?.score?.let { "${number(it)}/100" } ?: "Unavailable"}",
                 style = MaterialTheme.typography.titleMedium, color = DarkGreen)
             if (latest?.score != null) {
-                LinearProgressIndicator(progress = { latest.score.toFloat() / 100f }, modifier = Modifier.fillMaxWidth().height(8.dp),
+                WeGlowAnimatedProgress(progress = { latest.score.toFloat() / 100f }, modifier = Modifier.fillMaxWidth().height(8.dp),
                     color = DarkGreen, trackColor = MintChip)
             }
             latest?.signedImprovement?.let { change ->
@@ -148,7 +152,10 @@ private fun ProgressLineChart(intervals: List<ProgressInterval>, selectedId: Str
             Row(Modifier.width(chartWidth)) {
                 intervals.forEach { interval ->
                     TextButton(onClick = { onSelect(interval.current.id) }, modifier = Modifier.width(88.dp)
-                        .semantics { contentDescription = "Scan ${date(interval.current.scannedAt!!)}: ${interval.score?.let { "${number(it)} out of 100" } ?: "unavailable"}. Show interval details." }) {
+                        .semantics {
+                            this.selected = interval.current.id == selectedId
+                            contentDescription = "Scan ${date(interval.current.scannedAt!!)}: ${interval.score?.let { "${number(it)} out of 100" } ?: "unavailable"}. Show interval details."
+                        }) {
                         Text(date(interval.current.scannedAt!!, "MMM d\nyyyy"), style = MaterialTheme.typography.labelSmall,
                             color = if (interval.current.id == selectedId) AccentText else DarkGreen)
                     }

@@ -13,6 +13,8 @@ object AppConfig {
     val supabasePublishableKey: String get() = BuildConfig.SUPABASE_PUBLISHABLE_KEY
     val environment: String get() = BuildConfig.ENVIRONMENT
     val authScheme: String get() = BuildConfig.AUTH_SCHEME
+    val demoFeaturesEnabled: Boolean get() = BuildConfig.DEMO_FEATURES_ENABLED
+    val commerceEnabled: Boolean get() = BuildConfig.COMMERCE_ENABLED
 
     fun requireSupabaseConfiguration() {
         check(supabaseUrl.startsWith("https://")) {

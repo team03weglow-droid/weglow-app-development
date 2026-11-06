@@ -6,6 +6,9 @@ import com.example.weglow.ui.components.WeGlowOnboardingLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -63,7 +66,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(modifier = Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Gender.OPTIONS.forEach { option ->
                 val isSelected = option == selected
                 Row(
@@ -75,7 +78,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
                             if (isSelected) Modifier.border(2.dp, DarkGreen, RoundedCornerShape(999.dp))
                             else Modifier
                         )
-                        .clickable { selected = option }
+                        .selectable(selected = isSelected, role = Role.RadioButton, onClick = { selected = option })
                         .padding(horizontal = 20.dp, vertical = 18.dp)
                 ) {
                     Text(option, style = MaterialTheme.typography.titleSmall, color = TextBlack)
@@ -89,7 +92,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
             OutlinedButton(
                 onClick = onBack,
                 shape = RoundedCornerShape(999.dp),
-                modifier = Modifier.weight(1f).height(54.dp)
+                modifier = Modifier.weight(1f).heightIn(min = 54.dp)
             ) {
                 Text("Back", style = MaterialTheme.typography.bodyLarge, color = TextBlack)
             }
@@ -103,7 +106,7 @@ fun GenderSelectionScreen(onBack: () -> Unit, onContinue: (String) -> Unit) {
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(999.dp),
-                modifier = Modifier.weight(1f).height(54.dp)
+                modifier = Modifier.weight(1f).heightIn(min = 54.dp)
             ) {
                 Text("Continue", style = MaterialTheme.typography.bodyLarge)
             }

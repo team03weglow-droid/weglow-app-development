@@ -1,5 +1,7 @@
 package com.example.weglow.navigation
 
+import com.example.weglow.core.config.AppConfig
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -60,11 +62,14 @@ import com.example.weglow.ui.theme.DarkGreen
 
 private val tabs = listOf(
     WeGlowNavItem(Destination.Home.route, "Home", Icons.Default.Home),
-    WeGlowNavItem(Destination.Discover.route, "Discover", Icons.Default.Explore),
     WeGlowNavItem(Destination.Scan.route, "Scan", Icons.Default.CameraAlt),
     WeGlowNavItem(Destination.Routines.route, "Routines", Icons.Default.Spa),
     WeGlowNavItem(Destination.Profile.route, "Profile", Icons.Default.Person),
-)
+).let { items ->
+    if (AppConfig.commerceEnabled) items.toMutableList().apply {
+        add(1, WeGlowNavItem(Destination.Discover.route, "Discover", Icons.Default.Explore))
+    } else items
+}
 
 @Composable
 fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit = {}) {
@@ -414,7 +419,7 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = backStackEntry?.destination?.route
 
-            if (currentRoute == Destination.Home.route) {
+            if (currentRoute == Destination.Home.route && AppConfig.demoFeaturesEnabled) {
 
                 FloatingActionButton(
                     onClick = { showChatComingSoon = true },
@@ -435,6 +440,10 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
         NavHost(
             navController = navController,
             startDestination = Destination.Loading.route,
+            enterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(240)) },
+            exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) },
+            popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(240)) },
+            popExitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) },
             modifier = Modifier.padding(padding),
         ) {
 

@@ -6,7 +6,8 @@ const bob = '00000000-0000-4000-8000-0000000000b2';
 // Synthetic fixtures only. This runner never connects to a hosted database.
 const plan = { morning: [{ label: 'Cleanse', product: { id: 'test-product' }, reasons: [] }, { label: 'Unmatched', product: null, reasons: [] }], evening: [] };
 const revised = { ...plan, evening: [{ label: 'Moisturize', product: { id: 'test-product-2' }, reasons: [] }] };
-const migration = await readFile(new URL('../migrations/20261104000000_combined_progress.sql', import.meta.url), 'utf8');
+const migration = await readFile(new URL('../migrations/20261104000000_combined_progress.sql', import.meta.url), 'utf8') + '\n' +
+  await readFile(new URL('../migrations/20261106000000_product_independent_routines.sql', import.meta.url), 'utf8');
 for (const legacy of [true, false]) {
   const db = new PGlite();
   try {

@@ -35,8 +35,8 @@ class UvAlertNotifier(context: Context) {
             NOTIFICATION_ID,
             builder
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("High UV index")
-                .setContentText("Apply Sunscreen")
+                .setContentTitle(environment.locationName?.let { "High UV in $it" } ?: "High UV index")
+                .setContentText(if (environment.isCountryFallback) "Reading for your country's default city. Check local conditions before planning outdoor time." else "Apply Sunscreen")
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .build(),

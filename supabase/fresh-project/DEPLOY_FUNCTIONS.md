@@ -2,12 +2,21 @@
 
 Destination: `nkrxygqtptvarntzxawk`. SQL setup does not deploy Edge Functions.
 Weather function `smart-endpoint` was deployed to this destination on 2026-11-04
-and is ACTIVE (version 1). Its `WEATHER_API_KEY` secret is present. An
+and is ACTIVE. Its `WEATHER_API_KEY` secret is present. An
 unauthenticated request returned HTTP 401. On 2026-11-05, an authenticated
 temporary-user request returned HTTP 200 with current UV, humidity and location;
 an invalid session returned HTTP 401 and the test user was deleted. The separate
 Open-Meteo history request returned 30 dates with 30 UV values. Phone UI refresh
-still needs verification. `delete-account` and `chat` remain undeployed.
+still needs verification.
+
+On 2026-11-06, `delete-account` and the retired `chat` handler were deployed to
+this same project. Disposable-account live checks verified product-independent
+schedule persistence, idempotent completion/unchecking, cross-account isolation,
+private photo upload/read isolation, recovery-token verification/password change,
+and deletion of owned Auth/profile/photos/schedules/completions. A caller-supplied
+victim ID was ignored and the second account survived. All test fixtures were
+removed. Email inbox delivery and the public deletion-request webpage remain
+owner verification/setup items.
 
 Weather credential repair (2026-11-05): the supplied OpenWeatherMap credential
 was rejected by WeatherAPI.com (HTTP 401, provider code 2006), causing the proxy

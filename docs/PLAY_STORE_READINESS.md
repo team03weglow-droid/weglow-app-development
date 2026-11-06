@@ -268,3 +268,23 @@ Additional official references checked during this review:
 - Intellectual property: https://support.google.com/googleplay/android-developer/answer/9888072
 
 Recheck policies in Play Console before submission; requirements can change.
+
+### Accessibility pass — 2026-11-05
+
+Shared fields and buttons now use minimum heights so larger text can grow.
+Onboarding age/gender/skin-type choices expose selection state. Routine checks
+expose checkbox state; period tabs, feeling choices, calendar dates and progress
+point buttons expose selection. Home alert/profile hit areas are 48 dp. Bottom
+navigation avoids duplicate icon labels. Shared errors expose error semantics
+and polite announcements, with retry actions retained.
+
+Verified: debug and instrumentation APK builds, architecture guard, five isolated
+emulator accessibility tests at 200% text size, and two updated Home large-text
+regressions. A rendered Home large-text screenshot was reviewed. Main secondary,
+primary and accent text pairs on the standard card/page surfaces have contrast
+above 4.5:1; this is not a complete per-screen contrast audit.
+
+Still required before launch: a manual TalkBack/Switch Access walkthrough,
+keyboard/focus checks, and wider device/display-size coverage. Automated semantics
+tests do not establish complete accessibility or Play approval.
+Reference: https://developer.android.com/develop/ui/compose/accessibility/api-defaults

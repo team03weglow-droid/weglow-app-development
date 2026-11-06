@@ -1,5 +1,7 @@
 package com.example.weglow.ui.screens
 
+import com.example.weglow.core.config.AppConfig
+
 import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -137,7 +139,7 @@ fun ScanResultsScreen(
                 }
             }
             Text("Automated predictions can be incorrect. These results are not a medical diagnosis.", color = SoftGray, style = MaterialTheme.typography.bodySmall)
-            PillButton("View Recommendations", onViewRecommendations)
+            if (AppConfig.commerceEnabled) PillButton("View Recommendations", onViewRecommendations)
             Spacer(Modifier.height(8.dp))
         }
     }
