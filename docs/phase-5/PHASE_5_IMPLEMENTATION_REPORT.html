@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WeGlow — Phase 5 Onboarding Implementation Report</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5px; line-height: 1.5; color: #1a1a1a; margin: 0;
+  }
+  h1 { font-size: 20px; margin: 0 0 2px; border-bottom: 2px solid #2f5d3a; padding-bottom: 6px; }
+  h2 {
+    font-size: 13.5px; margin: 22px 0 8px; color: #2f5d3a;
+    border-bottom: 1px solid #cfe0d4; padding-bottom: 3px; page-break-after: avoid;
+  }
+  h3 { font-size: 11.5px; margin: 14px 0 5px; page-break-after: avoid; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+  code {
+    font-family: "SF Mono", "Menlo", Consolas, monospace; font-size: 9.2px;
+    background: #f2f2ef; padding: 1px 3px; border-radius: 3px; word-break: break-word;
+  }
+  pre {
+    font-family: "SF Mono", "Menlo", Consolas, monospace; font-size: 9px; line-height: 1.45;
+    background: #f5f5f2; border: 1px solid #e0e0da; border-radius: 5px;
+    padding: 8px 10px; overflow-x: auto; white-space: pre-wrap; margin: 8px 0;
+    page-break-inside: avoid;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 9.4px; }
+  th, td { border: 1px solid #d2d2cc; padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: #eef3ef; font-weight: 600; }
+  tr { page-break-inside: avoid; }
+  .meta { color: #555; font-size: 9.5px; margin: 4px 0 0; }
+  .sec { page-break-inside: auto; }
+  strong { font-weight: 650; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 18px 0; }
+  .status-pass { color: #1c7a3e; font-weight: 650; }
+  .status-fail { color: #b3261e; font-weight: 650; }
+</style>
+</head>
+<body>
+
+<h1>PHASE 5 — Onboarding Implementation Report</h1>
+<p class="meta">Project: WeGlow &nbsp;·&nbsp; Branch: <code>phase-5-onboarding</code> &nbsp;·&nbsp; No commits, pushes, merges, resets, or branch switches were made. Working tree contains only the changes documented below.</p>
+
+<div class="sec">
+<h2>A. Phase 5 Implementation Result</h2>
+<p>Phase 5 is implemented against the current project.</p>
+<ul>
+  <li>New account / first-time authenticated user runs the <strong>existing</strong> onboarding question screens (no UI redesign). Every answer is held in <code>OnboardingViewModel.uiState</code> across all screens.</li>
+  <li>On the final question, the answers are assembled into one <code>UserProfile</code> keyed to <code>authRepository.currentUserId()</code> and persisted with a single Supabase <code>upsert</code> to <code>public.profiles</code>.</li>
+  <li>Onboarding completion is now a <strong>real <code>onboarding_completed boolean NOT NULL DEFAULT false</code></strong> column, written <code>true</code> <strong>only</strong> on the success branch of the save. On failure nothing is marked and no forward navigation occurs — the existing error / disabled-button behavior on <code>SkinSensitivityScreen</code> is retained.</li>
+  <li>Returning authenticated users are routed by the actual <code>onboarding_completed</code> value (not by "a row exists"), both at app startup and immediately after authentication.</li>
+  <li>All four onboarding entry paths (manual email signup, email sign-in of an incomplete user, Google auth for a new / incomplete user, restored session with incomplete onboarding) reset <code>OnboardingViewModel</code> and resolve the user's identity before the first question, so stale answers from a previous attempt or another user cannot survive, and the manual-signup full name is never clobbered.</li>
+  <li>The manual-signup full name is preserved and persisted; for Google users the display name is taken from authenticated user metadata (never fabricated) and persisted when present.</li>
+  <li>Home and Profile show the real persisted name instead of the hardcoded "Team 03", loaded through a <code>ProfileRepository</code> read; neutral fallbacks are used when no name is available. Layout / styling / navigation of both screens is unchanged. No profile-photo work (that is Phase 6).</li>
+  <li>Supabase stays entirely under <code>data/</code>. No <code>io.github.jan.supabase</code> import was added to <code>feature/</code>, <code>ui/</code>, or <code>domain/</code>. <code>architectureCheck</code> still passes. <code>AppContainer</code> / <code>ViewModelFactory</code> architecture is preserved (one new ViewModel wired identically to the existing five).</li>
+  <li>No Supabase credentials are hardcoded. No fake persistence or fake success states.</li>
+  <li>Scan / acne model / ONNX / <code>ScanViewModel</code> / <code>ScanScreen</code> / <code>ScanResultScreen</code> / backend / acne tests were not modified.</li>
+</ul>
+<p><strong>Verification:</strong> <code>architectureCheck</code>, <code>compileDebugKotlin</code>, <code>compileDebugUnitTestKotlin</code>, <code>lintDebug</code> (0 errors), and <code>assembleDebug</code> (APK produced) all <span class="status-pass">succeed</span>. <code>testDebugUnitTest</code> is <strong>33 pass / 1 fail</strong>; the one failure is a <strong>pre-existing, previously-masked teammate scan test</strong> (<code>YoloPostProcessorTest</code>), unrelated to Phase 5 — see sections K and M. A full PASS is <span class="status-fail">not</span> claimed, and scan code was not modified to force one.</p>
+</div>
+
+<div class="sec">
+<h2>B. Every File Created</h2>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>supabase/migrations/20260910000000_add_onboarding_completed.sql</code></td><td>New, additive migration: adds <code>onboarding_completed</code> to <code>public.profiles</code> and runs a conservative, evidence-based backfill. Leaves the existing <code>20260909000000_create_profiles.sql</code> untouched.</td></tr>
+<tr><td><code>app/src/main/java/com/example/weglow/feature/profile/ProfileViewModel.kt</code></td><td>Loads the signed-in user's persisted profile so Home / Profile can display the real name. Depends only on <code>AuthRepository</code> + <code>ProfileRepository</code> domain interfaces — no Supabase import.</td></tr>
+<tr><td><code>app/src/test/java/com/example/weglow/data/repository/SupabaseProfileRepositoryTest.kt</code></td><td>Pure unit tests for the completion-decision rule (flag, not row existence) and the <code>ProfileRow</code> &harr; <code>UserProfile</code> mappers.</td></tr>
+</table>
+<p><code>docs/phase-5/</code> also appears as untracked — that directory holds the earlier <code>PHASE_5_AUDIT.md</code> document, which predates this implementation and is not code.</p>
+</div>
+
+<div class="sec">
+<h2>C. Every File Modified</h2>
+<table>
+<tr><th>File</th><th>Change</th></tr>
+<tr><td><code>domain/model/UserProfile.kt</code></td><td>Added <code>val onboardingCompleted: Boolean = false</code> (backend-agnostic domain model).</td></tr>
+<tr><td><code>domain/repository/ProfileRepository.kt</code></td><td>Added <code>suspend fun getProfile(userId: String): Result&lt;UserProfile?&gt;</code>; documented that <code>hasCompletedOnboarding</code> reads the flag, not row existence.</td></tr>
+<tr><td><code>domain/repository/AuthRepository.kt</code></td><td>Added <code>fun currentUserDisplayName(): String?</code> — best-effort name from the identity provider's metadata; never a UI-supplied or fabricated value.</td></tr>
+<tr><td><code>data/model/ProfileRow.kt</code></td><td>Added <code>val onboarding_completed: Boolean = false</code>; <code>toProfileRow()</code> maps <code>onboardingCompleted</code>; new <code>fun ProfileRow.toUserProfile()</code> reverse mapper.</td></tr>
+<tr><td><code>data/repository/SupabaseProfileRepository.kt</code></td><td>Implemented <code>getProfile</code> (<code>select … decodeList&lt;ProfileRow&gt;().firstOrNull()?.toUserProfile()</code>). <code>hasCompletedOnboarding</code> now returns <code>List&lt;ProfileRow&gt;.isOnboardingCompleted()</code> = <code>firstOrNull()?.onboarding_completed == true</code> (pure <code>internal</code> helper, unit-testable without a client).</td></tr>
+<tr><td><code>data/repository/SupabaseAuthRepository.kt</code></td><td>Implemented <code>currentUserDisplayName()</code> reading <code>client.auth.currentUserOrNull()?.userMetadata</code> keys <code>full_name</code> &rarr; <code>name</code> &rarr; <code>user_name</code> &rarr; <code>preferred_username</code> (first non-blank, trimmed). Added imports <code>kotlinx.serialization.json.JsonPrimitive</code>, <code>kotlinx.serialization.json.contentOrNull</code>.</td></tr>
+<tr><td><code>feature/onboarding/OnboardingViewModel.kt</code></td><td><code>start(fullName: String? = null)</code>: always resets <code>OnboardingUiState</code>; resolves name from the passed value, else <code>authRepository.currentUserDisplayName()</code>, else <code>""</code>. The <code>UserProfile</code> passed to <code>saveProfile</code> now sets <code>onboardingCompleted = true</code>; <code>saveCompleted</code> / navigation still only occur inside <code>onSuccess</code>; failure path unchanged.</td></tr>
+<tr><td><code>navigation/WeGlowApp.kt</code></td><td>Added <code>profileViewModel</code> (created via <code>viewModelFactory</code> from <code>container.authRepository</code> + <code>container.profileRepository</code>) and <code>profileState</code>. Calls <code>onboardingViewModel.start()</code> on the restored-session <code>ONBOARDING</code> branch and the post-auth <code>SignedIn</code>&rarr;not-HOME branch (manual-signup path already called <code>start(event.fullName)</code> and is unchanged). Home and Profile destinations call <code>profileViewModel.refresh()</code> on entry and pass <code>displayName = profileState.displayName</code>. All scan navigation left exactly as-is.</td></tr>
+<tr><td><code>ui/screens/HomeScreen.kt</code></td><td>Added <code>displayName: String? = null</code> param. <code>"Hello, Team 03"</code> &rarr; <code>displayName?.let { "Hello, $it" } ?: "Hello there"</code>. Only the string changed.</td></tr>
+<tr><td><code>ui/screens/ProfileScreen.kt</code></td><td>Added <code>displayName: String? = null</code> param. <code>"Team 03"</code> &rarr; <code>displayName ?: "Your Profile"</code>. Only the string changed.</td></tr>
+<tr><td><code>test/…/ArchitectureFoundationTest.kt</code></td><td>Kept all existing assertions; added <code>onboardingCompleted = true</code> to the fixture and <code>assertEquals(true, row.onboarding_completed)</code>.</td></tr>
+<tr><td><code>test/…/feature/auth/AuthViewModelTest.kt</code></td><td><code>FakeAuthRepository</code> implements <code>currentUserDisplayName()</code>; <code>FakeProfileRepository</code> implements <code>getProfile()</code>, gains an optional <code>storedProfile</code>, and derives completion from <code>storedProfile?.onboardingCompleted ?: completed</code>. Added test <code>restoredSession_withProfileRowButIncompleteOnboarding_routesToOnboarding</code>. All 8 original tests retained (9 total).</td></tr>
+<tr><td><code>test/…/feature/onboarding/OnboardingViewModelTest.kt</code></td><td>Fakes rebuilt to the current Phase 4 <code>AuthRepository</code> contract (<code>authenticationState</code>, <code>signInWithGoogle</code>) plus <code>currentUserDisplayName</code>; <code>RecordingProfileRepository</code> implements <code>getProfile</code>, supports an injectable failure <code>Result</code>, and records both the attempted and the persisted profile. Added Phase 5 test cases (see section J). This fixes audit blocker B4 — the unit-test source set previously did not compile.</td></tr>
+<tr><td><code>docs/phase-0/DATABASE_MODEL.md</code></td><td>One bullet added documenting <code>onboarding_completed</code> and the new migration.</td></tr>
+</table>
+</div>
+
+<div class="sec">
+<h2>D. Exact Database Migration Created and What It Does</h2>
+<p><code>supabase/migrations/20260910000000_add_onboarding_completed.sql</code> — timestamp is after the existing <code>20260909000000_create_profiles.sql</code>, so migration history is additive and nothing is edited destructively.</p>
+<p><strong>1. Schema:</strong></p>
+<pre>alter table public.profiles
+    add column if not exists onboarding_completed boolean not null default false;</pre>
+<p><strong>2. Backfill (deliberately <em>not</em> "mark every existing profile completed"):</strong></p>
+<pre>update public.profiles
+set onboarding_completed = true
+where onboarding_completed = false
+  and age_range is not null
+  and gender is not null
+  and is_skin_sensitive is not null;</pre>
+<p><strong>Choice and rationale:</strong> In the shipped app the only writer of <code>age_range</code>, <code>gender</code>, and <code>is_skin_sensitive</code> is the final onboarding save, which writes them together. Their combined presence is therefore reliable evidence that the questionnaire was completed. <code>skin_type</code> is <strong>excluded</strong> from the condition because the onboarding flow lets the user tap "Skip for now", leaving it legitimately <code>null</code>. Any row missing a required answer keeps the safe default <code>false</code>, so that user is asked the onboarding questions again rather than being silently advanced past onboarding with incomplete data. A false-negative here is harmless (ask once more); a false-positive would strand a user with <code>null</code> answers.</p>
+<p><strong>3. RLS:</strong> unchanged. Adding a column does not alter existing policies; the per-user <code>SELECT</code> / <code>INSERT</code> / <code>UPDATE</code> policies from the initial migration continue to restrict every row to <code>auth.uid() = id</code>. No new policy is required because <code>onboarding_completed</code> lives on the row the user already owns. The one-time <code>UPDATE</code> runs with migration privileges server-side — never from the client, and never with a service-role key embedded in the Android app.</p>
+<p><strong>4. Forward / backward safety:</strong> If the app runs before this migration is applied, <code>ProfileRow.onboarding_completed</code> deserializes to its default <code>false</code> (Kotlinx serialization default + Supabase's <code>ignoreUnknownKeys</code>), so nothing crashes and every user is simply treated as "not yet completed" — the safe direction.</p>
+</div>
+
+<div class="sec">
+<h2>E. How Each Onboarding Answer Is Persisted</h2>
+<p>Answers are collected into the single app-scoped <code>OnboardingViewModel.uiState</code> (<code>OnboardingUiState</code>) as the user moves through the existing screens:</p>
+<table>
+<tr><th>Screen (unchanged UI)</th><th>Callback</th><th><code>OnboardingUiState</code> field</th><th>Column</th></tr>
+<tr><td><code>AgeSelectionScreen</code></td><td><code>setAge(String)</code></td><td><code>ageRange</code></td><td><code>age_range</code></td></tr>
+<tr><td><code>SkinTypeScreen</code> (incl. "Skip for now" &rarr; <code>null</code>)</td><td><code>setSkinType(String?)</code></td><td><code>skinType</code></td><td><code>skin_type</code></td></tr>
+<tr><td><code>GenderSelectionScreen</code></td><td><code>setGender(String)</code></td><td><code>gender</code></td><td><code>gender</code></td></tr>
+<tr><td><code>SkinSensitivityScreen</code> (final question)</td><td><code>setSensitivityAndSave(Boolean)</code></td><td><code>isSkinSensitive</code>, then triggers <code>save()</code></td><td><code>is_skin_sensitive</code></td></tr>
+<tr><td>(from signup / provider metadata)</td><td><code>start(name)</code></td><td><code>fullName</code></td><td><code>full_name</code></td></tr>
+</table>
+<p><code>save()</code> builds <strong>one</strong> <code>UserProfile(id = currentUserId(), fullName, ageRange, skinType, gender, isSkinSensitive, onboardingCompleted = true)</code> and calls <code>profileRepository.saveProfile(...)</code>.</p>
+<p><code>SupabaseProfileRepository.saveProfile</code> performs a single <code>client.postgrest["profiles"].upsert(profile.toProfileRow())</code> — an upsert on primary key <code>id</code>, writing <code>full_name, age_range, skin_type, gender, is_skin_sensitive, onboarding_completed</code> (<code>created_at</code> / <code>updated_at</code> are DB-managed).</p>
+<p>On <code>onFailure</code>: <code>errorMessage</code> is set, <code>isSaving = false</code>, <code>saveCompleted</code> stays <code>false</code>, no navigation. On <code>onSuccess</code>: <code>saveCompleted = true</code>, which drives navigation to Welcome &rarr; Home.</p>
+<p>Data-loss items from the audit are closed: <code>full_name</code> is now populated on every entry path via <code>start()</code>, and completion is an explicit column rather than an inferred one.</p>
+</div>
+
+<div class="sec">
+<h2>F. How the Authenticated Supabase User ID Is Associated with the Profile</h2>
+<p><code>OnboardingViewModel.save()</code> calls <code>authRepository.currentUserId()</code> &rarr; <code>SupabaseAuthRepository.currentUserId()</code> &rarr; <code>client.auth.currentUserOrNull()?.id</code>.</p>
+<ul>
+  <li>If it is <code>null</code>, <code>save()</code> sets <code>errorMessage = "Your session is no longer active."</code> and <strong>returns without calling the repository</strong> — no persistence.</li>
+  <li>Otherwise that id is <code>UserProfile.id</code> &rarr; <code>ProfileRow.id</code> &rarr; the upsert's primary key.</li>
+</ul>
+<p>The UI layer never supplies, and cannot override, an id — screens only pass answer values through typed callbacks. Server-side, RLS <code>with check ((select auth.uid()) = id)</code> rejects any insert / update whose row id is not the caller's own. <code>ProfileViewModel.refresh()</code> likewise reads <code>authRepository.currentUserId()</code> itself and never accepts an id from a screen.</p>
+</div>
+
+<div class="sec">
+<h2>G. How Onboarding Completion Is Now Determined</h2>
+<p><code>SupabaseProfileRepository.hasCompletedOnboarding(userId)</code>:</p>
+<pre>client.postgrest["profiles"]
+    .select { filter { eq("id", userId) } }
+    .decodeList&lt;ProfileRow&gt;()
+    .isOnboardingCompleted()          // firstOrNull()?.onboarding_completed == true</pre>
+<p>A row that exists with <code>onboarding_completed = false</code> returns <strong><code>false</code></strong>. No row returns <code>false</code>. <code>AuthViewModel.determineDestination()</code> (unchanged) consumes this <code>Result&lt;Boolean&gt;</code> to choose <code>HOME</code> vs <code>ONBOARDING</code>, and it is evaluated both at startup (<code>startupDestination</code>) and on a fresh <code>AUTHENTICATED</code> transition (<code>AuthEvent.SignedIn(destination)</code>). The decision rule is a pure <code>internal</code> function so it is unit-tested directly without a Supabase client.</p>
+</div>
+
+<div class="sec">
+<h2>H. How Manual-Signup and Google Display Names Are Handled</h2>
+<ul>
+  <li><strong>Manual email signup:</strong> <code>SignUpScreen</code> &rarr; <code>AuthViewModel.signUp(fullName, …)</code> &rarr; <code>AuthEvent.SignedUp(fullName)</code> &rarr; <code>WeGlowApp</code> calls <code>onboardingViewModel.start(event.fullName)</code>. The trimmed, validated, non-blank name goes into <code>OnboardingUiState.fullName</code> and is persisted to <code>profiles.full_name</code> by the final save. Supabase email signup writes no user metadata, so the metadata fallback cannot override it. This path is unchanged except that <code>start</code> is now null-safe.</li>
+  <li><strong>Email sign-in of an incomplete user / Google new-or-incomplete user / restored session into onboarding:</strong> <code>WeGlowApp</code> now calls <code>onboardingViewModel.start()</code> (no argument) at each of these entries. <code>start()</code> first wipes any prior <code>OnboardingUiState</code>, then resolves the name from <code>authRepository.currentUserDisplayName()</code> &rarr; <code>SupabaseAuthRepository</code> reads <code>userMetadata</code> keys <code>full_name</code> &rarr; <code>name</code> &rarr; <code>user_name</code> &rarr; <code>preferred_username</code>, first non-blank wins (Google populates <code>full_name</code> / <code>name</code>). If nothing usable exists, <code>fullName</code> is <code>""</code> and persists as <code>null</code>.</li>
+  <li><strong>No invented names.</strong> The name is only ever a value the user typed at signup or a value the identity provider returned.</li>
+  <li>The resolved name is persisted to <code>profiles.full_name</code> as part of the same successful onboarding upsert.</li>
+</ul>
+</div>
+
+<div class="sec">
+<h2>I. How Home / Profile Obtain the Real User's Name</h2>
+<p>New <code>ProfileViewModel</code> (constructed in <code>WeGlowApp</code> via the existing <code>viewModelFactory</code> helper from <code>container.authRepository</code> + <code>container.profileRepository</code>; <code>AppContainer</code> needed no change — it already exposes both).</p>
+<p><code>WeGlowApp</code> runs <code>LaunchedEffect(Unit) { profileViewModel.refresh() }</code> when the Home and Profile destinations are entered. <code>refresh()</code>:</p>
+<ol>
+  <li><code>authRepository.currentUserId()</code> — if <code>null</code>, clears state so the neutral fallback shows.</li>
+  <li><code>profileRepository.getProfile(userId)</code> &rarr; <code>SupabaseProfileRepository</code> &rarr; <code>select … decodeList&lt;ProfileRow&gt;().firstOrNull()?.toUserProfile()</code>.</li>
+  <li><code>displayName = persistedProfile.fullName?.trim()?.takeIf { it.isNotBlank() } ?: authRepository.currentUserDisplayName()?.trim()?.takeIf { it.isNotBlank() }</code>.</li>
+</ol>
+<p><code>WeGlowApp</code> passes <code>profileState.displayName</code> into <code>HomeScreen(displayName = …)</code> and <code>ProfileScreen(displayName = …)</code>.</p>
+<ul>
+  <li>Home: <code>displayName?.let { "Hello, $it" } ?: "Hello there"</code>.</li>
+  <li>Profile: <code>displayName ?: "Your Profile"</code>.</li>
+</ul>
+<p>Both are neutral fallbacks — no fabricated user data. No Supabase import enters <code>feature/</code> or <code>ui/</code>. Figma layout, spacing, styling, navigation, and other functionality of both screens are untouched. No profile-photo upload (Phase 6).</p>
+</div>
+
+<div class="sec">
+<h2>J. Tests Added / Updated and What They Verify</h2>
+
+<h3><code>OnboardingViewModelTest.kt</code> (rewritten; fakes now satisfy the full Phase 4 <code>AuthRepository</code> + new members)</h3>
+<table>
+<tr><th>Test</th><th>Verifies (maps to the requested list)</th></tr>
+<tr><td><code>finalAnswer_savesAllAnswersForSignedInUser</code></td><td>All four answers <strong>+ <code>id = currentUserId()</code> + <code>onboardingCompleted = true</code></strong> in the saved <code>UserProfile</code>; <code>saveCompleted = true</code>; <code>isSaving = false</code>. &rarr; (1)(2)(3)</td></tr>
+<tr><td><code>successfulSave_marksOnboardingCompletedAndSaveCompleted</code></td><td><code>onboardingCompleted = true</code> persisted; a skipped skin type stays <code>null</code>; <code>saveCompleted = true</code>; no error. &rarr; (2)(3)</td></tr>
+<tr><td><code>failedSave_doesNotProduceSaveCompleted</code></td><td>Repository returns <code>Result.failure</code> &rarr; <code>saveCompleted = false</code>, <code>isSaving = false</code>, <code>errorMessage</code> retained; the attempted payload still carried <code>onboardingCompleted = true</code> (completion is only "real" once persisted). &rarr; (4)</td></tr>
+<tr><td><code>missingAuthenticatedUser_doesNotSave</code></td><td><code>currentUserId() == null</code> &rarr; repository never invoked, <code>saveCompleted = false</code>, error set. &rarr; (5)</td></tr>
+<tr><td><code>start_withoutManualName_usesAuthenticatedDisplayName</code></td><td><code>start()</code> with no arg pulls <code>"Google Person"</code> from provider metadata into the persisted <code>full_name</code>. &rarr; (H)</td></tr>
+<tr><td><code>start_withoutNameOrMetadata_persistsNullName</code></td><td>No name anywhere &rarr; <code>full_name</code> persists as <code>null</code>, never invented. &rarr; (H)</td></tr>
+<tr><td><code>start_clearsStaleAnswersFromPreviousAttempt</code></td><td>A second <code>start("Second User")</code> wipes prior age / skin / gender / sensitivity and <code>saveCompleted</code>. &rarr; identity-leak safety</td></tr>
+</table>
+
+<h3><code>SupabaseProfileRepositoryTest.kt</code> (new; pure — no Supabase client needed)</h3>
+<table>
+<tr><th>Test</th><th>Verifies</th></tr>
+<tr><td><code>noRow_isNotCompleted</code></td><td>Empty result &rarr; <code>false</code>.</td></tr>
+<tr><td><code>rowExistsButFlagFalse_isNotCompleted</code></td><td>A fully-populated row with <code>onboarding_completed = false</code> &rarr; <strong><code>false</code></strong>. Directly proves completion is decided by the flag, not by row existence. &rarr; (6)</td></tr>
+<tr><td><code>rowWithFlagTrue_isCompleted</code></td><td>Flag <code>true</code> &rarr; <code>true</code>.</td></tr>
+<tr><td><code>profileRow_mapsToUserProfile</code></td><td>Field-by-field <code>ProfileRow</code> &rarr; <code>UserProfile</code> mapping including the new flag. &rarr; (7)</td></tr>
+<tr><td><code>userProfile_roundTripsThroughProfileRow</code></td><td><code>toProfileRow().toUserProfile()</code> is identity. &rarr; (7)</td></tr>
+<tr><td><code>defaultProfileRow_isNotCompleted</code></td><td>Defaults are safe (<code>skin_type</code> null, flag false).</td></tr>
+</table>
+
+<h3><code>AuthViewModelTest.kt</code></h3>
+<ul>
+  <li>Compile fixes for the new interface members on both fakes; <code>FakeProfileRepository</code> can hold a <code>storedProfile</code> and derives completion from it.</li>
+  <li><strong>Added</strong> <code>restoredSession_withProfileRowButIncompleteOnboarding_routesToOnboarding</code> — a stored profile row with <code>onboardingCompleted = false</code> routes a restored session to <code>ONBOARDING</code> (behavioral coverage of (6) through <code>determineDestination</code>).</li>
+  <li>All 8 pre-existing tests retained and pass (9 total).</li>
+</ul>
+
+<h3><code>ArchitectureFoundationTest.kt</code></h3>
+<ul><li>All original assertions kept; one assertion added for <code>onboarding_completed</code> mapping.</li></ul>
+<p>No valid existing test was removed to make the build green.</p>
+</div>
+
+<div class="sec">
+<h2>K. Exact Result of <code>./gradlew clean architectureCheck testDebugUnitTest lintDebug assembleDebug</code></h2>
+<p>Run with <code>export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"</code> (system <code>java</code> is not on PATH on this Mac).</p>
+<p>Per-task outcome (captured with <code>--continue</code> so every task executed):</p>
+<pre>&gt; Task :app:architectureCheck            SUCCESS
+&gt; Task :app:compileDebugKotlin           SUCCESS   (pre-existing deprecation warnings only, in ScanScreen.kt / ScanResultScreen.kt — not touched)
+&gt; Task :app:compileDebugUnitTestKotlin   SUCCESS   (previously did not compile; audit blocker B4 fixed)
+&gt; Task :app:assembleDebug                SUCCESS   -&gt; app/build/outputs/apk/debug/app-debug.apk written
+&gt; Task :app:lintDebug                    SUCCESS   -&gt; lint-results-debug: 0 errors, 87 warnings (all pre-existing; 0 in any Phase 5 file)
+&gt; Task :app:testDebugUnitTest            FAILED    -&gt; 34 tests completed, 1 failed
+
+BUILD FAILED     (solely because of the single failing test below)</pre>
+<p>Per-suite unit-test results:</p>
+<table>
+<tr><th>Suite</th><th>Result</th></tr>
+<tr><td><code>feature.onboarding.OnboardingViewModelTest</code></td><td class="status-pass">7 / 7 pass</td></tr>
+<tr><td><code>data.repository.SupabaseProfileRepositoryTest</code></td><td class="status-pass">6 / 6 pass</td></tr>
+<tr><td><code>feature.auth.AuthViewModelTest</code></td><td class="status-pass">9 / 9 pass</td></tr>
+<tr><td><code>ArchitectureFoundationTest</code></td><td class="status-pass">1 / 1 pass</td></tr>
+<tr><td><code>feature.scan.ScanViewModelTest</code></td><td class="status-pass">3 / 3 pass</td></tr>
+<tr><td><code>data.scan.BundledAcneModelTest</code></td><td class="status-pass">1 / 1 pass</td></tr>
+<tr><td><code>ExampleUnitTest</code></td><td class="status-pass">1 / 1 pass</td></tr>
+<tr><td><code>data.scan.YoloPostProcessorTest</code></td><td class="status-fail">5 / 6 pass — 1 failure</td></tr>
+</table>
+<p>Failing test: <code>com.example.weglow.data.scan.YoloPostProcessorTest &gt; ignoresBelowThresholdInvalidAndPaddingOnlyDetections</code> — <code>java.lang.AssertionError</code> at <code>YoloPostProcessorTest.kt:37</code> (<code>assertTrue(detections.isEmpty())</code>).</p>
+<p><strong>A full PASS is not claimed.</strong> Every Phase 5 / onboarding / auth / profile / mapping check passes; <code>architectureCheck</code>, <code>lintDebug</code>, and <code>assembleDebug</code> pass; the overall command exits non-zero because of the one scan test described in section M.</p>
+</div>
+
+<div class="sec">
+<h2>L. What You Must Do Manually in the Supabase Dashboard</h2>
+<ol>
+  <li><strong>Apply the new migration</strong> <code>supabase/migrations/20260910000000_add_onboarding_completed.sql</code> to your project — either <code>supabase db push</code>, or open the SQL Editor and run the file's contents. It adds the <code>onboarding_completed</code> column, runs the conservative backfill, and leaves RLS unchanged.</li>
+  <li>Nothing else is required: no policy edits, no table changes, no dashboard configuration, no keys. Do <strong>not</strong> add a service-role key to the Android app.</li>
+  <li>Optional, for Google display names to populate <code>full_name</code>: confirm your Google OAuth provider returns the basic profile scope (Supabase's default Google setup already does), so <code>user_metadata.full_name</code> / <code>name</code> is present on the session.</li>
+</ol>
+</div>
+
+<div class="sec">
+<h2>M. Remaining True Blocker</h2>
+<p><strong><code>YoloPostProcessorTest.ignoresBelowThresholdInvalidAndPaddingOnlyDetections</code> fails — pre-existing, in teammate scan code, not caused by Phase 5, and outside the scope the instructions forbid modifying.</strong></p>
+<ul>
+  <li><code>app/src/main/java/com/example/weglow/data/scan/YoloPostProcessor.kt</code> was last changed in commit <code>7b4b8bb</code> ("Show low-confidence detections without confidence labels"), which deliberately changed low-confidence detection handling. <code>app/src/test/java/com/example/weglow/data/scan/YoloPostProcessorTest.kt</code> was last changed in the earlier commit <code>945ec34</code>; its expectation (<code>detections.isEmpty()</code> for an anchor whose class score is exactly <code>0.25</code>) was never updated to match the new processor behavior.</li>
+  <li>The failure was <strong>masked</strong> until now: on a clean checkout the unit-test source set does not compile, because <code>OnboardingViewModelTest</code>'s fake <code>AuthRepository</code> was missing <code>authenticationState</code> and <code>signInWithGoogle</code> (audit blocker B4). With no compilation, <code>testDebugUnitTest</code> never executed a single test. Phase 5 repaired that compile blocker, which is why this stale scan test is now visible and running.</li>
+  <li>Per the constraints (do not modify the acne detection / model / scan implementation unless a <em>compile</em> error is caused by Phase 5; do not refactor teammate scan systems; preserve all scan work; do not hide failing tests), both <code>YoloPostProcessor.kt</code> and <code>YoloPostProcessorTest.kt</code> were left untouched and the failure is reported here.</li>
+  <li>The fix is one line and belongs to the scan feature owner — either update the test's <code>assertTrue(detections.isEmpty())</code> expectation to match the intended low-confidence behavior, or re-introduce the sub-threshold filter in <code>YoloPostProcessor.decode</code>. Until then, <code>./gradlew … testDebugUnitTest …</code> will exit non-zero on this single test while all Phase 5 verification passes.</li>
+</ul>
+<p>No other blockers. No accidental or unrelated modifications are present in the working tree — <code>git status</code> shows only the files listed in sections B and C.</p>
+</div>
+
+</body>
+</html>
