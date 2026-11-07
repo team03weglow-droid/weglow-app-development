@@ -1,6 +1,11 @@
 package com.example.weglow.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,6 +19,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -44,12 +54,16 @@ fun WeGlowPrimaryButton(
     enabled: Boolean = true,
     loading: Boolean = false,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, tween(140), label = "Button press")
     Button(
         onClick = onClick,
+        interactionSource = interactionSource,
         enabled = enabled && !loading,
         colors = ButtonDefaults.buttonColors(containerColor = ButtonGreen, contentColor = Color.White),
         shape = RoundedCornerShape(WeGlowRadius.pill),
-        modifier = modifier.fillMaxWidth().height(WeGlowSize.buttonHeight),
+        modifier = modifier.fillMaxWidth().heightIn(min = WeGlowSize.buttonHeight).graphicsLayer { scaleX = scale; scaleY = scale },
     ) {
         if (loading) {
             CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp, color = Color.White)
@@ -71,7 +85,7 @@ fun WeGlowSecondaryButton(
         enabled = enabled,
         shape = RoundedCornerShape(WeGlowRadius.pill),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = ButtonGreen),
-        modifier = modifier.fillMaxWidth().height(WeGlowSize.buttonHeight),
+        modifier = modifier.fillMaxWidth().heightIn(min = WeGlowSize.buttonHeight),
     ) { Text(text, style = MaterialTheme.typography.labelLarge) }
 }
 
@@ -105,7 +119,8 @@ fun WeGlowTextField(
             focusedBorderColor = ButtonGreen.copy(alpha = 0.45f),
             disabledBorderColor = Color.Transparent,
         ),
-        modifier = modifier.fillMaxWidth().height(WeGlowSize.fieldHeight),
+        modifier = modifier.fillMaxWidth().heightIn(min = WeGlowSize.fieldHeight)
+            .semantics { contentDescription = placeholder },
     )
 }
 
@@ -149,7 +164,7 @@ fun WeGlowCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.(
 
 @Composable
 fun WeGlowLoadingView(message: String = "Loading…", modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth().padding(WeGlowSpacing.lg), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier = modifier.fillMaxWidth().padding(WeGlowSpacing.lg).semantics { liveRegion = LiveRegionMode.Polite }, horizontalAlignment = Alignment.CenterHorizontally) {
         CircularProgressIndicator(color = ButtonGreen)
         Spacer(Modifier.height(WeGlowSpacing.sm))
         Text(message, style = MaterialTheme.typography.bodyMedium, color = SoftGray)
@@ -159,7 +174,8 @@ fun WeGlowLoadingView(message: String = "Loading…", modifier: Modifier = Modif
 @Composable
 fun WeGlowErrorView(message: String, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null) {
     Column(modifier = modifier.fillMaxWidth().padding(WeGlowSpacing.md), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { error(message); liveRegion = LiveRegionMode.Polite })
         if (onRetry != null) {
             Spacer(Modifier.height(WeGlowSpacing.sm))
             WeGlowSecondaryButton("Try again", onRetry)

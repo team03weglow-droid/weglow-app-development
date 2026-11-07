@@ -30,7 +30,7 @@ object SupabaseClientProvider {
 
             install(Auth) {
                 flowType = FlowType.PKCE
-                scheme = "weglow"
+                scheme = AppConfig.authScheme
                 host = "login-callback"
             }
         }

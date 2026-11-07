@@ -1,5 +1,9 @@
 package com.example.weglow.ui.screens
 
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -74,7 +78,7 @@ fun SkinTypeScreen(onNext: (String) -> Unit, onSkip: () -> Unit) {
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(modifier = Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SKIN_TYPES.chunked(columnCount).forEach { rowItems ->
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     rowItems.forEach { option ->
@@ -88,7 +92,7 @@ fun SkinTypeScreen(onNext: (String) -> Unit, onSkip: () -> Unit) {
                                     if (isSelected) Modifier.border(2.dp, DarkGreen, RoundedCornerShape(16.dp))
                                     else Modifier
                                 )
-                                .clickable { selected = option.label }
+                                .selectable(selected = isSelected, role = Role.RadioButton, onClick = { selected = option.label })
                         ) {
                             Box(
                                 modifier = Modifier
@@ -132,7 +136,7 @@ fun SkinTypeScreen(onNext: (String) -> Unit, onSkip: () -> Unit) {
             enabled = selected != null,
             colors = ButtonDefaults.buttonColors(containerColor = DarkGreen, contentColor = Color.White),
             shape = RoundedCornerShape(999.dp),
-            modifier = Modifier.fillMaxWidth().height(58.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp)
         ) {
             Text("Next Step  →", style = MaterialTheme.typography.bodyLarge)
         }

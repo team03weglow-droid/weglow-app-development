@@ -1,5 +1,7 @@
 package com.example.weglow.ui.components
 
+import com.example.weglow.core.config.AppConfig
+
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.ButtonDefaults
@@ -15,6 +17,7 @@ import com.example.weglow.ui.theme.SoftGray
 /** Keeps planned integrations discoverable without suggesting that they already work. */
 @Composable
 fun WeGlowPlannedFeature(label: String, modifier: Modifier = Modifier) {
+    if (!AppConfig.demoFeaturesEnabled) return
     OutlinedButton(
         onClick = {},
         enabled = false,

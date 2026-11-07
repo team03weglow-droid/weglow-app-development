@@ -5,6 +5,9 @@ import com.example.weglow.ui.components.WeGlowOnboardingLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -69,7 +72,7 @@ fun AgeSelectionScreen(onContinue: (String) -> Unit) {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "You must be at least 14 years old to use WeGlow.",
+            text = "You must be at least 18 years old to use WeGlow.",
             style = MaterialTheme.typography.bodySmall,
             color = SoftGray,
             textAlign = TextAlign.Center,
@@ -78,7 +81,7 @@ fun AgeSelectionScreen(onContinue: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(36.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(modifier = Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             AgeRange.OPTIONS.forEach { option ->
                 val isSelected = option == selected
                 Row(
@@ -94,7 +97,7 @@ fun AgeSelectionScreen(onContinue: (String) -> Unit) {
                             if (isSelected) Modifier.border(1.5.dp, DarkGreen, RoundedCornerShape(16.dp))
                             else Modifier
                         )
-                        .clickable { selected = option }
+                        .selectable(selected = isSelected, role = Role.RadioButton, onClick = { selected = option })
                         .padding(horizontal = 20.dp, vertical = 18.dp)
                 ) {
                     Text(option, style = MaterialTheme.typography.titleMedium, color = DarkGreen)
@@ -116,7 +119,7 @@ fun AgeSelectionScreen(onContinue: (String) -> Unit) {
             shape = RoundedCornerShape(999.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp)
+                .heightIn(min = 58.dp)
         ) {
             Text("Continue", style = MaterialTheme.typography.labelLarge)
         }

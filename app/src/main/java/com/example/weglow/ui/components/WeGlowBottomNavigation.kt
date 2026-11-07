@@ -2,6 +2,11 @@ package com.example.weglow.ui.components
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -19,10 +24,11 @@ fun WeGlowBottomNavigation(
     NavigationBar(containerColor = com.example.weglow.ui.theme.PageBackground) {
         items.forEach { item ->
             val selected = selectedRoute == item.route
+            val scale by animateFloatAsState(if (selected) 1.12f else 1f, tween(220), label = "Selected tab")
             NavigationBarItem(
                 selected = selected,
                 onClick = { onSelect(item) },
-                icon = { Icon(item.icon, contentDescription = item.label) },
+                icon = { Icon(item.icon, contentDescription = null, modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }) },
                 label = {
                     Text(
                         item.label,

@@ -1,5 +1,7 @@
 package com.example.weglow.navigation
 
+import com.example.weglow.core.config.AppConfig
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -60,11 +62,14 @@ import com.example.weglow.ui.theme.DarkGreen
 
 private val tabs = listOf(
     WeGlowNavItem(Destination.Home.route, "Home", Icons.Default.Home),
-    WeGlowNavItem(Destination.Discover.route, "Discover", Icons.Default.Explore),
     WeGlowNavItem(Destination.Scan.route, "Scan", Icons.Default.CameraAlt),
     WeGlowNavItem(Destination.Routines.route, "Routines", Icons.Default.Spa),
     WeGlowNavItem(Destination.Profile.route, "Profile", Icons.Default.Person),
-)
+).let { items ->
+    if (AppConfig.commerceEnabled) items.toMutableList().apply {
+        add(1, WeGlowNavItem(Destination.Discover.route, "Discover", Icons.Default.Explore))
+    } else items
+}
 
 @Composable
 fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit = {}) {
@@ -171,6 +176,13 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
         }
     )
 
+    val progressViewModel: com.example.weglow.feature.progress.ProgressViewModel = viewModel(
+        factory = viewModelFactory {
+            com.example.weglow.feature.progress.ProgressViewModel(container.progressRepository, container.authRepository)
+        }
+    )
+    val progressState by progressViewModel.uiState.collectAsState()
+
     val savedProductsViewModel: SavedProductsViewModel = viewModel(
         factory = viewModelFactory {
             SavedProductsViewModel(
@@ -201,6 +213,12 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
     )
 
     val environmentState by environmentViewModel.uiState.collectAsState()
+    var weatherLocationRequested by remember { mutableStateOf(false) }
+    val weatherLocationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        environmentViewModel.refresh(context.hasWeatherLocationPermission())
+    }
 
     val uvAlertNotifier = remember { UvAlertNotifier(context) }
 
@@ -216,17 +234,6 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
                 ?.environment
                 ?.let(uvAlertNotifier::notifyIfHigh)
         }
-    }
-
-    var hasLocationPermission by remember {
-        mutableStateOf(context.hasEnvironmentLocationPermission())
-    }
-
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) {
-        hasLocationPermission = context.hasEnvironmentLocationPermission()
-        environmentViewModel.refresh(hasLocationPermission)
     }
 
     val journalState by journalViewModel.uiState.collectAsState()
@@ -247,6 +254,18 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
     val routineState by routineViewModel.uiState.collectAsState()
     val savedProductsState by savedProductsViewModel.uiState.collectAsState()
     val cartState by cartViewModel.uiState.collectAsState()
+
+    LaunchedEffect(routineState.plan, scanState.saveState) {
+        if (routineState.plan != null || scanState.saveState is com.example.weglow.feature.scan.ScanSaveState.Saved) {
+            progressViewModel.refresh(routineState.plan)
+        }
+    }
+    LaunchedEffect(progressViewModel) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            progressViewModel.updateDueTimes()
+        }
+    }
 
     LaunchedEffect(recoveryLink, authState.isLoading) {
         recoveryLink?.takeIf { !authState.isLoading }?.let {
@@ -318,6 +337,7 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
             profileViewModel.clear()
             recommendationViewModel.clear()
             routineViewModel.clear()
+            progressViewModel.clear()
             onboardingViewModel.clear()
             environmentViewModel.clear()
 
@@ -399,7 +419,7 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = backStackEntry?.destination?.route
 
-            if (currentRoute == Destination.Home.route) {
+            if (currentRoute == Destination.Home.route && AppConfig.demoFeaturesEnabled) {
 
                 FloatingActionButton(
                     onClick = { showChatComingSoon = true },
@@ -420,6 +440,10 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
         NavHost(
             navController = navController,
             startDestination = Destination.Loading.route,
+            enterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(240)) },
+            exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) },
+            popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(240)) },
+            popExitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) },
             modifier = Modifier.padding(padding),
         ) {
 
@@ -581,24 +605,36 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
 
                     val event = authState.event
 
-                    if (event is AuthEvent.SignedUp) {
-
-                        onboardingViewModel.start(
-                            event.fullName
-                        )
-
-                        navController.navigate(
-                            Destination.AgeSelection.route
-                        ) {
-
-                            popUpTo(Destination.Login.route) {
-                                inclusive = true
+                    when (event) {
+                        AuthEvent.ConfirmationRequired -> {
+                            navController.navigate(Destination.Login.route) {
+                                popUpTo(Destination.Login.route) { inclusive = true }
+                                launchSingleTop = true
                             }
-
-                            launchSingleTop = true
+                            authViewModel.consumeEvent()
                         }
-
-                        authViewModel.consumeEvent()
+                        is AuthEvent.SignedUp -> {
+                            onboardingViewModel.start(event.fullName)
+                            navController.navigate(Destination.AgeSelection.route) {
+                                popUpTo(Destination.Login.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                            authViewModel.consumeEvent()
+                        }
+                        is AuthEvent.SignedIn -> {
+                            // Confirmation may return to the app while Signup is
+                            // still visible. Handle the established session here too.
+                            val target = if (event.destination == StartupDestination.HOME) Destination.Home else {
+                                onboardingViewModel.start()
+                                Destination.AgeSelection
+                            }
+                            navController.navigate(target.route) {
+                                popUpTo(Destination.Login.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                            authViewModel.consumeEvent()
+                        }
+                        else -> Unit
                     }
                 }
             }
@@ -730,12 +766,9 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
 
                             if (event == Lifecycle.Event.ON_RESUME) {
 
-                                hasLocationPermission =
-                                    context.hasEnvironmentLocationPermission()
+                                progressViewModel.refresh(routineState.plan)
 
-                                if (hasLocationPermission) {
-                                    environmentViewModel.refresh(true)
-                                }
+                                environmentViewModel.refresh(context.hasWeatherLocationPermission())
                             }
                         }
 
@@ -750,16 +783,16 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
 
                     profileViewModel.refresh()
                     routineViewModel.load()
+                    progressViewModel.refresh(routineState.plan)
 
-                    if (hasLocationPermission) {
-                        environmentViewModel.refresh(true)
-                    } else {
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                            )
-                        )
+                    val locationAllowed = context.hasWeatherLocationPermission()
+                    environmentViewModel.refresh(locationAllowed)
+                    if (!locationAllowed && !weatherLocationRequested) {
+                        weatherLocationRequested = true
+                        weatherLocationLauncher.launch(arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        ))
                     }
                 }
 
@@ -769,32 +802,30 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
                     environmentState = environmentState,
 
                     onEnvironmentRetry = {
-
-                        if (hasLocationPermission) {
-                            environmentViewModel.refresh(true)
-                        } else {
-                            locationPermissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                                )
-                            )
+                        val locationAllowed = context.hasWeatherLocationPermission()
+                        environmentViewModel.refresh(locationAllowed)
+                        if (!locationAllowed) {
+                            weatherLocationRequested = true
+                            weatherLocationLauncher.launch(arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            ))
                         }
                     },
 
                     profileImage = profileState.profileImage,
 
                     morningRoutine =
-                        routineState.plan?.morning.orEmpty(),
+                        progressState.planOn(java.time.LocalDate.now())?.morning.orEmpty(),
 
                     eveningRoutine =
-                        routineState.plan?.evening.orEmpty(),
+                        progressState.planOn(java.time.LocalDate.now())?.evening.orEmpty(),
 
                     isRoutineLoading =
-                        routineState.isLoading,
+                        routineState.isLoading || progressState.loading,
 
                     routineError =
-                        journalState.errorMessage
+                        progressState.error ?: journalState.errorMessage
                             ?: routineState.errorMessage,
 
                     onProfileClick = {
@@ -824,10 +855,12 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
                     },
 
                     completedRoutineKeys =
-                        journalState.completedKeys,
+                        progressState.completedKeys,
 
-                    onToggleRoutineStep =
-                        journalViewModel::toggleCompletion,
+                    onSetRoutineCompletion = progressViewModel::setCompletion,
+                    completableRoutineKeys = progressState.tasksByKey.keys - progressState.pendingKeys,
+                    progressState = progressState,
+                    onProgressRetry = { progressViewModel.refresh(routineState.plan) },
 
                     onScanClick = {
 
@@ -1128,33 +1161,37 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
 
                     routineViewModel.load()
                     profileViewModel.refresh()
+                    progressViewModel.refresh(routineState.plan)
                 }
 
                 RoutinesScreen(
 
                     isLoading =
-                        routineState.isLoading,
+                        routineState.isLoading || progressState.loading,
 
                     errorMessage =
-                        routineState.errorMessage,
+                        progressState.error ?: routineState.errorMessage,
 
                     plan =
                         routineState.plan,
 
                     journal =
-                        journalState,
+                        journalState.copy(completedKeys = progressState.completedKeys),
 
                     initialMorning =
                         homeRoutineMorning,
 
-                    onToggleRoutineStep =
-                        journalViewModel::toggleCompletion,
+                    onSetRoutineCompletion = progressViewModel::setCompletion,
+                    completableRoutineKeys = progressState.tasksByKey.keys - progressState.pendingKeys,
+                    planOnDate = progressState::planOn,
 
                     onSaveNote =
                         journalViewModel::saveNote,
 
-                    onRetry =
-                        routineViewModel::load,
+                    onRetry = {
+                        routineViewModel.load()
+                        progressViewModel.refresh(routineState.plan)
+                    },
 
                     displayName =
                         profileState.displayName,
@@ -1403,12 +1440,6 @@ fun WeGlowApp(recoveryLink: String? = null, onRecoveryLinkConsumed: () -> Unit =
     }
 }
 
-private fun android.content.Context.hasEnvironmentLocationPermission(): Boolean =
-    ContextCompat.checkSelfPermission(
-        this,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+private fun android.content.Context.hasWeatherLocationPermission(): Boolean =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED

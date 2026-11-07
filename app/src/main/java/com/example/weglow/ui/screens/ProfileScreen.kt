@@ -1,5 +1,7 @@
 package com.example.weglow.ui.screens
 
+import com.example.weglow.core.config.AppConfig
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -369,13 +371,17 @@ fun ProfileScreen(
             ) {
                 SettingsRow(icon = Icons.Default.Settings, label = "Account Settings", onClick = onAccountSettingsClick)
                 HorizontalDivider(color = TrackGray)
-                SettingsRow(icon = Icons.Default.BookmarkBorder, label = "Saved Products", onClick = onSavedProductsClick)
-                HorizontalDivider(color = TrackGray)
+                if (AppConfig.commerceEnabled) {
+                    SettingsRow(icon = Icons.Default.BookmarkBorder, label = "Saved Products", onClick = onSavedProductsClick)
+                    HorizontalDivider(color = TrackGray)
+                }
                 SettingsRow(icon = Icons.Default.CameraAlt, label = "Analyze skin", onClick = onScanClick)
-                HorizontalDivider(color = TrackGray)
-                SettingsRow(icon = Icons.Default.FavoriteBorder, label = "Recommendations", onClick = onRecommendationsClick)
-                HorizontalDivider(color = TrackGray)
-                SettingsRow(icon = Icons.Default.ShoppingBag, label = "Discover products", onClick = onDiscoverClick)
+                if (AppConfig.commerceEnabled) {
+                    HorizontalDivider(color = TrackGray)
+                    SettingsRow(icon = Icons.Default.FavoriteBorder, label = "Recommendations", onClick = onRecommendationsClick)
+                    HorizontalDivider(color = TrackGray)
+                    SettingsRow(icon = Icons.Default.ShoppingBag, label = "Discover products", onClick = onDiscoverClick)
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))

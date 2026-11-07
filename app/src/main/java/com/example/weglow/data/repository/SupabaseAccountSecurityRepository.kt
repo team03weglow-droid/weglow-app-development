@@ -28,7 +28,7 @@ class SupabaseAccountSecurityRepository(
     private var recoveryRefreshToken: String? = null
 
     override suspend fun requestPasswordRecovery(email: String): Result<Unit> = runCatching {
-        client.auth.resetPasswordForEmail(email, redirectUrl = "weglow://password-reset")
+        client.auth.resetPasswordForEmail(email, redirectUrl = "${AppConfig.authScheme}://password-reset")
     }
 
     override suspend fun verifyPasswordRecovery(tokenHash: String): Result<Unit> = runCatching {

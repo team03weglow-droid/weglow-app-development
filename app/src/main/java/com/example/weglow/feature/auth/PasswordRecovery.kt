@@ -1,5 +1,7 @@
 package com.example.weglow.feature.auth
 
+import com.example.weglow.core.config.AppConfig
+
 import java.net.URI
 
 internal object PasswordRecovery {
@@ -11,7 +13,7 @@ internal object PasswordRecovery {
     fun tokenHash(link: String): String? = runCatching {
         require(link.length <= 4096)
         val uri = URI(link)
-        require(uri.scheme == "weglow" && uri.rawAuthority == "password-reset")
+        require(uri.scheme == AppConfig.authScheme && uri.rawAuthority == "password-reset")
         require(uri.rawPath.isNullOrEmpty() && uri.rawFragment == null)
         val pairs = uri.rawQuery.orEmpty().split('&').map { it.split('=', limit = 2) }
         require(pairs.size == 2 && pairs.all { it.size == 2 })

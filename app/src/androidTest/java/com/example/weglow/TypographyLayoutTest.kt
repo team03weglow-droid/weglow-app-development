@@ -86,8 +86,8 @@ class TypographyLayoutTest {
             HomeScreen({}, {}, {}, displayName = "Amaya", morningRoutine = listOf(step))
         }
         assertSingleLine("Hello, Amaya")
-        compose.onNodeWithTag("home").performScrollToNode(hasText("Find hairstyles"))
-        compose.onNodeWithText("Find hairstyles").assertIsDisplayed()
+        compose.onNodeWithTag("home").performScrollToNode(hasText("Your daily routine"))
+        compose.onNodeWithText("Your daily routine").assertIsDisplayed()
         screenshot("home-large-text")
         compose.onNodeWithTag("home").performScrollToNode(hasText(cleanser.name))
         compose.onNodeWithText(cleanser.name).assertIsDisplayed()
@@ -157,12 +157,11 @@ class TypographyLayoutTest {
 
     @Test fun homeFigmaSectionsRemainReachableWithLargeText() {
         render(fontScale = 1.3f) { HomeScreen({}, {}, {}, morningRoutine = listOf(step)) }
-        listOf("Today's Skin Environment", "WeGlow Insights", "Your progress", "Curated For You").forEachIndexed { index, title ->
+        listOf("Today's Skin Environment", "Your daily routine", "Combined Progress").forEachIndexed { index, title ->
             compose.onNodeWithTag("home").performScrollToNode(hasText(title))
             compose.onNodeWithText(title).assertIsDisplayed()
             screenshot("home-figma-section-$index")
         }
-        compose.onNodeWithText("See all guides · Coming soon").performScrollTo().assertIsNotEnabled()
     }
 
     @Test fun homeEveningUsesSeparateKeysAndOpensTheSelectedPeriod() {
